@@ -51,6 +51,24 @@ def load_data():
     # Load with MultiIndex header if multiple tickers were saved
     df = pd.read_csv(DATA_FILE, header=[0, 1], index_col=0, parse_dates=True)
     
+    # Ensure we have a valid DatetimeIndex
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+
+    # Sort index just in case
+    df.sort_index(inplace=True)
+
+    if not df.empty:
+        # Create a complete range of business days (Mon-Fri) from start to end
+        full_idx = pd.date_range(start=df.index.min(), end=df.index.max(), freq='B')
+        
+        # Reindex the DataFrame to include all business days
+        # This will introduce NaNs for missing days (e.g. holidays)
+        df = df.reindex(full_idx)
+        
+        # Forward fill missing prices (use previous day's price)
+        df.ffill(inplace=True)
+    
     _cached_data = df
     _cached_data_mtime = current_mtime
     
