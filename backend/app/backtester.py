@@ -18,7 +18,9 @@ class Portfolio:
         self.capital_gains_tax_enabled = capital_gains_tax_enabled
         self.capital_gains_tax_pct = capital_gains_tax_pct
         self.annual_realized_pnl = 0.0  # Track annual profit/loss for tax settlement
+        self.annual_realized_pnl = 0.0  # Track annual profit/loss for tax settlement
         self.loss_carryforward = []  # List of (year, remaining_loss) tuples for tax loss carryforward
+        self.margin_interest_rate_annual = 0.03 # 3% annual interest on negative cash balance
 
     def get_total_value(self, current_prices: dict) -> float:
         holdings_value = sum(self.holdings.get(t, 0) * p for t, p in current_prices.items() if t in self.holdings)
@@ -67,9 +69,11 @@ class Portfolio:
         if price <= 0: return None
         
         # Calculate quantity (whole shares only)
-        quantity = int(amount // price)
+        # Calculate quantity (whole shares only)
+        # Margin Trading: Buy 1 extra share beyond what cash allows
+        quantity = int(amount // price) + 1
         
-        if quantity == 0:
+        if quantity <= 0: # Should be at least 1 now, but safe check
             return None
 
         # Recalculate actual cost based on whole shares
@@ -194,25 +198,27 @@ class Portfolio:
         sold_performance = {}
         
         target_tickers = [t for t, s in target_tickers_with_scores]
+        target_tickers_set = set(target_tickers)
         scores_map = {t: s for t, s in target_tickers_with_scores}
         
-        # Sell all
+        # 1. Sell ONLY tickers that are NOT in the new target list
         for ticker in list(self.holdings.keys()):
-            if ticker in current_prices and not pd.isna(current_prices[ticker]):
-                price = current_prices[ticker]
-                record = self.sell_ticker(ticker, price, date, reason="rebalance")
-                if record:
-                    sold_performance[ticker] = record
+            if ticker not in target_tickers_set:
+                if ticker in current_prices and not pd.isna(current_prices[ticker]):
+                    price = current_prices[ticker]
+                    record = self.sell_ticker(ticker, price, date, reason="rebalance")
+                    if record:
+                        sold_performance[ticker] = record
         
-        # Remove 0 holdings (handled by sell_ticker but good to be safe if manual manipulation happened)
-        # self.holdings cleanup handled by sell_ticker
-
-        # Buy target tickers
+        # 2. Buy ONLY tickers that we don't own yet (from the target list)
         bought_performance = []
-        if target_tickers:
-            allocation_per_ticker = self.cash / len(target_tickers)
+        tickers_to_buy = [t for t in target_tickers if t not in self.holdings]
+        
+        if tickers_to_buy:
+             # Allocate available cash (including recent sales) among new buys
+            allocation_per_ticker = self.cash / len(tickers_to_buy)
             
-            for ticker in target_tickers:
+            for ticker in tickers_to_buy:
                 if ticker in current_prices and not pd.isna(current_prices[ticker]):
                     price = current_prices[ticker]
                     buy_record = self.buy_ticker(ticker, allocation_per_ticker, price, scores_map.get(ticker, 0.0), date)
@@ -234,6 +240,16 @@ class Portfolio:
             "total_value": total_value,
             "cash": self.cash
         })
+
+    def apply_daily_interest(self):
+        """
+        Apply daily interest if cash balance is negative (margin loan).
+        Interest is 3% annually.
+        """
+        if self.cash < 0:
+            daily_rate = self.margin_interest_rate_annual / 365.25
+            interest = abs(self.cash) * daily_rate
+            self.cash -= interest
 
 def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0):
     # Preprocessing to get Close prices only
@@ -341,6 +357,7 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
             last_rebalance_date = date
             print(f"  Portfolio Value: {portfolio.get_total_value(current_prices):.2f}")
         
+        portfolio.apply_daily_interest()
         portfolio.record_history(date, current_prices)
         prev_prices = current_prices
         
