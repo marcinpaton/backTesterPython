@@ -189,7 +189,14 @@ const ResultsDashboard = ({ results }) => {
                                     <div key={`rb-${index}`} className={`border rounded p-3 bg-white ${isStopLoss ? 'border-red-200' : 'border-blue-200'}`}>
                                         <div className={`font-semibold ${isStopLoss ? 'text-red-800 bg-red-50' : 'text-blue-800 bg-blue-50'} p-2 rounded mb-2 flex justify-between`}>
                                             <span>{isStopLoss ? 'Stop Loss Triggered' : 'Rebalancing Event'}</span>
-                                            <span>{event.date}</span>
+                                            <div className="flex gap-4">
+                                                {event.data.cash !== undefined && (
+                                                    <span className="text-sm font-normal text-gray-600">
+                                                        Cash: ${event.data.cash.toFixed(2)}
+                                                    </span>
+                                                )}
+                                                <span>{event.date}</span>
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
@@ -226,6 +233,11 @@ const ResultsDashboard = ({ results }) => {
                                                                     {score !== null && score !== undefined && (
                                                                         <span className="ml-1 text-green-600">
                                                                             ({score.toFixed(2)})
+                                                                        </span>
+                                                                    )}
+                                                                    {item.quantity && (
+                                                                        <span className="ml-1 text-gray-600 font-normal">
+                                                                            - {Math.floor(item.quantity)} shares
                                                                         </span>
                                                                     )}
                                                                 </span>

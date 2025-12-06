@@ -1,0 +1,5 @@
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+.\manage_services.ps1
+
+.\manage_services.ps1 -Action restart

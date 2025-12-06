@@ -66,19 +66,33 @@ class Portfolio:
     def buy_ticker(self, ticker, amount, price, score, date):
         if price <= 0: return None
         
-        # Calculate fee
+        # Calculate quantity (whole shares only)
+        quantity = int(amount // price)
+        
+        if quantity == 0:
+            return None
+
+        # Recalculate actual cost based on whole shares
+        actual_cost = quantity * price
+
+        # Recalculate fee based on actual cost
         fee = 0.0
         if self.transaction_fee_enabled:
             if self.transaction_fee_type == 'percentage':
-                fee = amount * (self.transaction_fee_value / 100)
+                fee = actual_cost * (self.transaction_fee_value / 100)
             else:  # fixed
                 fee = self.transaction_fee_value
         
-        quantity = amount / price
+        # Check if we have enough cash (cost + fee)
+        # Note: 'amount' was the target allocation, but we might need slightly less or more depending on fee calculation order.
+        # Here we assume 'amount' was the max we wanted to spend including fee? 
+        # Or 'amount' is raw capital allocation. 
+        # Let's stick to: we spend 'actual_cost' + 'fee'.
+        
         self.holdings[ticker] = quantity
-        self.cost_basis[ticker] = amount
+        self.cost_basis[ticker] = actual_cost
         self.entry_prices[ticker] = price
-        self.cash -= (amount + fee)
+        self.cash -= (actual_cost + fee)
         
         return {
             "ticker": ticker,
@@ -153,7 +167,8 @@ class Portfolio:
                 "remaining_losses": [(y, l) for y, l in self.loss_carryforward],
                 "tax": tax,
                 "sold": {},
-                "bought": []
+                "bought": [],
+                "cash": float(self.cash)
             })
         
         # Reset annual P&L for new year
@@ -208,7 +223,8 @@ class Portfolio:
             "date": date,
             "type": "rebalance",
             "sold": sold_performance,
-            "bought": bought_performance
+            "bought": bought_performance,
+            "cash": float(self.cash)
         })
 
     def record_history(self, date, current_prices):
@@ -303,7 +319,8 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                          "date": date,
                          "type": "stop_loss_smart" if smart_stop_loss else "stop_loss",
                          "sold": sold_performance,
-                         "bought": bought_performance
+                         "bought": bought_performance,
+                         "cash": float(self.cash)
                      })
         
         # Settle annual tax in January (before rebalancing)
