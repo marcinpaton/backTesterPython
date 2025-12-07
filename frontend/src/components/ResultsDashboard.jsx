@@ -226,6 +226,7 @@ const ResultsDashboard = ({ results }) => {
                                                             // Handle both old format (string) and new format (object)
                                                             const ticker = typeof item === 'string' ? item : item.ticker;
                                                             const score = typeof item === 'string' ? null : item.score;
+                                                            const varValue = typeof item === 'string' ? null : item.var;
 
                                                             return (
                                                                 <span key={`${ticker}-${index}`} className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded flex items-center">
@@ -233,6 +234,11 @@ const ResultsDashboard = ({ results }) => {
                                                                     {score !== null && score !== undefined && (
                                                                         <span className="ml-1 text-green-600">
                                                                             ({score.toFixed(2)})
+                                                                        </span>
+                                                                    )}
+                                                                    {varValue !== null && varValue !== undefined && (
+                                                                        <span className="ml-2 text-red-500 font-semibold border-l border-green-300 pl-2" title="Value At Risk (95%, 252 days)">
+                                                                            VaR: {(varValue * 100).toFixed(2)}%
                                                                         </span>
                                                                     )}
                                                                     {item.quantity && (

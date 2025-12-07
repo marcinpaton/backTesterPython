@@ -66,7 +66,7 @@ class Portfolio:
             
         return sold_record
 
-    def buy_ticker(self, ticker, amount, price, score, date):
+    def buy_ticker(self, ticker, amount, price, score, date, var=None):
         if price <= 0: return None
         
         # Calculate quantity (whole shares only)
@@ -106,7 +106,8 @@ class Portfolio:
             "quantity": quantity,
             "price": price,
             "score": score,
-            "fee": fee
+            "fee": fee,
+            "var": var
         }
 
     def settle_annual_tax(self, date):
@@ -197,7 +198,7 @@ class Portfolio:
                     candidates.append(ticker)
         return candidates
 
-    def rebalance(self, target_tickers_with_scores: list[tuple[str, float]], current_prices: dict, date):
+    def rebalance(self, target_tickers_with_scores: list[tuple[str, float]], current_prices: dict, date, var_map: dict = None):
         sold_performance = {}
         
         target_tickers = [t for t, s in target_tickers_with_scores]
@@ -224,7 +225,7 @@ class Portfolio:
             for ticker in tickers_to_buy:
                 if ticker in current_prices and not pd.isna(current_prices[ticker]):
                     price = current_prices[ticker]
-                    buy_record = self.buy_ticker(ticker, allocation_per_ticker, price, scores_map.get(ticker, 0.0), date)
+                    buy_record = self.buy_ticker(ticker, allocation_per_ticker, price, scores_map.get(ticker, 0.0), date, var=(var_map.get(ticker) if var_map else None))
                     if buy_record:
                         bought_performance.append(buy_record)
 
@@ -266,6 +267,9 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                  raise ValueError("Could not find 'Close' prices in data")
     else:
         close_prices = data
+    
+    # Keep full history for VaR calculation
+    full_close_prices = close_prices.copy()
 
     close_prices = close_prices.loc[start_date:end_date]
     
@@ -359,7 +363,36 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
             available_tickers = [t for t, p in current_prices.items() if not pd.isna(p)]
             target_tickers_with_scores = strategy.select_tickers(available_tickers, date)
             print(f"  Target tickers: {target_tickers_with_scores}")
-            portfolio.rebalance(target_tickers_with_scores, current_prices, date)
+            # Calculate VaR for target tickers
+            var_map = {}
+            lookback_days = 252
+            
+            # Get historical data up to this date (exclusive of today for calculation? or inclusive?)
+            # Usually VaR is calculated on past returns.
+            # We use data up to 'date'.
+            
+            # Optimization: Pre-calculate or slice efficiently
+            # We need ~252 rows ending at 'date'
+            
+            # Find integer location of current date in full_close_prices
+            if date in full_close_prices.index:
+                current_loc = full_close_prices.index.get_loc(date)
+                start_loc = max(0, current_loc - lookback_days)
+                # Slice: start_loc to current_loc (inclusive or exclusive?)
+                # We want past 252 days.
+                history_window = full_close_prices.iloc[start_loc : current_loc + 1]
+                
+                for ticker, _ in target_tickers_with_scores:
+                    if ticker in history_window.columns:
+                        series = history_window[ticker].dropna()
+                        if len(series) > 1:
+                            returns = series.pct_change().dropna()
+                            if not returns.empty:
+                                # 95% Confidence VaR (5th percentile)
+                                var_95 = np.percentile(returns, 5)
+                                var_map[ticker] = var_95
+
+            portfolio.rebalance(target_tickers_with_scores, current_prices, date, var_map)
             last_rebalance_date = date
             print(f"  Portfolio Value: {portfolio.get_total_value(current_prices):.2f}")
         
