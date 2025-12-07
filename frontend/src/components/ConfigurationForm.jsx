@@ -18,6 +18,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
 
   const [marginEnabled, setMarginEnabled] = useState(true);
   const [strategy, setStrategy] = useState('scoring');
+  const [sizingMethod, setSizingMethod] = useState('equal');
   const [initialCapital, setInitialCapital] = useState(10000);
 
   const handleDownload = () => {
@@ -40,10 +41,9 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
       transaction_fee_value: parseFloat(transactionFeeValue),
       capital_gains_tax_enabled: capitalGainsTaxEnabled,
       capital_gains_tax_pct: parseFloat(capitalGainsTaxPct),
-      capitalGainsTax_enabled: capitalGainsTaxEnabled,
-      capital_gains_tax_pct: parseFloat(capitalGainsTaxPct),
       margin_enabled: marginEnabled,
-      strategy: strategy
+      strategy: strategy,
+      sizing_method: sizingMethod
     });
   };
 
@@ -284,17 +284,31 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
           </p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Strategy</label>
-          <select
-            value={strategy}
-            onChange={(e) => setStrategy(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-          >
-            <option value="scoring">Scoring (Default)</option>
-            <option value="momentum">Momentum</option>
-            <option value="random">Random</option>
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Strategy</label>
+            <select
+              value={strategy}
+              onChange={(e) => setStrategy(e.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+            >
+              <option value="scoring">Scoring (Default)</option>
+              <option value="momentum">Momentum</option>
+              <option value="random">Random</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Position Sizing</label>
+            <select
+              value={sizingMethod}
+              onChange={(e) => setSizingMethod(e.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+            >
+              <option value="equal">Equal Weight (1/N)</option>
+              <option value="var">Risk Parity (Inverse VaR)</option>
+            </select>
+          </div>
         </div>
       </div>
 

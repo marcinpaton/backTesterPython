@@ -56,6 +56,7 @@ class BacktestRequest(BaseModel):
     capital_gains_tax_pct: float = 0.0
     margin_enabled: bool = True
     strategy: str = 'scoring' # 'random', 'momentum', 'scoring'
+    sizing_method: str = 'equal' # 'equal', 'var'
 
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
@@ -87,7 +88,8 @@ def run_backtest_endpoint(request: BacktestRequest):
             request.transaction_fee_value,
             request.capital_gains_tax_enabled,
             request.capital_gains_tax_pct,
-            request.margin_enabled
+            request.margin_enabled,
+            request.sizing_method
         )
         metrics = calculate_metrics(portfolio)
         return metrics

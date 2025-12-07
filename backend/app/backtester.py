@@ -4,7 +4,7 @@ from datetime import datetime
 from app.strategies import Strategy
 
 class Portfolio:
-    def __init__(self, initial_capital: float, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True):
+    def __init__(self, initial_capital: float, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal'):
         self.initial_capital = initial_capital
         self.cash = initial_capital
         self.holdings = {} # {ticker: quantity}
@@ -22,6 +22,7 @@ class Portfolio:
         self.loss_carryforward = []  # List of (year, remaining_loss) tuples for tax loss carryforward
         self.margin_interest_rate_annual = 0.03 # 3% annual interest on negative cash balance
         self.margin_enabled = margin_enabled
+        self.sizing_method = sizing_method
 
     def get_total_value(self, current_prices: dict) -> float:
         holdings_value = sum(self.holdings.get(t, 0) * p for t, p in current_prices.items() if t in self.holdings)
@@ -220,12 +221,44 @@ class Portfolio:
         
         if tickers_to_buy:
              # Allocate available cash (including recent sales) among new buys
-            allocation_per_ticker = self.cash / len(tickers_to_buy)
+             
+            if self.sizing_method == 'var' and var_map:
+                # Risk Parity: Allocation proportional to 1 / |VaR|
+                # Calculate weights
+                inverse_vars = {}
+                total_inverse_var = 0.0
+                
+                for ticker in tickers_to_buy:
+                    # Default to a small risk if VaR is missing or 0 to avoid division by zero
+                    # If VaR is -0.05 (5%), absolute is 0.05.
+                    if ticker in var_map and var_map[ticker] is not None and abs(var_map[ticker]) > 0.0001:
+                        inv_var = 1.0 / abs(var_map[ticker])
+                    else:
+                        # Fallback for missing/zero VaR: Assume it's average or high risk?
+                        # Let's give it median weight or equal weight equivalent?
+                        # For safety, let's treat it as "Average Risk" -> imply some default VaR e.g. 5%
+                        inv_var = 1.0 / 0.05 
+                    
+                    inverse_vars[ticker] = inv_var
+                    total_inverse_var += inv_var
+                
+                if total_inverse_var > 0:
+                     allocations = {t: (self.cash * (inv / total_inverse_var)) for t, inv in inverse_vars.items()}
+                else:
+                     # Fallback to equal
+                     allocations = {t: self.cash / len(tickers_to_buy) for t in tickers_to_buy}
+                     
+            else:
+                # Equal Weighting
+                allocations = {t: self.cash / len(tickers_to_buy) for t in tickers_to_buy}
             
             for ticker in tickers_to_buy:
                 if ticker in current_prices and not pd.isna(current_prices[ticker]):
                     price = current_prices[ticker]
-                    buy_record = self.buy_ticker(ticker, allocation_per_ticker, price, scores_map.get(ticker, 0.0), date, var=(var_map.get(ticker) if var_map else None))
+                    # Get allocation for this ticker
+                    allocation = allocations.get(ticker, 0.0)
+                    
+                    buy_record = self.buy_ticker(ticker, allocation, price, scores_map.get(ticker, 0.0), date, var=(var_map.get(ticker) if var_map else None))
                     if buy_record:
                         bought_performance.append(buy_record)
 
@@ -255,7 +288,7 @@ class Portfolio:
             interest = abs(self.cash) * daily_rate
             self.cash -= interest
 
-def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True):
+def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal'):
     # Preprocessing to get Close prices only
     if isinstance(data.columns, pd.MultiIndex):
         try:
@@ -284,7 +317,7 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
         print(f"Capital Gains Tax enabled: {capital_gains_tax_pct}%")
     print(f"Margin Trading enabled: {margin_enabled}")
     
-    portfolio = Portfolio(initial_capital, transaction_fee_enabled, transaction_fee_type, transaction_fee_value, capital_gains_tax_enabled, capital_gains_tax_pct, margin_enabled)
+    portfolio = Portfolio(initial_capital, transaction_fee_enabled, transaction_fee_type, transaction_fee_value, capital_gains_tax_enabled, capital_gains_tax_pct, margin_enabled, sizing_method)
     last_rebalance_date = None
     prev_prices = None
     
