@@ -15,6 +15,8 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
   const [transactionFeeValue, setTransactionFeeValue] = useState(0.1);
   const [capitalGainsTaxEnabled, setCapitalGainsTaxEnabled] = useState(false);
   const [capitalGainsTaxPct, setCapitalGainsTaxPct] = useState(19);
+
+  const [marginEnabled, setMarginEnabled] = useState(true);
   const [strategy, setStrategy] = useState('scoring');
   const [initialCapital, setInitialCapital] = useState(10000);
 
@@ -38,6 +40,9 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
       transaction_fee_value: parseFloat(transactionFeeValue),
       capital_gains_tax_enabled: capitalGainsTaxEnabled,
       capital_gains_tax_pct: parseFloat(capitalGainsTaxPct),
+      capitalGainsTax_enabled: capitalGainsTaxEnabled,
+      capital_gains_tax_pct: parseFloat(capitalGainsTaxPct),
+      margin_enabled: marginEnabled,
       strategy: strategy
     });
   };
@@ -169,6 +174,8 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
           </label>
         </div>
 
+
+
         <div>
           <label className="flex items-center space-x-2">
             <input
@@ -258,6 +265,23 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
             onChange={(e) => setInitialCapital(e.target.value)}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
           />
+        </div>
+
+        <div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={marginEnabled}
+              onChange={(e) => setMarginEnabled(e.target.checked)}
+              className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+            />
+            <span className="text-sm font-medium text-gray-700">
+              Enable Margin Trading (Leverage)
+            </span>
+          </label>
+          <p className="text-xs text-gray-500 ml-6">
+            If enabled, buys extra shares using borrowed cash (3% interest).
+          </p>
         </div>
 
         <div>

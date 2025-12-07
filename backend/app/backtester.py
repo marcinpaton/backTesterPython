@@ -4,7 +4,7 @@ from datetime import datetime
 from app.strategies import Strategy
 
 class Portfolio:
-    def __init__(self, initial_capital: float, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0):
+    def __init__(self, initial_capital: float, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True):
         self.initial_capital = initial_capital
         self.cash = initial_capital
         self.holdings = {} # {ticker: quantity}
@@ -21,6 +21,7 @@ class Portfolio:
         self.annual_realized_pnl = 0.0  # Track annual profit/loss for tax settlement
         self.loss_carryforward = []  # List of (year, remaining_loss) tuples for tax loss carryforward
         self.margin_interest_rate_annual = 0.03 # 3% annual interest on negative cash balance
+        self.margin_enabled = margin_enabled
 
     def get_total_value(self, current_prices: dict) -> float:
         holdings_value = sum(self.holdings.get(t, 0) * p for t, p in current_prices.items() if t in self.holdings)
@@ -69,9 +70,11 @@ class Portfolio:
         if price <= 0: return None
         
         # Calculate quantity (whole shares only)
-        # Calculate quantity (whole shares only)
-        # Margin Trading: Buy 1 extra share beyond what cash allows
-        quantity = int(amount // price) + 1
+        # Margin Trading: Buy 1 extra share beyond what cash allows IF enabled
+        if self.margin_enabled:
+            quantity = int(amount // price) + 1
+        else:
+            quantity = int(amount // price)
         
         if quantity <= 0: # Should be at least 1 now, but safe check
             return None
@@ -246,12 +249,12 @@ class Portfolio:
         Apply daily interest if cash balance is negative (margin loan).
         Interest is 3% annually.
         """
-        if self.cash < 0:
+        if self.margin_enabled and self.cash < 0:
             daily_rate = self.margin_interest_rate_annual / 365.25
             interest = abs(self.cash) * daily_rate
             self.cash -= interest
 
-def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0):
+def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True):
     # Preprocessing to get Close prices only
     if isinstance(data.columns, pd.MultiIndex):
         try:
@@ -274,7 +277,10 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
     if capital_gains_tax_enabled:
         print(f"Capital Gains Tax enabled: {capital_gains_tax_pct}%")
     
-    portfolio = Portfolio(initial_capital, transaction_fee_enabled, transaction_fee_type, transaction_fee_value, capital_gains_tax_enabled, capital_gains_tax_pct)
+        print(f"Capital Gains Tax enabled: {capital_gains_tax_pct}%")
+    print(f"Margin Trading enabled: {margin_enabled}")
+    
+    portfolio = Portfolio(initial_capital, transaction_fee_enabled, transaction_fee_type, transaction_fee_value, capital_gains_tax_enabled, capital_gains_tax_pct, margin_enabled)
     last_rebalance_date = None
     prev_prices = None
     
