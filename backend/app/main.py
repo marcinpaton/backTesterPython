@@ -1,5 +1,6 @@
+from __future__ import annotations
 from fastapi import FastAPI, HTTPException
-from typing import Optional
+from typing import Optional, List
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.data_loader import download_data, load_data
@@ -16,7 +17,7 @@ app.add_middleware(
 )
 
 class DownloadRequest(BaseModel):
-    tickers: list[str]
+    tickers: List[str]
     start_date: str
     end_date: str
 
