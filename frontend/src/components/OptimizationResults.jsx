@@ -32,6 +32,12 @@ const OptimizationResults = ({ results }) => {
                                     N Tickers
                                 </th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Rebalance (mo)
+                                </th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Lookback (d)
+                                </th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Stop Loss %
                                 </th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -62,6 +68,12 @@ const OptimizationResults = ({ results }) => {
                                     </td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                         {result.n_tickers}
+                                    </td>
+                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                                        {result.rebalance_period}
+                                    </td>
+                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                                        {result.momentum_lookback_days || '-'}
                                     </td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                         {result.stop_loss_pct ? `${result.stop_loss_pct}%` : '-'}

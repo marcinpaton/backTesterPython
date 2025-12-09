@@ -22,6 +22,16 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     const [stopLossMax, setStopLossMax] = useState(20);
     const [stopLossStep, setStopLossStep] = useState(1);
 
+    // Rebalance period range (in months)
+    const [rebalancePeriodMin, setRebalancePeriodMin] = useState(1);
+    const [rebalancePeriodMax, setRebalancePeriodMax] = useState(3);
+    const [rebalancePeriodStep, setRebalancePeriodStep] = useState(1);
+
+    // Momentum lookback period range (in days)
+    const [momentumLookbackMin, setMomentumLookbackMin] = useState(20);
+    const [momentumLookbackMax, setMomentumLookbackMax] = useState(60);
+    const [momentumLookbackStep, setMomentumLookbackStep] = useState(10);
+
     // Margin trading
     const [marginEnabled, setMarginEnabled] = useState(true);
 
@@ -79,6 +89,16 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                 max: parseFloat(stopLossMax),
                 step: parseFloat(stopLossStep)
             } : null,
+            rebalance_period_range: {
+                min: parseInt(rebalancePeriodMin),
+                max: parseInt(rebalancePeriodMax),
+                step: parseInt(rebalancePeriodStep)
+            },
+            momentum_lookback_range: {
+                min: parseInt(momentumLookbackMin),
+                max: parseInt(momentumLookbackMax),
+                step: parseInt(momentumLookbackStep)
+            },
             margin_enabled: marginEnabled,
             strategies: strategies,
             sizing_methods: sizingMethods
@@ -201,6 +221,83 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* Rebalance Period Range */}
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-3">Rebalance Period (months)</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Min</label>
+                            <input
+                                type="number"
+                                value={rebalancePeriodMin}
+                                onChange={(e) => setRebalancePeriodMin(e.target.value)}
+                                min="1"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Max</label>
+                            <input
+                                type="number"
+                                value={rebalancePeriodMax}
+                                onChange={(e) => setRebalancePeriodMax(e.target.value)}
+                                min="1"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Step</label>
+                            <input
+                                type="number"
+                                value={rebalancePeriodStep}
+                                onChange={(e) => setRebalancePeriodStep(e.target.value)}
+                                min="1"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Momentum Lookback Period Range */}
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-3">Momentum Lookback Period (days)</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Min</label>
+                            <input
+                                type="number"
+                                value={momentumLookbackMin}
+                                onChange={(e) => setMomentumLookbackMin(e.target.value)}
+                                min="1"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Max</label>
+                            <input
+                                type="number"
+                                value={momentumLookbackMax}
+                                onChange={(e) => setMomentumLookbackMax(e.target.value)}
+                                min="1"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Step</label>
+                            <input
+                                type="number"
+                                value={momentumLookbackStep}
+                                onChange={(e) => setMomentumLookbackStep(e.target.value)}
+                                min="1"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            />
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                        Used only when Momentum strategy is selected
+                    </p>
                 </div>
 
                 {/* Stop Loss Range */}
