@@ -43,11 +43,12 @@ class RandomSelectionStrategy(Strategy):
             return days_diff >= (self.rebalance_period * 30)
 
 class MomentumStrategy(Strategy):
-    def __init__(self, n_tickers: int, rebalance_period: int, rebalance_period_unit: str, data: pd.DataFrame):
+    def __init__(self, n_tickers: int, rebalance_period: int, rebalance_period_unit: str, data: pd.DataFrame, lookback_days: int = 30):
         self.n_tickers = n_tickers
         self.rebalance_period = rebalance_period
         self.rebalance_period_unit = rebalance_period_unit
         self.data = data
+        self.lookback_days = lookback_days
         self.close_prices = self._get_close_prices(data)
 
     def _get_close_prices(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -64,8 +65,8 @@ class MomentumStrategy(Strategy):
             return data
 
     def select_tickers(self, available_tickers: list[str], current_date: datetime) -> list[tuple[str, float]]:
-        # Calculate 1-month return (approx 30 days)
-        start_date = current_date - timedelta(days=30)
+        # Calculate return over lookback period
+        start_date = current_date - timedelta(days=self.lookback_days)
         
         # Get price at current_date (or closest previous)
         # We use 'asof' logic or just loc if we are sure dates match. 

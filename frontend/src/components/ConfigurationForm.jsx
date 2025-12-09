@@ -20,6 +20,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
   const [strategy, setStrategy] = useState('scoring');
   const [sizingMethod, setSizingMethod] = useState('equal');
   const [initialCapital, setInitialCapital] = useState(10000);
+  const [momentumLookbackDays, setMomentumLookbackDays] = useState(30);
 
   const handleDownload = () => {
     const tickerList = tickers.split(',').map(t => t.trim());
@@ -43,7 +44,8 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
       capital_gains_tax_pct: parseFloat(capitalGainsTaxPct),
       margin_enabled: marginEnabled,
       strategy: strategy,
-      sizing_method: sizingMethod
+      sizing_method: sizingMethod,
+      momentum_lookback_days: parseInt(momentumLookbackDays)
     });
   };
 
@@ -310,6 +312,23 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
             </select>
           </div>
         </div>
+
+        {/* Momentum Lookback Period - only show when Momentum strategy is selected */}
+        {strategy === 'momentum' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Momentum Lookback Period (days)</label>
+            <input
+              type="number"
+              value={momentumLookbackDays}
+              onChange={(e) => setMomentumLookbackDays(e.target.value)}
+              min="1"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Number of days to look back for calculating momentum (default: 30 days)
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 flex space-x-4">
