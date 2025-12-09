@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import OptimizationResults from './OptimizationResults';
 
-const OptimizationView = ({ onRunOptimization, isLoading, onBack }) => {
+const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => {
     const [tickers, setTickers] = useState(
         'AU, GOOG, FSLR, IDXX, WDC, ULS, FRES.L, WWD, KEYS, ISRG, NST.AX, TER, AMD, CLS.TO, CRS, DELTA.BK, FN, MU, STLD, FIX, CRDO, CTRA, APH, ANGPY, VRT, ASML, SDVKY, ANTO.L, KLAC, AEM.TO, ADI, FNV.TO, SHOP.TO, HWM, IFX.DE, UCBJY, UCB.BR, WPM.TO, PRY.MI, MPWR, BWXT, PSTG, EADSY, WPM.L, AIR.PA, FCX, FLEX, IFNNY, PLTR, BSX, NVDA, GD, AMZN, 1177.HK, ARZGY, ANET, EME, FUTU, RR.L, RYCEY, SAAB-B.ST, SCHW, TT, RMD, GEV, ASMIY, ASM.AS, FTNT, NVZMY, ADBE, ADYEN.AS, ADYEY, ARM, AXON, BLK, CDNS, DXCM, GWRE, LNSTY, MA, META, NOW, NSIS-B.CO, NTNX, PGHN.SW, PINS, RHM.DE, RJF, RMD.AX, SAP, SAP.DE, SMCI, SPOT, SYK, TOST, TW, V, VEEV, WDAY');
     const [startDate, setStartDate] = useState('2020-01-01');
@@ -334,6 +335,8 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack }) => {
                     </button>
                 </div>
             </div>
+
+            <OptimizationResults results={results} />
         </div>
     );
 };

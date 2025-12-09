@@ -99,5 +99,149 @@ def run_backtest_endpoint(request: BacktestRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+class OptimizationRangeRequest(BaseModel):
+    min: float
+    max: float
+    step: float
+
+class OptimizationRequest(BaseModel):
+    tickers: List[str]
+    start_date: str
+    end_date: str
+    brokers: List[str]  # ['bossa', 'interactive_brokers']
+    n_tickers_range: OptimizationRangeRequest
+    stop_loss_range: Optional[OptimizationRangeRequest] = None
+    margin_enabled: bool
+    strategies: List[str]  # ['scoring', 'momentum']
+    sizing_methods: List[str]  # ['equal', 'var']
+
+@app.post("/api/optimize")
+def run_optimization_endpoint(request: OptimizationRequest):
+    df = load_data()
+    if df is None:
+        raise HTTPException(status_code=404, detail="No data found. Please download data first.")
+    
+    # Broker presets
+    broker_configs = {
+        'bossa': {
+            'transaction_fee_enabled': True,
+            'transaction_fee_type': 'percentage',
+            'transaction_fee_value': 0.29,
+            'capital_gains_tax_enabled': False,
+            'capital_gains_tax_pct': 0.0
+        },
+        'interactive_brokers': {
+            'transaction_fee_enabled': True,
+            'transaction_fee_type': 'fixed',
+            'transaction_fee_value': 1.0,
+            'capital_gains_tax_enabled': True,
+            'capital_gains_tax_pct': 19.0
+        }
+    }
+    
+    # Generate parameter combinations
+    import numpy as np
+    
+    # Number of tickers range
+    n_tickers_values = list(range(
+        int(request.n_tickers_range.min),
+        int(request.n_tickers_range.max) + 1,
+        int(request.n_tickers_range.step)
+    ))
+    
+    # Stop loss range (optional)
+    if request.stop_loss_range:
+        stop_loss_values = list(np.arange(
+            request.stop_loss_range.min,
+            request.stop_loss_range.max + request.stop_loss_range.step,
+            request.stop_loss_range.step
+        ))
+        stop_loss_values = [round(v, 2) for v in stop_loss_values]
+    else:
+        stop_loss_values = [None]
+    
+    # Generate all combinations
+    results = []
+    total_combinations = (
+        len(request.brokers) * 
+        len(n_tickers_values) * 
+        len(stop_loss_values) * 
+        len(request.strategies) * 
+        len(request.sizing_methods)
+    )
+    
+    current_test = 0
+    
+    try:
+        for broker in request.brokers:
+            broker_config = broker_configs[broker]
+            
+            for n_tickers in n_tickers_values:
+                for stop_loss_pct in stop_loss_values:
+                    for strategy_name in request.strategies:
+                        for sizing_method in request.sizing_methods:
+                            current_test += 1
+                            
+                            # Create strategy
+                            if strategy_name == 'momentum':
+                                strategy = MomentumStrategy(n_tickers, 1, 'months', df)
+                            elif strategy_name == 'scoring':
+                                strategy = ScoringStrategy(n_tickers, 1, 'months', df)
+                            else:
+                                continue
+                            
+                            # Run backtest
+                            try:
+                                portfolio = run_backtest(
+                                    strategy,
+                                    df,
+                                    10000,  # Fixed initial capital
+                                    request.start_date,
+                                    request.end_date,
+                                    stop_loss_pct / 100 if stop_loss_pct else None,
+                                    False,  # smart_stop_loss
+                                    broker_config['transaction_fee_enabled'],
+                                    broker_config['transaction_fee_type'],
+                                    broker_config['transaction_fee_value'],
+                                    broker_config['capital_gains_tax_enabled'],
+                                    broker_config['capital_gains_tax_pct'],
+                                    request.margin_enabled,
+                                    sizing_method
+                                )
+                                
+                                metrics = calculate_metrics(portfolio)
+                                
+                                # Store result with parameters
+                                results.append({
+                                    'test_number': current_test,
+                                    'broker': broker,
+                                    'n_tickers': n_tickers,
+                                    'stop_loss_pct': stop_loss_pct,
+                                    'strategy': strategy_name,
+                                    'sizing_method': sizing_method,
+                                    'cagr': metrics.get('cagr', 0),
+                                    'max_drawdown': metrics.get('max_drawdown', 0),
+                                    'final_value': metrics.get('final_value', 0),
+                                    'total_return': metrics.get('total_return', 0)
+                                })
+                            except Exception as e:
+                                print(f"Error in test {current_test}: {e}")
+                                # Continue with next combination
+                                continue
+        
+        # Sort results by CAGR (descending) and Max Drawdown (ascending - less negative is better)
+        results.sort(key=lambda x: (-x['cagr'], -x['max_drawdown']))
+        
+        return {
+            'total_tests': total_combinations,
+            'completed_tests': len(results),
+            'results': results
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8002, reload=True)

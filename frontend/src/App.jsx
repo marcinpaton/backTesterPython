@@ -43,11 +43,8 @@ function App() {
     setIsLoading(true);
     setError(null);
     try {
-      // TODO: Implement backend endpoint
-      console.log('Optimization params:', params);
-      alert('Optimization will be implemented in the backend');
-      // const response = await axios.post('http://127.0.0.1:8000/api/optimize', params);
-      // setResults(response.data);
+      const response = await axios.post('http://127.0.0.1:8000/api/optimize', params);
+      setResults(response.data);
     } catch (err) {
       setError(err.message || 'Failed to run optimization');
       console.error(err);
@@ -92,6 +89,7 @@ function App() {
             onRunOptimization={handleRunOptimization}
             isLoading={isLoading}
             onBack={() => setCurrentView('dashboard')}
+            results={results}
           />
         )}
       </div>
