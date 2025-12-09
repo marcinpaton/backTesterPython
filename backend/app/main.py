@@ -256,7 +256,9 @@ def run_optimization_endpoint(request: OptimizationRequest):
                                         
                                         results.append(result)
                                     except Exception as e:
+                                        import traceback
                                         print(f"Error in test {current_test}: {e}")
+                                        traceback.print_exc()
                                         # Continue with next combination
                                         continue
         

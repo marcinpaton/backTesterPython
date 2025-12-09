@@ -182,6 +182,9 @@ class ScoringStrategy(Strategy):
         idx_loc = self.close_prices.index.searchsorted(current_date)
         # Assuming current_date is in index (checked above), idx_loc is its position
         
+        # Capture self.close_prices in local variable for nested function
+        close_prices_df = self.close_prices
+        
         # Helper to get past price by offset
         def get_past_price(ticker, offset):
             if idx_loc < offset:
@@ -190,9 +193,9 @@ class ScoringStrategy(Strategy):
             # Check if valid
             if past_date_idx < 0: return None
             
-            # We need to access by integer location, but self.close_prices is a DataFrame
+            # We need to access by integer location, but close_prices_df is a DataFrame
             # iloc works on row position
-            return self.close_prices.iloc[past_date_idx].get(ticker)
+            return close_prices_df.iloc[past_date_idx].get(ticker)
 
         # SMA 200
         # We need average of last 200 prices
@@ -227,7 +230,7 @@ class ScoringStrategy(Strategy):
                 # Get last 200 prices for this ticker
                 # Optimization: calculating SMA for all tickers at once is faster but let's do per ticker for clarity first
                 # Actually, slicing the dataframe is fast.
-                window = self.close_prices.iloc[idx_loc-199 : idx_loc+1][ticker]
+                window = close_prices_df.iloc[idx_loc-199 : idx_loc+1][ticker]
                 
                 # Check for NaNs in window?
                 # Relaxed check: allow some NaNs, just calculate mean

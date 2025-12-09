@@ -380,7 +380,7 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                          "type": "stop_loss_smart" if smart_stop_loss else "stop_loss",
                          "sold": sold_performance,
                          "bought": bought_performance,
-                         "cash": float(self.cash)
+                         "cash": float(portfolio.cash)
                      })
         
         # Settle annual tax in January (before rebalancing)
