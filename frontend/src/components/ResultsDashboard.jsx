@@ -56,7 +56,10 @@ const ResultsDashboard = ({ results }) => {
                             events.push({
                                 type: 'monthly_return',
                                 date: month, // "YYYY-MM"
-                                sortDate: month + '-31', // Approximate end of month for sorting
+                                // Use day 32 to ensure it's after all events in the month (max day is 31)
+                                // but still sorts before next month (e.g., 2020-01-32 < 2020-02-01)
+                                sortDate: month + '-32',
+                                sortPriority: 1, // Monthly returns come after rebalancing events
                                 value: ret
                             });
                         });
@@ -68,13 +71,18 @@ const ResultsDashboard = ({ results }) => {
                                     type: 'rebalance',
                                     date: event.date,
                                     sortDate: event.date,
+                                    sortPriority: 0, // Rebalancing events come first
                                     data: event
                                 });
                             });
                         }
 
-                        // Sort by date
-                        events.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+                        // Sort by date, then by priority (rebalancing before monthly returns)
+                        events.sort((a, b) => {
+                            const dateCompare = a.sortDate.localeCompare(b.sortDate);
+                            if (dateCompare !== 0) return dateCompare;
+                            return a.sortPriority - b.sortPriority;
+                        });
 
                         return events.map((event, index) => {
                             if (event.type === 'monthly_return') {
