@@ -1,6 +1,6 @@
 import React from 'react';
 
-const OptimizationResults = ({ results, onSave }) => {
+const OptimizationResults = ({ results, onSave, startDate, endDate }) => {
     if (!results || !results.results) {
         return null;
     }
@@ -130,6 +130,10 @@ const OptimizationResults = ({ results, onSave }) => {
                                                 if (result.margin_enabled !== undefined) params.set('margin_enabled', result.margin_enabled);
                                                 if (result.momentum_lookback_days) params.set('momentum_lookback_days', result.momentum_lookback_days);
                                                 if (result.filter_negative_momentum !== undefined) params.set('filter_negative_momentum', result.filter_negative_momentum);
+
+                                                // Pass dates
+                                                if (startDate) params.set('start_date', startDate);
+                                                if (endDate) params.set('end_date', endDate);
 
                                                 // Broker params
                                                 if (result.broker === 'bossa') {

@@ -551,7 +551,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                 </div>
             </div>
 
-            <OptimizationResults results={results} onSave={handleSaveResults} />
+            <OptimizationResults results={results} onSave={handleSaveResults} startDate={startDate} endDate={endDate} />
         </div>
     );
 };
