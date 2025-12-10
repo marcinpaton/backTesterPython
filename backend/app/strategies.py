@@ -43,12 +43,13 @@ class RandomSelectionStrategy(Strategy):
             return days_diff >= (self.rebalance_period * 30)
 
 class MomentumStrategy(Strategy):
-    def __init__(self, n_tickers: int, rebalance_period: int, rebalance_period_unit: str, data: pd.DataFrame, lookback_days: int = 30):
+    def __init__(self, n_tickers: int, rebalance_period: int, rebalance_period_unit: str, data: pd.DataFrame, lookback_days: int = 30, filter_negative_momentum: bool = False):
         self.n_tickers = n_tickers
         self.rebalance_period = rebalance_period
         self.rebalance_period_unit = rebalance_period_unit
         self.data = data
         self.lookback_days = lookback_days
+        self.filter_negative_momentum = filter_negative_momentum
         self.close_prices = self._get_close_prices(data)
 
     def _get_close_prices(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -102,12 +103,19 @@ class MomentumStrategy(Strategy):
         momentum_scores = []
         for ticker in available_tickers:
             if ticker in current_prices and ticker in past_prices:
-                p0 = past_prices[ticker]
-                p1 = current_prices[ticker]
+                p_curr = current_prices[ticker]
+                p_past = past_prices[ticker]
                 
-                if not pd.isna(p0) and not pd.isna(p1) and p0 > 0:
-                    ret = (p1 - p0) / p0
-                    momentum_scores.append((ticker, ret))
+                if pd.isna(p_curr) or pd.isna(p_past) or p_past == 0:
+                    continue
+                    
+                ret = (p_curr - p_past) / p_past
+                
+                # Filter negative momentum if enabled
+                if self.filter_negative_momentum and ret < 0:
+                    continue
+                    
+                momentum_scores.append((ticker, ret))
         
         # Sort by return descending
         momentum_scores.sort(key=lambda x: x[1], reverse=True)

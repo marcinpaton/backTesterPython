@@ -21,6 +21,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
   const [sizingMethod, setSizingMethod] = useState('equal');
   const [initialCapital, setInitialCapital] = useState(10000);
   const [momentumLookbackDays, setMomentumLookbackDays] = useState(30);
+  const [filterNegativeMomentum, setFilterNegativeMomentum] = useState(false);
 
   const handleDownload = () => {
     const tickerList = tickers.split(',').map(t => t.trim());
@@ -45,7 +46,8 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
       margin_enabled: marginEnabled,
       strategy: strategy,
       sizing_method: sizingMethod,
-      momentum_lookback_days: parseInt(momentumLookbackDays)
+      momentum_lookback_days: parseInt(momentumLookbackDays),
+      filter_negative_momentum: filterNegativeMomentum
     });
   };
 
@@ -307,26 +309,42 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
               onChange={(e) => setSizingMethod(e.target.value)}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
             >
-              <option value="equal">Equal Weight (1/N)</option>
-              <option value="var">Risk Parity (Inverse VaR)</option>
+              <option value="equal">Equal Weight</option>
+              <option value="var">Risk Parity (VaR)</option>
             </select>
           </div>
         </div>
 
-        {/* Momentum Lookback Period - only show when Momentum strategy is selected */}
         {strategy === 'momentum' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Momentum Lookback Period (days)</label>
-            <input
-              type="number"
-              value={momentumLookbackDays}
-              onChange={(e) => setMomentumLookbackDays(e.target.value)}
-              min="1"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Number of days to look back for calculating momentum (default: 30 days)
-            </p>
+          <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Momentum Settings</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500">Lookback Period (days)</label>
+                <input
+                  type="number"
+                  value={momentumLookbackDays}
+                  onChange={(e) => setMomentumLookbackDays(e.target.value)}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Number of days to look back for calculating momentum (default: 30 days)
+                </p>
+              </div>
+              <div className="flex items-center mt-6">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filterNegativeMomentum}
+                    onChange={(e) => setFilterNegativeMomentum(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Filter Negative Momentum
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
         )}
       </div>

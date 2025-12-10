@@ -59,6 +59,7 @@ class BacktestRequest(BaseModel):
     strategy: str = 'scoring' # 'random', 'momentum', 'scoring'
     sizing_method: str = 'equal' # 'equal', 'var'
     momentum_lookback_days: int = 30 # Lookback period for momentum strategy
+    filter_negative_momentum: bool = False # If True, skip tickers with negative momentum
 
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
@@ -69,7 +70,7 @@ def run_backtest_endpoint(request: BacktestRequest):
     if request.strategy == 'random':
         strategy = RandomSelectionStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit)
     elif request.strategy == 'momentum':
-        strategy = MomentumStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit, df, request.momentum_lookback_days)
+        strategy = MomentumStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit, df, request.momentum_lookback_days, request.filter_negative_momentum)
     elif request.strategy == 'scoring':
         strategy = ScoringStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit, df)
     else:
