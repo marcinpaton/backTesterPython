@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.data_loader import download_data, load_data
 import uvicorn
+import os
+from datetime import datetime
 
 app = FastAPI()
 
@@ -115,6 +117,7 @@ class OptimizationRequest(BaseModel):
     stop_loss_range: Optional[OptimizationRangeRequest] = None
     rebalance_period_range: OptimizationRangeRequest  # In months
     momentum_lookback_range: OptimizationRangeRequest  # In days
+    filter_negative_momentum: List[bool] = [False] # Default to False if not provided
     margin_enabled: bool
     strategies: List[str]  # ['scoring', 'momentum']
     sizing_methods: List[str]  # ['equal', 'var']
@@ -187,7 +190,8 @@ def run_optimization_endpoint(request: OptimizationRequest):
         len(stop_loss_values) * 
         len(request.strategies) * 
         len(request.sizing_methods) *
-        len(momentum_lookback_values)  # Only used when momentum is selected
+        len(momentum_lookback_values) * # Only used when momentum is selected
+        len(request.filter_negative_momentum) # Only used when momentum is selected
     )
     
     current_test = 0
@@ -201,67 +205,70 @@ def run_optimization_endpoint(request: OptimizationRequest):
                     for stop_loss_pct in stop_loss_values:
                         for strategy_name in request.strategies:
                             for sizing_method in request.sizing_methods:
-                                # For momentum, iterate over lookback values
+                                # For momentum, iterate over lookback values and filter options
                                 lookback_values = momentum_lookback_values if strategy_name == 'momentum' else [30]
+                                filter_values = request.filter_negative_momentum if strategy_name == 'momentum' else [False]
                                 
                                 for lookback_days in lookback_values:
-                                    current_test += 1
-                                    
-                                    # Create strategy
-                                    if strategy_name == 'momentum':
-                                        strategy = MomentumStrategy(n_tickers, rebalance_period, 'months', df, lookback_days)
-                                    elif strategy_name == 'scoring':
-                                        strategy = ScoringStrategy(n_tickers, rebalance_period, 'months', df)
-                                    else:
-                                        continue
-                                    
-                                    # Run backtest
-                                    try:
-                                        portfolio = run_backtest(
-                                            strategy,
-                                            df,
-                                            10000,  # Fixed initial capital
-                                            request.start_date,
-                                            request.end_date,
-                                            stop_loss_pct / 100 if stop_loss_pct else None,
-                                            False,  # smart_stop_loss
-                                            broker_config['transaction_fee_enabled'],
-                                            broker_config['transaction_fee_type'],
-                                            broker_config['transaction_fee_value'],
-                                            broker_config['capital_gains_tax_enabled'],
-                                            broker_config['capital_gains_tax_pct'],
-                                            request.margin_enabled,
-                                            sizing_method
-                                        )
+                                    for filter_neg_mom in filter_values:
+                                        current_test += 1
                                         
-                                        metrics = calculate_metrics(portfolio)
-                                        
-                                        # Store result with parameters
-                                        result = {
-                                            'test_number': current_test,
-                                            'broker': broker,
-                                            'n_tickers': n_tickers,
-                                            'rebalance_period': rebalance_period,
-                                            'stop_loss_pct': stop_loss_pct,
-                                            'strategy': strategy_name,
-                                            'sizing_method': sizing_method,
-                                            'cagr': metrics.get('cagr', 0),
-                                            'max_drawdown': metrics.get('max_drawdown', 0),
-                                            'final_value': metrics.get('final_value', 0),
-                                            'total_return': metrics.get('total_return', 0)
-                                        }
-                                        
-                                        # Add momentum lookback only if momentum strategy
+                                        # Create strategy
                                         if strategy_name == 'momentum':
-                                            result['momentum_lookback_days'] = lookback_days
+                                            strategy = MomentumStrategy(n_tickers, rebalance_period, 'months', df, lookback_days, filter_neg_mom)
+                                        elif strategy_name == 'scoring':
+                                            strategy = ScoringStrategy(n_tickers, rebalance_period, 'months', df)
+                                        else:
+                                            continue
                                         
-                                        results.append(result)
-                                    except Exception as e:
-                                        import traceback
-                                        print(f"Error in test {current_test}: {e}")
-                                        traceback.print_exc()
-                                        # Continue with next combination
-                                        continue
+                                        # Run backtest
+                                        try:
+                                            portfolio = run_backtest(
+                                                strategy,
+                                                df,
+                                                10000,  # Fixed initial capital
+                                                request.start_date,
+                                                request.end_date,
+                                                stop_loss_pct / 100 if stop_loss_pct else None,
+                                                False,  # smart_stop_loss
+                                                broker_config['transaction_fee_enabled'],
+                                                broker_config['transaction_fee_type'],
+                                                broker_config['transaction_fee_value'],
+                                                broker_config['capital_gains_tax_enabled'],
+                                                broker_config['capital_gains_tax_pct'],
+                                                request.margin_enabled,
+                                                sizing_method
+                                            )
+                                            
+                                            metrics = calculate_metrics(portfolio)
+                                            
+                                            # Store result with parameters
+                                            result = {
+                                                'test_number': current_test,
+                                                'broker': broker,
+                                                'n_tickers': n_tickers,
+                                                'rebalance_period': rebalance_period,
+                                                'stop_loss_pct': stop_loss_pct,
+                                                'strategy': strategy_name,
+                                                'sizing_method': sizing_method,
+                                                'cagr': metrics.get('cagr', 0),
+                                                'max_drawdown': metrics.get('max_drawdown', 0),
+                                                'final_value': metrics.get('final_value', 0),
+                                                'total_return': metrics.get('total_return', 0)
+                                            }
+                                            
+                                            # Add momentum specific params
+                                            if strategy_name == 'momentum':
+                                                result['momentum_lookback_days'] = lookback_days
+                                                result['filter_negative_momentum'] = filter_neg_mom
+                                            
+                                            results.append(result)
+                                        except Exception as e:
+                                            import traceback
+                                            print(f"Error in test {current_test}: {e}")
+                                            traceback.print_exc()
+                                            # Continue with next combination
+                                            continue
         
         # Sort results by CAGR (descending) and Max Drawdown (ascending - less negative is better)
         results.sort(key=lambda x: (-x['cagr'], -x['max_drawdown']))
@@ -272,6 +279,78 @@ def run_optimization_endpoint(request: OptimizationRequest):
             'results': results
         }
         
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+OPTIMIZATION_RESULTS_DIR = "/home/mpaton/Projects/my/backTesterPython/backTesterPython/optimisation"
+
+class SaveOptimizationResultsRequest(BaseModel):
+    params: OptimizationRequest
+    results: List[dict]
+
+@app.post("/api/save_optimization_results")
+async def save_optimization_results(request: SaveOptimizationResultsRequest):
+    try:
+        if not os.path.exists(OPTIMIZATION_RESULTS_DIR):
+            os.makedirs(OPTIMIZATION_RESULTS_DIR)
+            
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        filename = f"optimization_results_{timestamp}.txt"
+        filepath = os.path.join(OPTIMIZATION_RESULTS_DIR, filename)
+        
+        with open(filepath, "w") as f:
+            f.write(f"Optimization Results - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 50 + "\n\n")
+            
+            f.write("Parameters:\n")
+            f.write("-" * 20 + "\n")
+            f.write(f"Start Date: {request.params.start_date}\n")
+            f.write(f"End Date: {request.params.end_date}\n")
+            f.write(f"Tickers: {', '.join(request.params.tickers)}\n")
+            f.write(f"Brokers: {', '.join(request.params.brokers)}\n")
+            f.write(f"Strategies: {', '.join(request.params.strategies)}\n")
+            f.write(f"Sizing Methods: {', '.join(request.params.sizing_methods)}\n")
+            f.write(f"Margin Enabled: {request.params.margin_enabled}\n")
+            f.write(f"Filter Negative Momentum: {request.params.filter_negative_momentum}\n")
+            
+            f.write("\nRanges:\n")
+            f.write(f"N Tickers: {request.params.n_tickers_range}\n")
+            f.write(f"Rebalance Period: {request.params.rebalance_period_range}\n")
+            f.write(f"Momentum Lookback: {request.params.momentum_lookback_range}\n")
+            if request.params.stop_loss_range:
+                f.write(f"Stop Loss: {request.params.stop_loss_range}\n")
+            
+            f.write("\n" + "=" * 50 + "\n\n")
+            f.write("Top 300 Results:\n")
+            f.write("-" * 20 + "\n")
+            
+            # Header
+            headers = ["#", "Broker", "N Tickers", "Rebalance", "Lookback", "Filter Neg Mom", "Stop Loss", "Strategy", "Sizing", "CAGR", "Max DD", "Final Value"]
+            # Simple formatting
+            header_str = " | ".join(headers)
+            f.write(header_str + "\n")
+            f.write("-" * len(header_str) + "\n")
+            
+            for res in request.results[:300]:
+                row = [
+                    str(res.get('test_number', '')),
+                    str(res.get('broker', '')),
+                    str(res.get('n_tickers', '')),
+                    str(res.get('rebalance_period', '')),
+                    str(res.get('momentum_lookback_days', '-')),
+                    'Yes' if res.get('filter_negative_momentum') else 'No' if res.get('filter_negative_momentum') is False else '-',
+                    f"{res.get('stop_loss_pct')}%" if res.get('stop_loss_pct') else '-',
+                    str(res.get('strategy', '')),
+                    str(res.get('sizing_method', '')),
+                    f"{res.get('cagr', 0)*100:.2f}%",
+                    f"{res.get('max_drawdown', 0)*100:.2f}%",
+                    f"${res.get('final_value', 0):.2f}"
+                ]
+                f.write(" | ".join(row) + "\n")
+                
+        return {"message": "Results saved successfully", "filename": filename, "path": filepath}
     except Exception as e:
         import traceback
         traceback.print_exc()

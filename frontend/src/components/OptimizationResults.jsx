@@ -1,6 +1,6 @@
 import React from 'react';
 
-const OptimizationResults = ({ results }) => {
+const OptimizationResults = ({ results, onSave }) => {
     if (!results || !results.results) {
         return null;
     }
@@ -9,7 +9,17 @@ const OptimizationResults = ({ results }) => {
 
     return (
         <div className="mt-6 p-4 bg-white shadow rounded-lg">
-            <h2 className="text-2xl font-bold mb-4">Optimization Results</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Optimization Results</h2>
+                {onSave && (
+                    <button
+                        onClick={onSave}
+                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center"
+                    >
+                        <span className="mr-2">💾</span> Save Results
+                    </button>
+                )}
+            </div>
 
             <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
                 <p className="text-sm font-semibold">
@@ -36,6 +46,9 @@ const OptimizationResults = ({ results }) => {
                                 </th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Lookback (d)
+                                </th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Filter Neg. Mom.
                                 </th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Stop Loss %
@@ -74,6 +87,9 @@ const OptimizationResults = ({ results }) => {
                                     </td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                         {result.momentum_lookback_days || '-'}
+                                    </td>
+                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                                        {result.filter_negative_momentum !== undefined ? (result.filter_negative_momentum ? 'Yes' : 'No') : '-'}
                                     </td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                         {result.stop_loss_pct ? `${result.stop_loss_pct}%` : '-'}

@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const ResultsDashboard = ({ results }) => {
+    const [showRebalancing, setShowRebalancing] = useState(false);
+    const [showSoldBought, setShowSoldBought] = useState(false);
+    const [showTax, setShowTax] = useState(false);
+    const [showMonthlyReturn, setShowMonthlyReturn] = useState(false);
+
     if (!results) return null;
 
     const { total_return, cagr, final_value, monthly_returns, history } = results;
@@ -45,35 +50,92 @@ const ResultsDashboard = ({ results }) => {
 
             {/* Combined History */}
             <div className="bg-white p-4 rounded-lg shadow">
-                <h3 className="text-lg font-bold mb-4">History (Returns & Rebalancing)</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold">History (Returns & Rebalancing)</h3>
+                    <div className="flex space-x-4 text-sm">
+                        <label className="flex items-center space-x-1">
+                            <input
+                                type="checkbox"
+                                checked={showMonthlyReturn}
+                                onChange={(e) => setShowMonthlyReturn(e.target.checked)}
+                                className="rounded text-blue-600"
+                            />
+                            <span>Monthly Returns</span>
+                        </label>
+                        <label className="flex items-center space-x-1">
+                            <input
+                                type="checkbox"
+                                checked={showRebalancing}
+                                onChange={(e) => setShowRebalancing(e.target.checked)}
+                                className="rounded text-blue-600"
+                            />
+                            <span>Rebalancing Events</span>
+                        </label>
+                        <label className="flex items-center space-x-1">
+                            <input
+                                type="checkbox"
+                                checked={showSoldBought}
+                                onChange={(e) => setShowSoldBought(e.target.checked)}
+                                disabled={!showRebalancing}
+                                className={`rounded text-blue-600 ${!showRebalancing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            />
+                            <span>Sold/Bought Details</span>
+                        </label>
+                        <label className="flex items-center space-x-1">
+                            <input
+                                type="checkbox"
+                                checked={showTax}
+                                onChange={(e) => setShowTax(e.target.checked)}
+                                className="rounded text-blue-600"
+                            />
+                            <span>Tax Settlement</span>
+                        </label>
+                    </div>
+                </div>
                 <div className="space-y-4">
                     {(() => {
                         // Merge and sort events
                         const events = [];
 
-                        // Add monthly returns
-                        Object.entries(monthly_returns).forEach(([month, ret]) => {
-                            events.push({
-                                type: 'monthly_return',
-                                date: month, // "YYYY-MM"
-                                // Use day 32 to ensure it's after all events in the month (max day is 31)
-                                // but still sorts before next month (e.g., 2020-01-32 < 2020-02-01)
-                                sortDate: month + '-32',
-                                sortPriority: 1, // Monthly returns come after rebalancing events
-                                value: ret
-                            });
-                        });
-
-                        // Add rebalancing events
-                        if (results.rebalance_history) {
-                            results.rebalance_history.forEach(event => {
+                        // Add monthly returns ONLY if enabled
+                        if (showMonthlyReturn) {
+                            Object.entries(monthly_returns).forEach(([month, ret]) => {
                                 events.push({
-                                    type: 'rebalance',
-                                    date: event.date,
-                                    sortDate: event.date,
-                                    sortPriority: 0, // Rebalancing events come first
-                                    data: event
+                                    type: 'monthly_return',
+                                    date: month, // "YYYY-MM"
+                                    // Use day 32 to ensure it's after all events in the month (max day is 31)
+                                    // but still sorts before next month (e.g., 2020-01-32 < 2020-02-01)
+                                    sortDate: month + '-32',
+                                    sortPriority: 1, // Monthly returns come after rebalancing events
+                                    value: ret
                                 });
+                            });
+                        }
+
+                        // Add rebalancing events ONLY if enabled (or tax enabled for tax events)
+                        if (results.rebalance_history && (showRebalancing || showTax)) {
+                            results.rebalance_history.forEach(event => {
+                                // Optimization: Only add events we care about
+                                const isTax = event.type === 'tax_settlement' || event.type === 'annual_summary';
+                                const isRebalance = event.type === 'rebalance' || event.type === 'stop_loss' || event.type === 'stop_loss_smart';
+
+                                if (isTax && showTax) {
+                                    events.push({
+                                        type: 'rebalance', // Keeping type generic for sorting, but data has specific type
+                                        date: event.date,
+                                        sortDate: event.date,
+                                        sortPriority: 0,
+                                        data: event
+                                    });
+                                } else if (isRebalance && showRebalancing) {
+                                    events.push({
+                                        type: 'rebalance',
+                                        date: event.date,
+                                        sortDate: event.date,
+                                        sortPriority: 0,
+                                        data: event
+                                    });
+                                }
                             });
                         }
 
@@ -100,6 +162,7 @@ const ResultsDashboard = ({ results }) => {
                                 const isTaxSettlement = type === 'tax_settlement';
 
                                 if (isTaxSettlement) {
+                                    if (!showTax) return null;
                                     return (
                                         <div key={`tax-${index}`} className="border rounded p-3 bg-white border-yellow-200">
                                             <div className="font-semibold text-yellow-800 bg-yellow-50 p-2 rounded mb-2 flex justify-between">
@@ -193,6 +256,8 @@ const ResultsDashboard = ({ results }) => {
                                 }
 
 
+                                if (!showRebalancing) return null;
+
                                 return (
                                     <div key={`rb-${index}`} className={`border rounded p-3 bg-white ${isStopLoss ? 'border-red-200' : 'border-blue-200'}`}>
                                         <div className={`font-semibold ${isStopLoss ? 'text-red-800 bg-red-50' : 'text-blue-800 bg-blue-50'} p-2 rounded mb-2 flex justify-between`}>
@@ -206,61 +271,63 @@ const ResultsDashboard = ({ results }) => {
                                                 <span>{event.date}</span>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <h4 className="text-sm font-bold text-red-600 mb-1">Sold</h4>
-                                                {Object.keys(sold).length === 0 ? (
-                                                    <p className="text-sm text-gray-500">Nothing sold</p>
-                                                ) : (
-                                                    <ul className="text-sm space-y-1">
-                                                        {Object.entries(sold).map(([ticker, data]) => (
-                                                            <li key={ticker} className="flex justify-between">
-                                                                <span>{ticker}</span>
-                                                                <span className={data.profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                                    {data.profit >= 0 ? '+' : ''}{data.profit.toFixed(2)} ({(data.return_pct * 100).toFixed(2)}%)
-                                                                </span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <h4 className="text-sm font-bold text-green-600 mb-1">Bought</h4>
-                                                {bought.length === 0 ? (
-                                                    <p className="text-sm text-gray-500">Nothing bought</p>
-                                                ) : (
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {bought.map((item, index) => {
-                                                            // Handle both old format (string) and new format (object)
-                                                            const ticker = typeof item === 'string' ? item : item.ticker;
-                                                            const score = typeof item === 'string' ? null : item.score;
-                                                            const varValue = typeof item === 'string' ? null : item.var;
+                                        {showSoldBought && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-red-600 mb-1">Sold</h4>
+                                                    {Object.keys(sold).length === 0 ? (
+                                                        <p className="text-sm text-gray-500">Nothing sold</p>
+                                                    ) : (
+                                                        <ul className="text-sm space-y-1">
+                                                            {Object.entries(sold).map(([ticker, data]) => (
+                                                                <li key={ticker} className="flex justify-between">
+                                                                    <span>{ticker}</span>
+                                                                    <span className={data.profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                        {data.profit >= 0 ? '+' : ''}{data.profit.toFixed(2)} ({(data.return_pct * 100).toFixed(2)}%)
+                                                                    </span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-green-600 mb-1">Bought</h4>
+                                                    {bought.length === 0 ? (
+                                                        <p className="text-sm text-gray-500">Nothing bought</p>
+                                                    ) : (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {bought.map((item, index) => {
+                                                                // Handle both old format (string) and new format (object)
+                                                                const ticker = typeof item === 'string' ? item : item.ticker;
+                                                                const score = typeof item === 'string' ? null : item.score;
+                                                                const varValue = typeof item === 'string' ? null : item.var;
 
-                                                            return (
-                                                                <span key={`${ticker}-${index}`} className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded flex items-center">
-                                                                    <span className="font-bold">{ticker}</span>
-                                                                    {score !== null && score !== undefined && (
-                                                                        <span className="ml-1 text-green-600">
-                                                                            ({score.toFixed(2)})
-                                                                        </span>
-                                                                    )}
-                                                                    {varValue !== null && varValue !== undefined && (
-                                                                        <span className="ml-2 text-red-500 font-semibold border-l border-green-300 pl-2" title="Value At Risk (95%, 252 days)">
-                                                                            VaR: {(varValue * 100).toFixed(2)}%
-                                                                        </span>
-                                                                    )}
-                                                                    {item.quantity && (
-                                                                        <span className="ml-1 text-gray-600 font-normal">
-                                                                            - {Math.floor(item.quantity)} shares
-                                                                        </span>
-                                                                    )}
-                                                                </span>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
+                                                                return (
+                                                                    <span key={`${ticker}-${index}`} className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded flex items-center">
+                                                                        <span className="font-bold">{ticker}</span>
+                                                                        {score !== null && score !== undefined && (
+                                                                            <span className="ml-1 text-green-600">
+                                                                                ({score.toFixed(2)})
+                                                                            </span>
+                                                                        )}
+                                                                        {varValue !== null && varValue !== undefined && (
+                                                                            <span className="ml-2 text-red-500 font-semibold border-l border-green-300 pl-2" title="Value At Risk (95%, 252 days)">
+                                                                                VaR: {(varValue * 100).toFixed(2)}%
+                                                                            </span>
+                                                                        )}
+                                                                        {item.quantity && (
+                                                                            <span className="ml-1 text-gray-600 font-normal">
+                                                                                - {Math.floor(item.quantity)} shares
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 );
                             }

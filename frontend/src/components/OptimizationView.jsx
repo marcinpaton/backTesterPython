@@ -12,32 +12,34 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     const [ibEnabled, setIbEnabled] = useState(false);
 
     // Number of tickers range
-    const [nTickersMin, setNTickersMin] = useState(3);
-    const [nTickersMax, setNTickersMax] = useState(15);
+    const [nTickersMin, setNTickersMin] = useState(5);
+    const [nTickersMax, setNTickersMax] = useState(5);
     const [nTickersStep, setNTickersStep] = useState(1);
 
     // Stop loss range (optional)
     const [stopLossEnabled, setStopLossEnabled] = useState(false);
-    const [stopLossMin, setStopLossMin] = useState(5);
-    const [stopLossMax, setStopLossMax] = useState(20);
+    const [stopLossMin, setStopLossMin] = useState(10);
+    const [stopLossMax, setStopLossMax] = useState(10);
     const [stopLossStep, setStopLossStep] = useState(1);
 
     // Rebalance period range (in months)
     const [rebalancePeriodMin, setRebalancePeriodMin] = useState(1);
-    const [rebalancePeriodMax, setRebalancePeriodMax] = useState(3);
+    const [rebalancePeriodMax, setRebalancePeriodMax] = useState(1);
     const [rebalancePeriodStep, setRebalancePeriodStep] = useState(1);
 
     // Momentum lookback period range (in days)
-    const [momentumLookbackMin, setMomentumLookbackMin] = useState(20);
-    const [momentumLookbackMax, setMomentumLookbackMax] = useState(60);
+    const [momentumLookbackMin, setMomentumLookbackMin] = useState(30);
+    const [momentumLookbackMax, setMomentumLookbackMax] = useState(30);
     const [momentumLookbackStep, setMomentumLookbackStep] = useState(10);
+    const [filterNegativeMomentumEnabled, setFilterNegativeMomentumEnabled] = useState(false); // Test with filter=True
+    const [filterNegativeMomentumDisabled, setFilterNegativeMomentumDisabled] = useState(true); // Test with filter=False
 
     // Margin trading
-    const [marginEnabled, setMarginEnabled] = useState(true);
+    const [marginEnabled, setMarginEnabled] = useState(false);
 
     // Strategies (multi-select)
-    const [scoringEnabled, setScoringEnabled] = useState(true);
-    const [momentumEnabled, setMomentumEnabled] = useState(false);
+    const [scoringEnabled, setScoringEnabled] = useState(false);
+    const [momentumEnabled, setMomentumEnabled] = useState(true);
 
     // Position sizing (multi-select)
     const [equalWeightEnabled, setEqualWeightEnabled] = useState(true);
@@ -74,6 +76,20 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
         if (equalWeightEnabled) sizingMethods.push('equal');
         if (riskParityEnabled) sizingMethods.push('var');
 
+        const filterNegativeMomentum = [];
+        if (filterNegativeMomentumEnabled) filterNegativeMomentum.push(true);
+        if (filterNegativeMomentumDisabled) filterNegativeMomentum.push(false);
+
+        // If neither selected, default to false (or alert?)
+        if (momentumEnabled && filterNegativeMomentum.length === 0) {
+            alert('Please select at least one option for Filter Negative Momentum');
+            return;
+        }
+        // If momentum not selected, just pass [false] to satisfy type, though it won't be used
+        if (!momentumEnabled && filterNegativeMomentum.length === 0) {
+            filterNegativeMomentum.push(false);
+        }
+
         const params = {
             tickers: tickers.split(',').map(t => t.trim()),
             start_date: startDate,
@@ -99,12 +115,90 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                 max: parseInt(momentumLookbackMax),
                 step: parseInt(momentumLookbackStep)
             },
+            filter_negative_momentum: filterNegativeMomentum,
             margin_enabled: marginEnabled,
             strategies: strategies,
             sizing_methods: sizingMethods
         };
 
         onRunOptimization(params);
+    };
+
+    const handleSaveResults = async () => {
+        if (!results || !results.results) return;
+
+        // Reconstruct params object (similar to handleRunOptimization but we need it here)
+        const tickerList = tickers.split(',').map(t => t.trim());
+        const brokers = [];
+        if (bossaEnabled) brokers.push('bossa');
+        if (ibEnabled) brokers.push('ib');
+
+        const strategies = [];
+        if (scoringEnabled) strategies.push('scoring');
+        if (momentumEnabled) strategies.push('momentum');
+
+        const sizingMethods = [];
+        if (equalWeightEnabled) sizingMethods.push('equal');
+        if (riskParityEnabled) sizingMethods.push('var');
+
+        const filterNegativeMomentum = [];
+        if (filterNegativeMomentumEnabled) filterNegativeMomentum.push(true);
+        if (filterNegativeMomentumDisabled) filterNegativeMomentum.push(false);
+        if (!momentumEnabled && filterNegativeMomentum.length === 0) filterNegativeMomentum.push(false);
+
+        const params = {
+            tickers: tickerList,
+            start_date: startDate,
+            end_date: endDate,
+            brokers: brokers,
+            n_tickers_range: {
+                min: parseInt(nTickersMin),
+                max: parseInt(nTickersMax),
+                step: parseInt(nTickersStep)
+            },
+            stop_loss_range: stopLossEnabled ? {
+                min: parseFloat(stopLossMin),
+                max: parseFloat(stopLossMax),
+                step: parseFloat(stopLossStep)
+            } : null,
+            rebalance_period_range: {
+                min: parseInt(rebalancePeriodMin),
+                max: parseInt(rebalancePeriodMax),
+                step: parseInt(rebalancePeriodStep)
+            },
+            momentum_lookback_range: {
+                min: parseInt(momentumLookbackMin),
+                max: parseInt(momentumLookbackMax),
+                step: parseInt(momentumLookbackStep)
+            },
+            filter_negative_momentum: filterNegativeMomentum,
+            margin_enabled: marginEnabled,
+            strategies: strategies,
+            sizing_methods: sizingMethods
+        };
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/save_optimization_results', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    params: params,
+                    results: results.results
+                }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                alert(`Results saved to: ${data.filename}`);
+            } else {
+                alert('Failed to save results');
+            }
+        } catch (error) {
+            console.error('Error saving results:', error);
+            alert('Error saving results' + error);
+        }
     };
 
     return (
@@ -298,6 +392,30 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                     <p className="text-xs text-gray-500 mt-2">
                         Used only when Momentum strategy is selected
                     </p>
+
+                    <div className="mt-4 border-t border-gray-200 pt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Filter Negative Momentum</h4>
+                        <div className="flex space-x-4">
+                            <label className="flex items-center space-x-2">
+                                <input
+                                    type="checkbox"
+                                    checked={filterNegativeMomentumEnabled}
+                                    onChange={(e) => setFilterNegativeMomentumEnabled(e.target.checked)}
+                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                />
+                                <span className="text-sm text-gray-700">Test Enabled (True)</span>
+                            </label>
+                            <label className="flex items-center space-x-2">
+                                <input
+                                    type="checkbox"
+                                    checked={filterNegativeMomentumDisabled}
+                                    onChange={(e) => setFilterNegativeMomentumDisabled(e.target.checked)}
+                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                />
+                                <span className="text-sm text-gray-700">Test Disabled (False)</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Stop Loss Range */}
@@ -433,7 +551,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                 </div>
             </div>
 
-            <OptimizationResults results={results} />
+            <OptimizationResults results={results} onSave={handleSaveResults} />
         </div>
     );
 };
