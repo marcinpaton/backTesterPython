@@ -1,27 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading }) => {
+const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialValues }) => {
   const [tickers, setTickers] = useState(
-    'AU, GOOG, FSLR, IDXX, WDC, ULS, FRES.L, WWD, KEYS, ISRG, NST.AX, TER, AMD, CLS.TO, CRS, DELTA.BK, FN, MU, STLD, FIX, CRDO, CTRA, APH, ANGPY, VRT, ASML, SDVKY, ANTO.L, KLAC, AEM.TO, ADI, FNV.TO, SHOP.TO, HWM, IFX.DE, UCBJY, UCB.BR, WPM.TO, PRY.MI, MPWR, BWXT, PSTG, EADSY, WPM.L, AIR.PA, FCX, FLEX, IFNNY, PLTR, BSX, NVDA, GD, AMZN, 1177.HK, ARZGY, ANET, EME, FUTU, RR.L, RYCEY, SAAB-B.ST, SCHW, TT, RMD, GEV, ASMIY, ASM.AS, FTNT, NVZMY, ADBE, ADYEN.AS, ADYEY, ARM, AXON, BLK, CDNS, DXCM, GWRE, LNSTY, MA, META, NOW, NSIS-B.CO, NTNX, PGHN.SW, PINS, RHM.DE, RJF, RMD.AX, SAP, SAP.DE, SMCI, SPOT, SYK, TOST, TW, V, VEEV, WDAY');
-  const [startDate, setStartDate] = useState('2020-01-01');
-  const [endDate, setEndDate] = useState('2025-11-15');
-  const [nTickers, setNTickers] = useState(7);
-  const [rebalancePeriod, setRebalancePeriod] = useState(1);
-  const [rebalancePeriodUnit, setRebalancePeriodUnit] = useState('months');
-  const [stopLoss, setStopLoss] = useState('');
-  const [smartStopLoss, setSmartStopLoss] = useState(false);
-  const [transactionFeeEnabled, setTransactionFeeEnabled] = useState(false);
-  const [transactionFeeType, setTransactionFeeType] = useState('percentage');
-  const [transactionFeeValue, setTransactionFeeValue] = useState(0.1);
-  const [capitalGainsTaxEnabled, setCapitalGainsTaxEnabled] = useState(false);
-  const [capitalGainsTaxPct, setCapitalGainsTaxPct] = useState(19);
+    initialValues?.tickers?.join(', ') || 'AU, GOOG, FSLR, IDXX, WDC, ULS, FRES.L, WWD, KEYS, ISRG, NST.AX, TER, AMD, CLS.TO, CRS, DELTA.BK, FN, MU, STLD, FIX, CRDO, CTRA, APH, ANGPY, VRT, ASML, SDVKY, ANTO.L, KLAC, AEM.TO, ADI, FNV.TO, SHOP.TO, HWM, IFX.DE, UCBJY, UCB.BR, WPM.TO, PRY.MI, MPWR, BWXT, PSTG, EADSY, WPM.L, AIR.PA, FCX, FLEX, IFNNY, PLTR, BSX, NVDA, GD, AMZN, 1177.HK, ARZGY, ANET, EME, FUTU, RR.L, RYCEY, SAAB-B.ST, SCHW, TT, RMD, GEV, ASMIY, ASM.AS, FTNT, NVZMY, ADBE, ADYEN.AS, ADYEY, ARM, AXON, BLK, CDNS, DXCM, GWRE, LNSTY, MA, META, NOW, NSIS-B.CO, NTNX, PGHN.SW, PINS, RHM.DE, RJF, RMD.AX, SAP, SAP.DE, SMCI, SPOT, SYK, TOST, TW, V, VEEV, WDAY');
+  const [startDate, setStartDate] = useState(initialValues?.start_date || '2020-01-01');
+  const [endDate, setEndDate] = useState(initialValues?.end_date || '2025-11-15');
+  const [nTickers, setNTickers] = useState(initialValues?.n_tickers || 7);
+  const [rebalancePeriod, setRebalancePeriod] = useState(initialValues?.rebalance_period || 1);
+  const [rebalancePeriodUnit, setRebalancePeriodUnit] = useState(initialValues?.rebalance_period_unit || 'months');
+  const [stopLoss, setStopLoss] = useState(initialValues?.stop_loss_pct ? initialValues.stop_loss_pct * 100 : '');
+  const [smartStopLoss, setSmartStopLoss] = useState(initialValues?.smart_stop_loss || false);
+  const [transactionFeeEnabled, setTransactionFeeEnabled] = useState(initialValues?.transaction_fee_enabled || false);
+  const [transactionFeeType, setTransactionFeeType] = useState(initialValues?.transaction_fee_type || 'percentage');
+  const [transactionFeeValue, setTransactionFeeValue] = useState(initialValues?.transaction_fee_value || 0.1);
+  const [capitalGainsTaxEnabled, setCapitalGainsTaxEnabled] = useState(initialValues?.capital_gains_tax_enabled || false);
+  const [capitalGainsTaxPct, setCapitalGainsTaxPct] = useState(initialValues?.capital_gains_tax_pct || 19);
 
-  const [marginEnabled, setMarginEnabled] = useState(true);
-  const [strategy, setStrategy] = useState('scoring');
-  const [sizingMethod, setSizingMethod] = useState('equal');
-  const [initialCapital, setInitialCapital] = useState(10000);
-  const [momentumLookbackDays, setMomentumLookbackDays] = useState(30);
-  const [filterNegativeMomentum, setFilterNegativeMomentum] = useState(false);
+  const [marginEnabled, setMarginEnabled] = useState(initialValues?.margin_enabled !== undefined ? initialValues.margin_enabled : true);
+  const [strategy, setStrategy] = useState(initialValues?.strategy || 'scoring');
+  const [sizingMethod, setSizingMethod] = useState(initialValues?.sizing_method || 'equal');
+  const [initialCapital, setInitialCapital] = useState(initialValues?.initial_capital || 10000);
+  const [momentumLookbackDays, setMomentumLookbackDays] = useState(initialValues?.momentum_lookback_days || 30);
+  const [filterNegativeMomentum, setFilterNegativeMomentum] = useState(initialValues?.filter_negative_momentum || false);
+
+  // Effect to update state if initialValues changes (e.g., when navigation happens)
+  useEffect(() => {
+    if (initialValues) {
+      if (initialValues.tickers) setTickers(initialValues.tickers.join(', '));
+      if (initialValues.start_date) setStartDate(initialValues.start_date);
+      if (initialValues.end_date) setEndDate(initialValues.end_date);
+      if (initialValues.n_tickers) setNTickers(initialValues.n_tickers);
+      if (initialValues.rebalance_period) setRebalancePeriod(initialValues.rebalance_period);
+      if (initialValues.rebalance_period_unit) setRebalancePeriodUnit(initialValues.rebalance_period_unit);
+      if (initialValues.stop_loss_pct !== undefined) setStopLoss(initialValues.stop_loss_pct ? initialValues.stop_loss_pct * 100 : '');
+      if (initialValues.smart_stop_loss !== undefined) setSmartStopLoss(initialValues.smart_stop_loss);
+      if (initialValues.transaction_fee_enabled !== undefined) setTransactionFeeEnabled(initialValues.transaction_fee_enabled);
+      if (initialValues.transaction_fee_type) setTransactionFeeType(initialValues.transaction_fee_type);
+      if (initialValues.transaction_fee_value !== undefined) setTransactionFeeValue(initialValues.transaction_fee_value);
+      if (initialValues.capital_gains_tax_enabled !== undefined) setCapitalGainsTaxEnabled(initialValues.capital_gains_tax_enabled);
+      if (initialValues.capital_gains_tax_pct !== undefined) setCapitalGainsTaxPct(initialValues.capital_gains_tax_pct);
+      if (initialValues.margin_enabled !== undefined) setMarginEnabled(initialValues.margin_enabled);
+      if (initialValues.strategy) setStrategy(initialValues.strategy);
+      if (initialValues.sizing_method) setSizingMethod(initialValues.sizing_method);
+      if (initialValues.initial_capital) setInitialCapital(initialValues.initial_capital);
+      if (initialValues.momentum_lookback_days) setMomentumLookbackDays(initialValues.momentum_lookback_days);
+      if (initialValues.filter_negative_momentum !== undefined) setFilterNegativeMomentum(initialValues.filter_negative_momentum);
+    }
+  }, [initialValues]);
 
   const handleDownload = () => {
     const tickerList = tickers.split(',').map(t => t.trim());

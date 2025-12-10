@@ -68,6 +68,9 @@ const OptimizationResults = ({ results, onSave }) => {
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Final Value
                                 </th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Details
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -108,6 +111,46 @@ const OptimizationResults = ({ results, onSave }) => {
                                     </td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                         ${result.final_value.toFixed(2)}
+                                    </td>
+                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                                        <button
+                                            onClick={() => {
+                                                const params = new URLSearchParams();
+                                                params.set('view', 'backtest');
+                                                params.set('autoRun', 'true');
+                                                params.set('n_tickers', result.n_tickers);
+                                                params.set('rebalance_period', result.rebalance_period);
+                                                // Assuming unit is fixed to months for now in optimization or needs to be in result
+                                                params.set('rebalance_period_unit', 'months');
+                                                params.set('stop_loss_pct', result.stop_loss_pct || '');
+                                                // smart_stop_loss might not be in result if not optimized, assume false or check params
+                                                // For now, let's pass what we have
+                                                params.set('strategy', result.strategy);
+                                                params.set('sizing_method', result.sizing_method);
+                                                if (result.margin_enabled !== undefined) params.set('margin_enabled', result.margin_enabled);
+                                                if (result.momentum_lookback_days) params.set('momentum_lookback_days', result.momentum_lookback_days);
+                                                if (result.filter_negative_momentum !== undefined) params.set('filter_negative_momentum', result.filter_negative_momentum);
+
+                                                // Broker params
+                                                if (result.broker === 'bossa') {
+                                                    params.set('transaction_fee_enabled', 'true');
+                                                    params.set('transaction_fee_type', 'percentage');
+                                                    params.set('transaction_fee_value', '0.29');
+                                                    params.set('capital_gains_tax_enabled', 'false');
+                                                } else if (result.broker === 'ib') {
+                                                    params.set('transaction_fee_enabled', 'true');
+                                                    params.set('transaction_fee_type', 'fixed');
+                                                    params.set('transaction_fee_value', '1');
+                                                    params.set('capital_gains_tax_enabled', 'true');
+                                                    params.set('capital_gains_tax_pct', '19');
+                                                }
+
+                                                window.open(`/?${params.toString()}`, '_blank');
+                                            }}
+                                            className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs"
+                                        >
+                                            View
+                                        </button>
                                     </td>
                                 </tr>
                             ))}

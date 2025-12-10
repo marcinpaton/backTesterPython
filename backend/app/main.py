@@ -251,6 +251,7 @@ def run_optimization_endpoint(request: OptimizationRequest):
                                                 'stop_loss_pct': stop_loss_pct,
                                                 'strategy': strategy_name,
                                                 'sizing_method': sizing_method,
+                                                'margin_enabled': request.margin_enabled,
                                                 'cagr': metrics.get('cagr', 0),
                                                 'max_drawdown': metrics.get('max_drawdown', 0),
                                                 'final_value': metrics.get('final_value', 0),

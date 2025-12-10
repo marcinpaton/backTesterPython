@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ConfigurationForm from './components/ConfigurationForm';
 import ResultsDashboard from './components/ResultsDashboard';
@@ -38,6 +38,61 @@ function App() {
       setIsLoading(false);
     }
   };
+
+  const [initialFormValues, setInitialFormValues] = useState(null);
+
+  useEffect(() => {
+    // Check URL params for auto-run configuration
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('autoRun')) {
+      const config = {};
+
+      // Helper to parse boolean
+      const parseBool = (key) => params.get(key) === 'true';
+      // Helper to parse int/float
+      const parseFloatVal = (key) => params.has(key) && params.get(key) !== '' ? parseFloat(params.get(key)) : undefined;
+      const parseIntVal = (key) => params.has(key) && params.get(key) !== '' ? parseInt(params.get(key)) : undefined;
+
+      if (params.has('n_tickers')) config.n_tickers = parseIntVal('n_tickers');
+      if (params.has('rebalance_period')) config.rebalance_period = parseIntVal('rebalance_period');
+      if (params.has('rebalance_period_unit')) config.rebalance_period_unit = params.get('rebalance_period_unit');
+      if (params.has('stop_loss_pct')) config.stop_loss_pct = parseFloatVal('stop_loss_pct');
+      if (params.has('smart_stop_loss')) config.smart_stop_loss = parseBool('smart_stop_loss');
+      if (params.has('transaction_fee_enabled')) config.transaction_fee_enabled = parseBool('transaction_fee_enabled');
+      if (params.has('transaction_fee_type')) config.transaction_fee_type = params.get('transaction_fee_type');
+      if (params.has('transaction_fee_value')) config.transaction_fee_value = parseFloatVal('transaction_fee_value');
+      if (params.has('capital_gains_tax_enabled')) config.capital_gains_tax_enabled = parseBool('capital_gains_tax_enabled');
+      if (params.has('capital_gains_tax_pct')) config.capital_gains_tax_pct = parseFloatVal('capital_gains_tax_pct');
+      if (params.has('margin_enabled')) config.margin_enabled = parseBool('margin_enabled');
+      if (params.has('strategy')) config.strategy = params.get('strategy');
+      if (params.has('sizing_method')) config.sizing_method = params.get('sizing_method');
+      if (params.has('momentum_lookback_days')) config.momentum_lookback_days = parseIntVal('momentum_lookback_days');
+      if (params.has('filter_negative_momentum')) config.filter_negative_momentum = parseBool('filter_negative_momentum');
+
+      // Add defaults for missing required params if needed, or rely on ConfigurationForm defaults if undefined
+      // But we need to execute runBacktest with complete params.
+      // Merging with defaults for run:
+      const fullParams = {
+        n_tickers: 7,
+        rebalance_period: 1,
+        rebalance_period_unit: 'months',
+        initial_capital: 10000,
+        start_date: '2020-01-01',
+        end_date: '2025-11-15',
+        margin_enabled: true,
+        strategy: 'scoring',
+        sizing_method: 'equal',
+        ...config
+      };
+
+      setInitialFormValues(fullParams);
+      // Auto run
+      handleRunBacktest(fullParams);
+
+      // Clean URL (optional, keeps history clean)
+      window.history.replaceState({}, document.title, "/");
+    }
+  }, []);
 
   const handleRunOptimization = async (params) => {
     setIsLoading(true);
@@ -81,6 +136,7 @@ function App() {
               onDownloadData={handleDownload}
               onRunBacktest={handleRunBacktest}
               isLoading={isLoading}
+              initialValues={initialFormValues}
             />
             <ResultsDashboard results={results} />
           </>
