@@ -121,12 +121,162 @@ class OptimizationRequest(BaseModel):
     margin_enabled: bool
     strategies: List[str]  # ['scoring', 'momentum']
     sizing_methods: List[str]  # ['equal', 'var']
+    
+    # Train/Test Split Parameters (optional)
+    enable_train_test: bool = False
+    train_start_date: Optional[str] = None
+    train_months: Optional[int] = None
+    test_months: Optional[int] = None
+    top_n_for_test: Optional[int] = 10
+
+# Helper function to run a single backtest for optimization
+def run_single_backtest(df, config, start_date, end_date, margin_enabled):
+    broker_configs = {
+        'bossa': {
+            'transaction_fee_enabled': True,
+            'transaction_fee_type': 'percentage',
+            'transaction_fee_value': 0.29,
+            'capital_gains_tax_enabled': False,
+            'capital_gains_tax_pct': 0.0
+        },
+        'interactive_brokers': {
+            'transaction_fee_enabled': True,
+            'transaction_fee_type': 'fixed',
+            'transaction_fee_value': 1.0,
+            'capital_gains_tax_enabled': True,
+            'capital_gains_tax_pct': 19.0
+        }
+    }
+    
+    broker_config = broker_configs[config['broker']]
+    
+    # Create strategy
+    if config['strategy'] == 'momentum':
+        strategy = MomentumStrategy(config['n_tickers'], config['rebalance_period'], 'months', df, config['momentum_lookback_days'], config['filter_negative_momentum'])
+    elif config['strategy'] == 'scoring':
+        strategy = ScoringStrategy(config['n_tickers'], config['rebalance_period'], 'months', df)
+    else:
+        return None # Should not happen with validation
+    
+    # Run backtest
+    portfolio = run_backtest(
+        strategy,
+        df,
+        10000,  # Fixed initial capital
+        start_date,
+        end_date,
+        config['stop_loss_pct'] / 100 if config['stop_loss_pct'] else None,
+        False,  # smart_stop_loss
+        broker_config['transaction_fee_enabled'],
+        broker_config['transaction_fee_type'],
+        broker_config['transaction_fee_value'],
+        broker_config['capital_gains_tax_enabled'],
+        broker_config['capital_gains_tax_pct'],
+        margin_enabled,
+        config['sizing_method']
+    )
+    
+    metrics = calculate_metrics(portfolio)
+    
+    # Store result with parameters
+    result = {
+        'broker': config['broker'],
+        'n_tickers': config['n_tickers'],
+        'rebalance_period': config['rebalance_period'],
+        'stop_loss_pct': config['stop_loss_pct'],
+        'strategy': config['strategy'],
+        'sizing_method': config['sizing_method'],
+        'margin_enabled': margin_enabled,
+        'cagr': metrics.get('cagr', 0),
+        'max_drawdown': metrics.get('max_drawdown', 0),
+        'final_value': metrics.get('final_value', 0),
+        'total_return': metrics.get('total_return', 0)
+    }
+    
+    # Add momentum specific params
+    if config['strategy'] == 'momentum':
+        result['momentum_lookback_days'] = config['momentum_lookback_days']
+        result['filter_negative_momentum'] = config['filter_negative_momentum']
+        
+    return result
 
 @app.post("/api/optimize")
 def run_optimization_endpoint(request: OptimizationRequest):
     df = load_data()
     if df is None:
         raise HTTPException(status_code=404, detail="No data found. Please download data first.")
+    
+    # Handle Train/Test Split
+    if request.enable_train_test:
+        from dateutil.relativedelta import relativedelta
+        from datetime import datetime as dt
+        
+        # Calculate train and test periods
+        train_start = dt.strptime(request.train_start_date, '%Y-%m-%d')
+        train_end = train_start + relativedelta(months=request.train_months) - relativedelta(days=1)
+        test_start = train_end + relativedelta(days=1)
+        test_end = test_start + relativedelta(months=request.test_months) - relativedelta(days=1)
+        
+        train_start_str = train_start.strftime('%Y-%m-%d')
+        train_end_str = train_end.strftime('%Y-%m-%d')
+        test_start_str = test_start.strftime('%Y-%m-%d')
+        test_end_str = test_end.strftime('%Y-%m-%d')
+        
+        # Run optimization on training period
+        train_request = OptimizationRequest(
+            tickers=request.tickers,
+            start_date=train_start_str,
+            end_date=train_end_str,
+            brokers=request.brokers,
+            n_tickers_range=request.n_tickers_range,
+            stop_loss_range=request.stop_loss_range,
+            rebalance_period_range=request.rebalance_period_range,
+            momentum_lookback_range=request.momentum_lookback_range,
+            filter_negative_momentum=request.filter_negative_momentum,
+            margin_enabled=request.margin_enabled,
+            strategies=request.strategies,
+            sizing_methods=request.sizing_methods,
+            enable_train_test=False  # Disable recursion
+        )
+        
+        # Get training results
+        train_results = run_optimization_endpoint(train_request)
+        
+        # Select top N results
+        top_n_results = train_results['results'][:request.top_n_for_test]
+        
+        # Run backtests on test period for top N
+        test_results = []
+        for train_result in top_n_results:
+            # Extract parameters from training result
+            test_config = {
+                'broker': train_result['broker'],
+                'n_tickers': train_result['n_tickers'],
+                'rebalance_period': train_result['rebalance_period'],
+                'stop_loss_pct': train_result.get('stop_loss_pct'),
+                'strategy': train_result['strategy'],
+                'sizing_method': train_result['sizing_method'],
+                'momentum_lookback_days': train_result.get('momentum_lookback_days', 30),
+                'filter_negative_momentum': train_result.get('filter_negative_momentum', False)
+            }
+            
+            # Run backtest on test period
+            test_result = run_single_backtest(
+                df, test_config, test_start_str, test_end_str, request.margin_enabled
+            )
+            test_results.append(test_result)
+        
+        # Return combined results
+        return {
+            'train_test_mode': True,
+            'train_period': {'start': train_start_str, 'end': train_end_str},
+            'test_period': {'start': test_start_str, 'end': test_end_str},
+            'train_results': top_n_results,
+            'test_results': test_results,
+            'total_tests': train_results['total_tests'],
+            'completed_tests': train_results['completed_tests']
+        }
+    
     
     # Broker presets
     broker_configs = {

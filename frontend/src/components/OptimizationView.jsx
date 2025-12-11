@@ -45,6 +45,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     const [equalWeightEnabled, setEqualWeightEnabled] = useState(true);
     const [riskParityEnabled, setRiskParityEnabled] = useState(false);
 
+    // Train/Test Split
+    const [enableTrainTest, setEnableTrainTest] = useState(false);
+    const [trainStartDate, setTrainStartDate] = useState('2016-01-01');
+    const [trainMonths, setTrainMonths] = useState(24);
+    const [testMonths, setTestMonths] = useState(12);
+    const [topNForTest, setTopNForTest] = useState(10);
+
     const handleRunOptimization = () => {
         // Validate at least one broker is selected
         if (!bossaEnabled && !ibEnabled) {
@@ -118,7 +125,14 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
             filter_negative_momentum: filterNegativeMomentum,
             margin_enabled: marginEnabled,
             strategies: strategies,
-            sizing_methods: sizingMethods
+            sizing_methods: sizingMethods,
+
+            // Train/Test Split parameters
+            enable_train_test: enableTrainTest,
+            train_start_date: enableTrainTest ? trainStartDate : null,
+            train_months: enableTrainTest ? parseInt(trainMonths) : null,
+            test_months: enableTrainTest ? parseInt(testMonths) : null,
+            top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null
         };
 
         onRunOptimization(params);
@@ -237,6 +251,71 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* Train/Test Split */}
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <label className="flex items-center space-x-2 mb-3">
+                        <input
+                            type="checkbox"
+                            checked={enableTrainTest}
+                            onChange={(e) => setEnableTrainTest(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                        />
+                        <span className="text-lg font-semibold text-gray-700">
+                            Enable Train/Test Split
+                        </span>
+                    </label>
+
+                    {enableTrainTest && (
+                        <div className="mt-4 space-y-4 bg-blue-50 p-4 rounded border border-blue-200">
+                            <p className="text-sm text-blue-800 mb-3">
+                                Optimize on training period, then automatically test top N results on test period.
+                            </p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Training Start Date</label>
+                                    <input
+                                        type="date"
+                                        value={trainStartDate}
+                                        onChange={(e) => setTrainStartDate(e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Training Period (months)</label>
+                                    <input
+                                        type="number"
+                                        value={trainMonths}
+                                        onChange={(e) => setTrainMonths(e.target.value)}
+                                        min="1"
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Test Period (months)</label>
+                                    <input
+                                        type="number"
+                                        value={testMonths}
+                                        onChange={(e) => setTestMonths(e.target.value)}
+                                        min="1"
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Top N to Test</label>
+                                    <input
+                                        type="number"
+                                        value={topNForTest}
+                                        onChange={(e) => setTopNForTest(e.target.value)}
+                                        min="1"
+                                        max="100"
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Broker Presets */}
