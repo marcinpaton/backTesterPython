@@ -92,7 +92,12 @@ const OptimizationResults = ({ results, onSave }) => {
 
                         // Find all results matching this parameter across all windows
                         windows.forEach(window => {
-                            window.train_results.forEach((result, idx) => {
+                            // Use all_train_results to search through ALL results, not just top N
+                            const allTrainResults = window.all_train_results || window.train_results;
+                            const allTestResults = window.all_test_results || window.test_results;
+                            const allScores = window.all_scores || window.scores;
+
+                            allTrainResults.forEach((result, idx) => {
                                 if (
                                     result.broker === param.parameters.broker &&
                                     result.n_tickers === param.parameters.n_tickers &&
@@ -108,13 +113,16 @@ const OptimizationResults = ({ results, onSave }) => {
                                         window_period: `${window.window.train_start} → ${window.window.test_end}`,
                                         train_cagr: result.cagr,
                                         train_dd: result.max_drawdown,
-                                        test_cagr: window.test_results[idx]?.cagr,
-                                        test_dd: window.test_results[idx]?.max_drawdown,
-                                        score: window.scores[idx]
+                                        test_cagr: allTestResults[idx]?.cagr,
+                                        test_dd: allTestResults[idx]?.max_drawdown,
+                                        score: allScores[idx]
                                     });
                                 }
                             });
                         });
+
+                        console.log('Total matching results found:', matchingResults.length, 'across', windows.length, 'windows');
+                        console.log('Selected param:', param.parameters);
 
                         return (
                             <div className="mt-4 p-4 bg-purple-100 rounded border border-purple-300">

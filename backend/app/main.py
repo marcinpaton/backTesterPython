@@ -356,12 +356,12 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
         # Run train/test for this window
         window_results = run_optimization_endpoint(window_request)
         
-        # Extract top N configurations from training results
+        # Extract top N configurations from training results for frequency counting
         top_configs = window_results['train_results'][:request.top_n_for_test]
         test_configs = window_results['test_results'][:request.top_n_for_test]
         scores = window_results.get('scores', [])[:request.top_n_for_test]
         
-        # Count parameter combinations
+        # Count parameter combinations (only from top N)
         for config in top_configs:
             # Create hashable key from parameters
             param_key = (
@@ -376,12 +376,16 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
             )
             parameter_frequency[param_key] += 1
         
+        # Store results for this window
         all_window_results.append({
             'window_number': i + 1,
             'window': window,
-            'train_results': top_configs,
-            'test_results': test_configs,
-            'scores': scores
+            'train_results': top_configs,  # Top N for display
+            'test_results': test_configs,   # Top N for display
+            'scores': scores,               # Top N for display
+            'all_train_results': window_results.get('all_train_results', window_results['train_results']),  # ALL results
+            'all_test_results': window_results.get('all_test_results', window_results['test_results']),    # ALL results
+            'all_scores': window_results.get('all_scores', window_results.get('scores', []))                # ALL scores
         })
     
     # Rank parameters by frequency
@@ -500,19 +504,27 @@ def run_optimization_endpoint(request: OptimizationRequest):
         all_results_with_scores.sort(key=lambda x: x['score'], reverse=True)
         top_n_scored = all_results_with_scores[:request.top_n_for_test]
         
-        # Extract train and test results for response
+        # Extract train and test results for top N (for display)
         top_n_train_results = [r['train_result'] for r in top_n_scored]
         top_n_test_results = [r['test_result'] for r in top_n_scored]
         top_n_scores = [r['score'] for r in top_n_scored]
+        
+        # Extract ALL results (before top N selection) for walk-forward analysis
+        all_train_results = [r['train_result'] for r in all_results_with_scores]
+        all_test_results = [r['test_result'] for r in all_results_with_scores]
+        all_scores = [r['score'] for r in all_results_with_scores]
         
         # Return combined results
         return {
             'train_test_mode': True,
             'train_period': {'start': train_start_str, 'end': train_end_str},
             'test_period': {'start': test_start_str, 'end': test_end_str},
-            'train_results': top_n_train_results,
-            'test_results': top_n_test_results,
-            'scores': top_n_scores,
+            'train_results': top_n_train_results,      # Top N for display
+            'test_results': top_n_test_results,        # Top N for display
+            'scores': top_n_scores,                     # Top N for display
+            'all_train_results': all_train_results,    # ALL results for walk-forward
+            'all_test_results': all_test_results,      # ALL results for walk-forward
+            'all_scores': all_scores,                   # ALL scores for walk-forward
             'total_tests': train_results['total_tests'],
             'completed_tests': train_results['completed_tests']
         }
