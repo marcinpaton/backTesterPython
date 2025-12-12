@@ -1,0 +1,2 @@
+1. Walk-Forward Analysis z Estimated Windows: 9 windows(Train: 72mo, Test: 12mo, Step: 3mo) od 2016-01-01
+daje bardzo wysokie wyniki w Testowym okresie

@@ -220,12 +220,14 @@ def run_single_backtest(df, config, start_date, end_date, margin_enabled):
 
 def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd, config=None):
     """
-    Calculate score for train/test optimization based on both train and test results.
+    Calculate score for train/test optimization based ONLY on train results.
     
     Uses configurable thresholds and weights from ScoringConfig.
     
-    Score = Train_CAGR_score + Train_DD_score + Test_CAGR_score + Test_DD_score
-    Maximum: (cagr_weight + dd_weight) * 2
+    Score = Train_CAGR_score + Train_DD_score
+    Maximum: cagr_weight + dd_weight
+    
+    Note: Test results are calculated but excluded from the score to prevent look-ahead bias.
     """
     if config is None:
         config = ScoringConfig()  # Use defaults
@@ -250,10 +252,11 @@ def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd, config=
     # Calculate scores for train and test
     train_cagr_score = calc_cagr_score(train_cagr)
     train_dd_score = calc_dd_score(train_dd)
-    test_cagr_score = calc_cagr_score(test_cagr)
-    test_dd_score = calc_dd_score(test_dd)
+    # test_cagr_score = calc_cagr_score(test_cagr)
+    # test_dd_score = calc_dd_score(test_dd)
     
-    return train_cagr_score + train_dd_score + test_cagr_score + test_dd_score
+    # ONLY use Train score for selection to prevent look-ahead bias
+    return train_cagr_score + train_dd_score
 
 def calculate_single_score(cagr, dd, config=None):
     """
@@ -694,7 +697,7 @@ def run_optimization_endpoint(request: OptimizationRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-OPTIMIZATION_RESULTS_DIR = "/home/mpaton/Projects/my/backTesterPython/backTesterPython/optimisation"
+OPTIMIZATION_RESULTS_DIR = os.getenv("OPTIMIZATION_RESULTS_DIR", "/home/mpaton/Projects/my/backTesterPython/backTesterPython/optimisation")
 
 class SaveOptimizationResultsRequest(BaseModel):
     params: OptimizationRequest

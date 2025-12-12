@@ -32,6 +32,10 @@ stop_process_by_port() {
 start_backend() {
     echo "Starting Backend..."
     
+    # Set OPTIMIZATION_RESULTS_DIR
+    export OPTIMIZATION_RESULTS_DIR="/home/mpaton/Projects/my/backTesterPython/backTesterPython/optimisation"
+    echo "Optimization Results Dir: $OPTIMIZATION_RESULTS_DIR"
+    
     # Prepare the activation command for venv
     VENV_ACTIVATE=""
     if [ -d "$SCRIPT_DIR/backend/venv" ]; then
