@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 const OptimizationResults = ({ results, onSave }) => {
     const [sortBy, setSortBy] = useState('score'); // Default sort by score
     const [expandedWindow, setExpandedWindow] = useState(null); // For walk-forward mode
+    const [selectedParam, setSelectedParam] = useState(null); // For showing parameter details
 
     if (!results) {
         return null;
@@ -42,7 +43,7 @@ const OptimizationResults = ({ results, onSave }) => {
                 <div className="mb-6">
                     <h3 className="text-xl font-bold mb-3">Most Consistent Parameters</h3>
                     <p className="text-sm text-gray-600 mb-3">
-                        Parameters ranked by how often they appeared in top results across all windows
+                        Parameters that appeared more than once in top results (click row for details)
                     </p>
 
                     <div className="overflow-x-auto">
@@ -62,8 +63,12 @@ const OptimizationResults = ({ results, onSave }) => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {ranked_parameters.map((param, index) => (
-                                    <tr key={index} className="hover:bg-gray-50">
+                                {ranked_parameters.filter(p => p.frequency > 1).map((param, index) => (
+                                    <tr
+                                        key={index}
+                                        onClick={() => setSelectedParam(selectedParam === index ? null : index)}
+                                        className={`cursor-pointer ${selectedParam === index ? 'bg-purple-200' : 'hover:bg-purple-50'}`}
+                                    >
                                         <td className="px-3 py-3 text-sm font-bold">{index + 1}</td>
                                         <td className="px-3 py-3 text-sm">{param.parameters.broker === 'interactive_brokers' ? 'IB' : param.parameters.broker}</td>
                                         <td className="px-3 py-3 text-sm">{param.parameters.n_tickers}</td>
@@ -79,6 +84,72 @@ const OptimizationResults = ({ results, onSave }) => {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Parameter Details */}
+                    {selectedParam !== null && (() => {
+                        const param = ranked_parameters.filter(p => p.frequency > 1)[selectedParam];
+                        const matchingResults = [];
+
+                        // Find all results matching this parameter across all windows
+                        windows.forEach(window => {
+                            window.train_results.forEach((result, idx) => {
+                                if (
+                                    result.broker === param.parameters.broker &&
+                                    result.n_tickers === param.parameters.n_tickers &&
+                                    result.rebalance_period === param.parameters.rebalance_period &&
+                                    (result.momentum_lookback_days || 0) === (param.parameters.momentum_lookback_days || 0) &&
+                                    (result.filter_negative_momentum || false) === (param.parameters.filter_negative_momentum || false) &&
+                                    (result.stop_loss_pct || 0) === (param.parameters.stop_loss_pct || 0) &&
+                                    result.strategy === param.parameters.strategy &&
+                                    result.sizing_method === param.parameters.sizing_method
+                                ) {
+                                    matchingResults.push({
+                                        window_number: window.window_number,
+                                        window_period: `${window.window.train_start} → ${window.window.test_end}`,
+                                        train_cagr: result.cagr,
+                                        train_dd: result.max_drawdown,
+                                        test_cagr: window.test_results[idx]?.cagr,
+                                        test_dd: window.test_results[idx]?.max_drawdown,
+                                        score: window.scores[idx]
+                                    });
+                                }
+                            });
+                        });
+
+                        return (
+                            <div className="mt-4 p-4 bg-purple-100 rounded border border-purple-300">
+                                <h4 className="font-bold mb-3">Results for Selected Parameters Across All Windows</h4>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-2 py-2 text-left">Window</th>
+                                                <th className="px-2 py-2 text-left">Period</th>
+                                                <th className="px-2 py-2 text-left bg-green-50">Train CAGR</th>
+                                                <th className="px-2 py-2 text-left bg-red-50">Train DD</th>
+                                                <th className="px-2 py-2 text-left bg-green-100">Test CAGR</th>
+                                                <th className="px-2 py-2 text-left bg-red-100">Test DD</th>
+                                                <th className="px-2 py-2 text-left bg-purple-50">Score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {matchingResults.map((result, idx) => (
+                                                <tr key={idx} className="hover:bg-gray-50">
+                                                    <td className="px-2 py-2">{result.window_number}</td>
+                                                    <td className="px-2 py-2 text-xs">{result.window_period}</td>
+                                                    <td className="px-2 py-2 bg-green-50">{(result.train_cagr * 100).toFixed(2)}%</td>
+                                                    <td className="px-2 py-2 bg-red-50">{(result.train_dd * 100).toFixed(2)}%</td>
+                                                    <td className="px-2 py-2 bg-green-100">{(result.test_cagr * 100).toFixed(2)}%</td>
+                                                    <td className="px-2 py-2 bg-red-100">{(result.test_dd * 100).toFixed(2)}%</td>
+                                                    <td className="px-2 py-2 bg-purple-50 font-bold">{result.score?.toFixed(1)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Individual Windows */}
