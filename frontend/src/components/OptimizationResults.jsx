@@ -182,6 +182,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sizing</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">CAGR</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-red-50">Max DD</th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Score</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Final Value</th>
                             </tr>
                         </thead>
@@ -210,6 +211,9 @@ const OptimizationResults = ({ results, onSave }) => {
                                     </td>
                                     <td className="px-3 py-3 text-sm font-semibold text-red-700 bg-red-50">
                                         {(result.max_drawdown * 100).toFixed(2)}%
+                                    </td>
+                                    <td className="px-3 py-3 text-sm font-bold text-purple-700 bg-purple-50">
+                                        {result.score ? result.score.toFixed(1) : '-'}
                                     </td>
                                     <td className="px-3 py-3 text-sm text-gray-900">
                                         ${result.final_value.toFixed(2)}

@@ -52,6 +52,15 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     const [testMonths, setTestMonths] = useState(12);
     const [topNForTest, setTopNForTest] = useState(10);
 
+    // Scoring Configuration
+    const [cagrMin, setCagrMin] = useState(40);
+    const [cagrMax, setCagrMax] = useState(60);
+    const [cagrWeight, setCagrWeight] = useState(60);
+    const [ddMin, setDdMin] = useState(-45);
+    const [ddMax, setDdMax] = useState(-30);
+    const [ddWeight, setDdWeight] = useState(40);
+    const [showScoringConfig, setShowScoringConfig] = useState(false);
+
     const handleRunOptimization = () => {
         // Validate at least one broker is selected
         if (!bossaEnabled && !ibEnabled) {
@@ -132,7 +141,17 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
             train_start_date: enableTrainTest ? trainStartDate : null,
             train_months: enableTrainTest ? parseInt(trainMonths) : null,
             test_months: enableTrainTest ? parseInt(testMonths) : null,
-            top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null
+            top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null,
+
+            // Scoring Configuration
+            scoring_config: {
+                cagr_min: cagrMin / 100,
+                cagr_max: cagrMax / 100,
+                cagr_weight: parseFloat(cagrWeight),
+                dd_min: ddMin / 100,
+                dd_max: ddMax / 100,
+                dd_weight: parseFloat(ddWeight)
+            }
         };
 
         onRunOptimization(params);
@@ -313,6 +332,137 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Date Preview */}
+                            {trainStartDate && trainMonths && testMonths && (
+                                <div className="mt-4 p-3 bg-white rounded border border-blue-300">
+                                    <p className="text-xs font-semibold text-gray-600 mb-2">📅 Period Preview:</p>
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                        <div>
+                                            <span className="font-medium text-green-700">Training:</span>
+                                            <div className="text-gray-700 ml-2">
+                                                {(() => {
+                                                    const start = new Date(trainStartDate);
+                                                    const end = new Date(start);
+                                                    end.setMonth(end.getMonth() + parseInt(trainMonths));
+                                                    end.setDate(end.getDate() - 1);
+                                                    return `${start.toLocaleDateString('en-CA')} to ${end.toLocaleDateString('en-CA')}`;
+                                                })()}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span className="font-medium text-blue-700">Test:</span>
+                                            <div className="text-gray-700 ml-2">
+                                                {(() => {
+                                                    const trainStart = new Date(trainStartDate);
+                                                    const trainEnd = new Date(trainStart);
+                                                    trainEnd.setMonth(trainEnd.getMonth() + parseInt(trainMonths));
+                                                    trainEnd.setDate(trainEnd.getDate() - 1);
+                                                    const testStart = new Date(trainEnd);
+                                                    testStart.setDate(testStart.getDate() + 1);
+                                                    const testEnd = new Date(testStart);
+                                                    testEnd.setMonth(testEnd.getMonth() + parseInt(testMonths));
+                                                    testEnd.setDate(testEnd.getDate() - 1);
+                                                    return `${testStart.toLocaleDateString('en-CA')} to ${testEnd.toLocaleDateString('en-CA')}`;
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Scoring Configuration */}
+                            <div className="mt-4">
+                                <button
+                                    onClick={() => setShowScoringConfig(!showScoringConfig)}
+                                    className="text-sm text-blue-700 hover:text-blue-900 underline font-medium"
+                                >
+                                    {showScoringConfig ? '▼' : '▶'} Advanced: Configure Scoring Parameters
+                                </button>
+
+                                {showScoringConfig && (
+                                    <div className="mt-3 p-4 bg-yellow-50 rounded border border-yellow-300">
+                                        <h4 className="font-semibold text-sm mb-3">Scoring Configuration</h4>
+
+                                        <div className="grid grid-cols-3 gap-4">
+                                            {/* CAGR Settings */}
+                                            <div className="col-span-3">
+                                                <p className="font-medium text-sm mb-2 text-green-700">CAGR Thresholds & Weight</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Min CAGR (%)</label>
+                                                <input
+                                                    type="number"
+                                                    value={cagrMin}
+                                                    onChange={(e) => setCagrMin(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Max CAGR (%)</label>
+                                                <input
+                                                    type="number"
+                                                    value={cagrMax}
+                                                    onChange={(e) => setCagrMax(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Weight (points)</label>
+                                                <input
+                                                    type="number"
+                                                    value={cagrWeight}
+                                                    onChange={(e) => setCagrWeight(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+
+                                            {/* DD Settings */}
+                                            <div className="col-span-3">
+                                                <p className="font-medium text-sm mb-2 mt-2 text-red-700">Max DD Thresholds & Weight</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Min DD (%)</label>
+                                                <input
+                                                    type="number"
+                                                    value={ddMin}
+                                                    onChange={(e) => setDdMin(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Max DD (%)</label>
+                                                <input
+                                                    type="number"
+                                                    value={ddMax}
+                                                    onChange={(e) => setDdMax(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Weight (points)</label>
+                                                <input
+                                                    type="number"
+                                                    value={ddWeight}
+                                                    onChange={(e) => setDdWeight(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 p-2 bg-white rounded border border-yellow-400">
+                                            <p className="text-xs text-gray-700">
+                                                <strong>Max Score:</strong> {enableTrainTest ? (parseFloat(cagrWeight) + parseFloat(ddWeight)) * 2 : parseFloat(cagrWeight) + parseFloat(ddWeight)} points
+                                                {enableTrainTest && (
+                                                    <span className="ml-2 text-gray-600">
+                                                        (Train: {parseFloat(cagrWeight) + parseFloat(ddWeight)}, Test: {parseFloat(cagrWeight) + parseFloat(ddWeight)})
+                                                    </span>
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

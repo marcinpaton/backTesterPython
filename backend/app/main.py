@@ -108,6 +108,15 @@ class OptimizationRangeRequest(BaseModel):
     max: float
     step: float
 
+class ScoringConfig(BaseModel):
+    """Configuration for scoring calculation"""
+    cagr_min: float = 0.40  # 40%
+    cagr_max: float = 0.60  # 60%
+    cagr_weight: float = 60.0
+    dd_min: float = -0.45  # -45%
+    dd_max: float = -0.30  # -30%
+    dd_weight: float = 40.0
+
 class OptimizationRequest(BaseModel):
     tickers: List[str]
     start_date: str
@@ -128,6 +137,9 @@ class OptimizationRequest(BaseModel):
     train_months: Optional[int] = None
     test_months: Optional[int] = None
     top_n_for_test: Optional[int] = 10
+    
+    # Scoring Configuration (optional)
+    scoring_config: Optional[ScoringConfig] = None
 
 # Helper function to run a single backtest for optimization
 def run_single_backtest(df, config, start_date, end_date, margin_enabled):
@@ -200,39 +212,34 @@ def run_single_backtest(df, config, start_date, end_date, margin_enabled):
         
     return result
 
-def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd):
+def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd, config=None):
     """
     Calculate score for train/test optimization based on both train and test results.
     
-    Score = Train_CAGR_score (0-60) + Train_DD_score (0-40) + Test_CAGR_score (0-60) + Test_DD_score (0-40)
-    Maximum: 200 points
+    Uses configurable thresholds and weights from ScoringConfig.
     
-    CAGR_score (applies to both train and test):
-    - Below 40%: 0 points
-    - Above 60%: 60 points
-    - Between 40-60%: proportional 0-60
-    
-    DD_score (applies to both train and test):
-    - Above -45%: 0 points
-    - Below -30%: 40 points
-    - Between -45% to -30%: proportional 0-40
+    Score = Train_CAGR_score + Train_DD_score + Test_CAGR_score + Test_DD_score
+    Maximum: (cagr_weight + dd_weight) * 2
     """
+    if config is None:
+        config = ScoringConfig()  # Use defaults
+    
     def calc_cagr_score(cagr):
-        if cagr < 0.40:
+        if cagr < config.cagr_min:
             return 0
-        elif cagr > 0.60:
-            return 60
+        elif cagr > config.cagr_max:
+            return config.cagr_weight
         else:
-            return ((cagr - 0.40) / (0.60 - 0.40)) * 60
+            return ((cagr - config.cagr_min) / (config.cagr_max - config.cagr_min)) * config.cagr_weight
     
     def calc_dd_score(dd):
-        # Note: max_drawdown is negative, so -30% is better than -45%
-        if dd < -0.45:  # Worse than -45%
+        # Note: max_drawdown is negative, so dd_max (less negative) is better than dd_min (more negative)
+        if dd < config.dd_min:  # Worse than min threshold
             return 0
-        elif dd > -0.30:  # Better than -30%
-            return 40
+        elif dd > config.dd_max:  # Better than max threshold
+            return config.dd_weight
         else:
-            return ((dd - (-0.45)) / ((-0.30) - (-0.45))) * 40
+            return ((dd - config.dd_min) / (config.dd_max - config.dd_min)) * config.dd_weight
     
     # Calculate scores for train and test
     train_cagr_score = calc_cagr_score(train_cagr)
@@ -241,6 +248,37 @@ def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd):
     test_dd_score = calc_dd_score(test_dd)
     
     return train_cagr_score + train_dd_score + test_cagr_score + test_dd_score
+
+def calculate_single_score(cagr, dd, config=None):
+    """
+    Calculate score for normal optimization (single period).
+    
+    Uses configurable thresholds and weights from ScoringConfig.
+    
+    Score = CAGR_score + DD_score
+    Maximum: cagr_weight + dd_weight
+    """
+    if config is None:
+        config = ScoringConfig()  # Use defaults
+    
+    # CAGR score
+    if cagr < config.cagr_min:
+        cagr_score = 0
+    elif cagr > config.cagr_max:
+        cagr_score = config.cagr_weight
+    else:
+        cagr_score = ((cagr - config.cagr_min) / (config.cagr_max - config.cagr_min)) * config.cagr_weight
+    
+    # DD score
+    if dd < config.dd_min:
+        dd_score = 0
+    elif dd > config.dd_max:
+        dd_score = config.dd_weight
+    else:
+        dd_score = ((dd - config.dd_min) / (config.dd_max - config.dd_min)) * config.dd_weight
+    
+    return cagr_score + dd_score
+
 
 
 
@@ -311,7 +349,8 @@ def run_optimization_endpoint(request: OptimizationRequest):
                 train_result['cagr'], 
                 train_result['max_drawdown'],
                 test_result['cagr'], 
-                test_result['max_drawdown']
+                test_result['max_drawdown'],
+                request.scoring_config
             )
             
             # Combine train and test results with score
@@ -479,6 +518,13 @@ def run_optimization_endpoint(request: OptimizationRequest):
                                                 result['momentum_lookback_days'] = lookback_days
                                                 result['filter_negative_momentum'] = filter_neg_mom
                                             
+                                            # Calculate score for this result
+                                            result['score'] = calculate_single_score(
+                                                metrics.get('cagr', 0),
+                                                metrics.get('max_drawdown', 0),
+                                                request.scoring_config
+                                            )
+                                            
                                             results.append(result)
                                         except Exception as e:
                                             import traceback
@@ -487,8 +533,8 @@ def run_optimization_endpoint(request: OptimizationRequest):
                                             # Continue with next combination
                                             continue
         
-        # Sort results by CAGR (descending) and Max Drawdown (ascending - less negative is better)
-        results.sort(key=lambda x: (-x['cagr'], -x['max_drawdown']))
+        # Sort results by score (descending), then by CAGR and Max Drawdown
+        results.sort(key=lambda x: (-x.get('score', 0), -x['cagr'], -x['max_drawdown']))
         
         return {
             'total_tests': total_combinations,
