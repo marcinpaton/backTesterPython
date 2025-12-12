@@ -200,6 +200,50 @@ def run_single_backtest(df, config, start_date, end_date, margin_enabled):
         
     return result
 
+def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd):
+    """
+    Calculate score for train/test optimization based on both train and test results.
+    
+    Score = Train_CAGR_score (0-60) + Train_DD_score (0-40) + Test_CAGR_score (0-60) + Test_DD_score (0-40)
+    Maximum: 200 points
+    
+    CAGR_score (applies to both train and test):
+    - Below 40%: 0 points
+    - Above 60%: 60 points
+    - Between 40-60%: proportional 0-60
+    
+    DD_score (applies to both train and test):
+    - Above -45%: 0 points
+    - Below -30%: 40 points
+    - Between -45% to -30%: proportional 0-40
+    """
+    def calc_cagr_score(cagr):
+        if cagr < 0.40:
+            return 0
+        elif cagr > 0.60:
+            return 60
+        else:
+            return ((cagr - 0.40) / (0.60 - 0.40)) * 60
+    
+    def calc_dd_score(dd):
+        # Note: max_drawdown is negative, so -30% is better than -45%
+        if dd < -0.45:  # Worse than -45%
+            return 0
+        elif dd > -0.30:  # Better than -30%
+            return 40
+        else:
+            return ((dd - (-0.45)) / ((-0.30) - (-0.45))) * 40
+    
+    # Calculate scores for train and test
+    train_cagr_score = calc_cagr_score(train_cagr)
+    train_dd_score = calc_dd_score(train_dd)
+    test_cagr_score = calc_cagr_score(test_cagr)
+    test_dd_score = calc_dd_score(test_dd)
+    
+    return train_cagr_score + train_dd_score + test_cagr_score + test_dd_score
+
+
+
 @app.post("/api/optimize")
 def run_optimization_endpoint(request: OptimizationRequest):
     df = load_data()
@@ -242,12 +286,9 @@ def run_optimization_endpoint(request: OptimizationRequest):
         # Get training results
         train_results = run_optimization_endpoint(train_request)
         
-        # Select top N results
-        top_n_results = train_results['results'][:request.top_n_for_test]
-        
-        # Run backtests on test period for top N
-        test_results = []
-        for train_result in top_n_results:
+        # Run backtests on test period for ALL training results to calculate scores
+        all_results_with_scores = []
+        for train_result in train_results['results']:
             # Extract parameters from training result
             test_config = {
                 'broker': train_result['broker'],
@@ -264,15 +305,40 @@ def run_optimization_endpoint(request: OptimizationRequest):
             test_result = run_single_backtest(
                 df, test_config, test_start_str, test_end_str, request.margin_enabled
             )
-            test_results.append(test_result)
+            
+            # Calculate score based on both train and test results
+            score = calculate_train_test_score(
+                train_result['cagr'], 
+                train_result['max_drawdown'],
+                test_result['cagr'], 
+                test_result['max_drawdown']
+            )
+            
+            # Combine train and test results with score
+            combined_result = {
+                'train_result': train_result,
+                'test_result': test_result,
+                'score': score
+            }
+            all_results_with_scores.append(combined_result)
+        
+        # Sort by score (descending) and select top N
+        all_results_with_scores.sort(key=lambda x: x['score'], reverse=True)
+        top_n_scored = all_results_with_scores[:request.top_n_for_test]
+        
+        # Extract train and test results for response
+        top_n_train_results = [r['train_result'] for r in top_n_scored]
+        top_n_test_results = [r['test_result'] for r in top_n_scored]
+        top_n_scores = [r['score'] for r in top_n_scored]
         
         # Return combined results
         return {
             'train_test_mode': True,
             'train_period': {'start': train_start_str, 'end': train_end_str},
             'test_period': {'start': test_start_str, 'end': test_end_str},
-            'train_results': top_n_results,
-            'test_results': test_results,
+            'train_results': top_n_train_results,
+            'test_results': top_n_test_results,
+            'scores': top_n_scores,
             'total_tests': train_results['total_tests'],
             'completed_tests': train_results['completed_tests']
         }

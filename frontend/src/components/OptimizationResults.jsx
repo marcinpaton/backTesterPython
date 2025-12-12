@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 const OptimizationResults = ({ results, onSave }) => {
-    const [sortBy, setSortBy] = useState('train_cagr');
+    const [sortBy, setSortBy] = useState('score'); // Default sort by score
 
     if (!results) {
         return null;
@@ -12,18 +12,20 @@ const OptimizationResults = ({ results, onSave }) => {
 
     if (isTrainTestMode) {
         // Train/Test Split Mode
-        const { train_period, test_period, train_results, test_results, total_tests, completed_tests } = results;
+        const { train_period, test_period, train_results, test_results, scores, total_tests, completed_tests } = results;
 
         // Combine train and test results for display
         const combinedResults = train_results.map((trainResult, index) => ({
             ...trainResult,
             test_cagr: test_results[index]?.cagr || 0,
             test_max_drawdown: test_results[index]?.max_drawdown || 0,
-            test_final_value: test_results[index]?.final_value || 0
+            test_final_value: test_results[index]?.final_value || 0,
+            score: scores[index] || 0
         }));
 
         // Sort combined results
         const sortedResults = [...combinedResults].sort((a, b) => {
+            if (sortBy === 'score') return b.score - a.score;
             if (sortBy === 'train_cagr') return b.cagr - a.cagr;
             if (sortBy === 'test_cagr') return b.test_cagr - a.test_cagr;
             if (sortBy === 'train_dd') return b.max_drawdown - a.max_drawdown;
@@ -56,24 +58,30 @@ const OptimizationResults = ({ results, onSave }) => {
                         <p className="text-sm font-semibold">
                             Completed: {completed_tests} / {total_tests} tests on training period
                         </p>
+                        <p className="text-sm text-blue-700 mt-2">
+                            ℹ️ Top N selected based on <strong>Scoring</strong> (Test CAGR: 0-60 pts + Test DD: 0-40 pts)
+                        </p>
                     </div>
 
                     <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                        <p className="text-sm">
-                            <strong>Sort by:</strong>
-                            <button onClick={() => setSortBy('train_cagr')} className={`ml-2 px-2 py-1 rounded text-xs ${sortBy === 'train_cagr' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <strong className="text-sm">Sort by:</strong>
+                            <button onClick={() => setSortBy('score')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'score' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                                Score
+                            </button>
+                            <button onClick={() => setSortBy('train_cagr')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'train_cagr' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
                                 Train CAGR
                             </button>
-                            <button onClick={() => setSortBy('test_cagr')} className={`ml-2 px-2 py-1 rounded text-xs ${sortBy === 'test_cagr' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+                            <button onClick={() => setSortBy('test_cagr')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'test_cagr' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
                                 Test CAGR
                             </button>
-                            <button onClick={() => setSortBy('train_dd')} className={`ml-2 px-2 py-1 rounded text-xs ${sortBy === 'train_dd' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+                            <button onClick={() => setSortBy('train_dd')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'train_dd' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
                                 Train DD
                             </button>
-                            <button onClick={() => setSortBy('test_dd')} className={`ml-2 px-2 py-1 rounded text-xs ${sortBy === 'test_dd' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+                            <button onClick={() => setSortBy('test_dd')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'test_dd' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
                                 Test DD
                             </button>
-                        </p>
+                        </div>
                     </div>
                 </div>
 
@@ -94,6 +102,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                     <th className="px-2 py-2 text-left text-xs font-medium text-red-700 uppercase bg-red-50">Train DD</th>
                                     <th className="px-2 py-2 text-left text-xs font-medium text-green-700 uppercase bg-green-100">Test CAGR</th>
                                     <th className="px-2 py-2 text-left text-xs font-medium text-red-700 uppercase bg-red-100">Test DD</th>
+                                    <th className="px-2 py-2 text-left text-xs font-medium text-purple-700 uppercase bg-purple-50">Score</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -118,6 +127,9 @@ const OptimizationResults = ({ results, onSave }) => {
                                         </td>
                                         <td className="px-2 py-2 text-sm font-semibold text-red-700 bg-red-100">
                                             {(result.test_max_drawdown * 100).toFixed(2)}%
+                                        </td>
+                                        <td className="px-2 py-2 text-sm font-bold text-purple-700 bg-purple-50">
+                                            {result.score.toFixed(1)}
                                         </td>
                                     </tr>
                                 ))}
