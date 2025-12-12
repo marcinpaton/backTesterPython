@@ -713,7 +713,7 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
         filename = f"optimization_results_{timestamp}.txt"
         filepath = os.path.join(OPTIMIZATION_RESULTS_DIR, filename)
         
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write(f"Optimization Results - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write("=" * 50 + "\n\n")
             
