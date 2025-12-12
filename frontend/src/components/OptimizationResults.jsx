@@ -2,13 +2,151 @@ import React, { useState } from 'react';
 
 const OptimizationResults = ({ results, onSave }) => {
     const [sortBy, setSortBy] = useState('score'); // Default sort by score
+    const [expandedWindow, setExpandedWindow] = useState(null); // For walk-forward mode
 
     if (!results) {
         return null;
     }
 
+    // Check if this is walk-forward mode
+    const isWalkForwardMode = results.walk_forward_mode === true;
+
     // Check if this is train/test mode
     const isTrainTestMode = results.train_test_mode === true;
+
+    if (isWalkForwardMode) {
+        // Walk-Forward Mode - show ranked parameters and all windows
+        const { total_windows, windows, ranked_parameters, train_period_months, test_period_months, step_months } = results;
+
+        return (
+            <div className="mt-6 p-4 bg-white shadow rounded-lg">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-2xl font-bold">Walk-Forward Optimization Results</h2>
+                    {onSave && (
+                        <button
+                            onClick={onSave}
+                            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center"
+                        >
+                            <span className="mr-2">💾</span> Save Results
+                        </button>
+                    )}
+                </div>
+
+                <div className="mb-4 p-3 bg-purple-50 rounded border border-purple-200">
+                    <p className="text-sm font-semibold">
+                        Total Windows: {total_windows} | Train: {train_period_months}mo | Test: {test_period_months}mo | Step: {step_months}mo
+                    </p>
+                </div>
+
+                {/* Ranked Parameters by Frequency */}
+                <div className="mb-6">
+                    <h3 className="text-xl font-bold mb-3">Most Consistent Parameters</h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                        Parameters ranked by how often they appeared in top results across all windows
+                    </p>
+
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Broker</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">N</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rebal</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Look</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">SL%</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Strat</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-purple-700 uppercase bg-purple-50">Frequency</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-purple-700 uppercase bg-purple-50">% Windows</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {ranked_parameters.map((param, index) => (
+                                    <tr key={index} className="hover:bg-gray-50">
+                                        <td className="px-3 py-3 text-sm font-bold">{index + 1}</td>
+                                        <td className="px-3 py-3 text-sm">{param.parameters.broker === 'interactive_brokers' ? 'IB' : param.parameters.broker}</td>
+                                        <td className="px-3 py-3 text-sm">{param.parameters.n_tickers}</td>
+                                        <td className="px-3 py-3 text-sm">{param.parameters.rebalance_period}</td>
+                                        <td className="px-3 py-3 text-sm">{param.parameters.momentum_lookback_days || '-'}</td>
+                                        <td className="px-3 py-3 text-sm">{param.parameters.stop_loss_pct || '-'}</td>
+                                        <td className="px-3 py-3 text-sm">{param.parameters.strategy}</td>
+                                        <td className="px-3 py-3 text-sm">{param.parameters.sizing_method}</td>
+                                        <td className="px-3 py-3 text-sm font-bold text-purple-700 bg-purple-50">{param.frequency}</td>
+                                        <td className="px-3 py-3 text-sm font-bold text-purple-700 bg-purple-50">{param.percentage.toFixed(1)}%</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Individual Windows */}
+                <div>
+                    <h3 className="text-xl font-bold mb-3">Individual Windows</h3>
+                    <div className="space-y-2">
+                        {windows.map((window) => (
+                            <div key={window.window_number} className="border border-gray-300 rounded">
+                                <button
+                                    onClick={() => setExpandedWindow(expandedWindow === window.window_number ? null : window.window_number)}
+                                    className="w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 flex justify-between items-center"
+                                >
+                                    <span className="font-medium">
+                                        Window {window.window_number}: {window.window.train_start} → {window.window.test_end}
+                                    </span>
+                                    <span>{expandedWindow === window.window_number ? '▼' : '▶'}</span>
+                                </button>
+
+                                {expandedWindow === window.window_number && (
+                                    <div className="p-4 bg-white">
+                                        <p className="text-sm mb-2">
+                                            <strong>Train:</strong> {window.window.train_start} to {window.window.train_end} |
+                                            <strong className="ml-2">Test:</strong> {window.window.test_start} to {window.window.test_end}
+                                        </p>
+
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full divide-y divide-gray-200 text-xs">
+                                                <thead className="bg-gray-50">
+                                                    <tr>
+                                                        <th className="px-2 py-2 text-left">#</th>
+                                                        <th className="px-2 py-2 text-left">Broker</th>
+                                                        <th className="px-2 py-2 text-left">N</th>
+                                                        <th className="px-2 py-2 text-left">Rebal</th>
+                                                        <th className="px-2 py-2 text-left">Look</th>
+                                                        <th className="px-2 py-2 text-left bg-green-50">Train CAGR</th>
+                                                        <th className="px-2 py-2 text-left bg-red-50">Train DD</th>
+                                                        <th className="px-2 py-2 text-left bg-green-100">Test CAGR</th>
+                                                        <th className="px-2 py-2 text-left bg-red-100">Test DD</th>
+                                                        <th className="px-2 py-2 text-left bg-purple-50">Score</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white divide-y divide-gray-200">
+                                                    {window.train_results.map((result, idx) => (
+                                                        <tr key={idx} className="hover:bg-gray-50">
+                                                            <td className="px-2 py-2">{idx + 1}</td>
+                                                            <td className="px-2 py-2">{result.broker === 'interactive_brokers' ? 'IB' : result.broker}</td>
+                                                            <td className="px-2 py-2">{result.n_tickers}</td>
+                                                            <td className="px-2 py-2">{result.rebalance_period}</td>
+                                                            <td className="px-2 py-2">{result.momentum_lookback_days || '-'}</td>
+                                                            <td className="px-2 py-2 bg-green-50">{(result.cagr * 100).toFixed(2)}%</td>
+                                                            <td className="px-2 py-2 bg-red-50">{(result.max_drawdown * 100).toFixed(2)}%</td>
+                                                            <td className="px-2 py-2 bg-green-100">{(window.test_results[idx]?.cagr * 100).toFixed(2)}%</td>
+                                                            <td className="px-2 py-2 bg-red-100">{(window.test_results[idx]?.max_drawdown * 100).toFixed(2)}%</td>
+                                                            <td className="px-2 py-2 bg-purple-50 font-bold">{window.scores[idx]?.toFixed(1)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (isTrainTestMode) {
         // Train/Test Split Mode
@@ -66,19 +204,19 @@ const OptimizationResults = ({ results, onSave }) => {
                     <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
                         <div className="flex items-center gap-3 flex-wrap">
                             <strong className="text-sm">Sort by:</strong>
-                            <button onClick={() => setSortBy('score')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'score' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                            <button onClick={() => setSortBy('score')} className={`px - 3 py - 1.5 rounded text - sm font - medium ${sortBy === 'score' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300'} `}>
                                 Score
                             </button>
-                            <button onClick={() => setSortBy('train_cagr')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'train_cagr' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                            <button onClick={() => setSortBy('train_cagr')} className={`px - 3 py - 1.5 rounded text - sm font - medium ${sortBy === 'train_cagr' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'} `}>
                                 Train CAGR
                             </button>
-                            <button onClick={() => setSortBy('test_cagr')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'test_cagr' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                            <button onClick={() => setSortBy('test_cagr')} className={`px - 3 py - 1.5 rounded text - sm font - medium ${sortBy === 'test_cagr' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'} `}>
                                 Test CAGR
                             </button>
-                            <button onClick={() => setSortBy('train_dd')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'train_dd' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                            <button onClick={() => setSortBy('train_dd')} className={`px - 3 py - 1.5 rounded text - sm font - medium ${sortBy === 'train_dd' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'} `}>
                                 Train DD
                             </button>
-                            <button onClick={() => setSortBy('test_dd')} className={`px-3 py-1.5 rounded text-sm font-medium ${sortBy === 'test_dd' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                            <button onClick={() => setSortBy('test_dd')} className={`px - 3 py - 1.5 rounded text - sm font - medium ${sortBy === 'test_dd' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'} `}>
                                 Test DD
                             </button>
                         </div>

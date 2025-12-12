@@ -61,6 +61,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     const [ddWeight, setDdWeight] = useState(40);
     const [showScoringConfig, setShowScoringConfig] = useState(false);
 
+    // Walk-Forward
+    const [enableWalkForward, setEnableWalkForward] = useState(false);
+    const [walkForwardStart, setWalkForwardStart] = useState('2016-01-01');
+    const [walkForwardEnd, setWalkForwardEnd] = useState('2025-01-01');
+    const [walkForwardStep, setWalkForwardStep] = useState(6);
+
+
     const handleRunOptimization = () => {
         // Validate at least one broker is selected
         if (!bossaEnabled && !ibEnabled) {
@@ -151,7 +158,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                 dd_min: ddMin / 100,
                 dd_max: ddMax / 100,
                 dd_weight: parseFloat(ddWeight)
-            }
+            },
+
+            // Walk-Forward parameters
+            enable_walk_forward: enableWalkForward,
+            walk_forward_start: enableWalkForward ? walkForwardStart : null,
+            walk_forward_end: enableWalkForward ? walkForwardEnd : null,
+            walk_forward_step_months: enableWalkForward ? parseInt(walkForwardStep) : null
         };
 
         onRunOptimization(params);
@@ -461,6 +474,91 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                                 )}
                                             </p>
                                         </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Walk-Forward Optimization */}
+                            <div className="mt-4 p-3 bg-purple-50 rounded border border-purple-300">
+                                <label className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={enableWalkForward}
+                                        onChange={(e) => setEnableWalkForward(e.target.checked)}
+                                        className="h-4 w-4 text-purple-600 border-gray-300 rounded"
+                                    />
+                                    <span className="text-sm font-semibold text-gray-700">
+                                        Enable Walk-Forward Analysis
+                                    </span>
+                                </label>
+
+                                {enableWalkForward && (
+                                    <div className="mt-3 space-y-3">
+                                        <p className="text-xs text-purple-800">
+                                            Run multiple train/test windows across time period to find most consistent parameters
+                                        </p>
+
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Overall Start Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={walkForwardStart}
+                                                    onChange={(e) => setWalkForwardStart(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Overall End Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={walkForwardEnd}
+                                                    onChange={(e) => setWalkForwardEnd(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Step Size (months)</label>
+                                                <input
+                                                    type="number"
+                                                    value={walkForwardStep}
+                                                    onChange={(e) => setWalkForwardStep(e.target.value)}
+                                                    min="1"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Window count preview */}
+                                        {walkForwardStart && walkForwardEnd && trainMonths && testMonths && walkForwardStep && (
+                                            <div className="p-2 bg-white rounded border border-purple-400">
+                                                <p className="text-xs text-gray-700">
+                                                    <strong>Estimated Windows:</strong> {(() => {
+                                                        const start = new Date(walkForwardStart);
+                                                        const end = new Date(walkForwardEnd);
+                                                        const trainM = parseInt(trainMonths);
+                                                        const testM = parseInt(testMonths);
+                                                        const stepM = parseInt(walkForwardStep);
+
+                                                        let count = 0;
+                                                        let current = new Date(start);
+
+                                                        while (true) {
+                                                            const testEnd = new Date(current);
+                                                            testEnd.setMonth(testEnd.getMonth() + trainM + testM);
+                                                            if (testEnd > end) break;
+                                                            count++;
+                                                            current.setMonth(current.getMonth() + stepM);
+                                                        }
+
+                                                        return count;
+                                                    })()} windows
+                                                    <span className="ml-2 text-gray-600">
+                                                        (Train: {trainMonths}mo, Test: {testMonths}mo, Step: {walkForwardStep}mo)
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

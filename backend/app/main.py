@@ -140,6 +140,12 @@ class OptimizationRequest(BaseModel):
     
     # Scoring Configuration (optional)
     scoring_config: Optional[ScoringConfig] = None
+    
+    # Walk-Forward Parameters (optional)
+    enable_walk_forward: bool = False
+    walk_forward_start: Optional[str] = None  # Overall start date
+    walk_forward_end: Optional[str] = None    # Overall end date  
+    walk_forward_step_months: Optional[int] = 6  # Step size in months
 
 # Helper function to run a single backtest for optimization
 def run_single_backtest(df, config, start_date, end_date, margin_enabled):
@@ -282,11 +288,140 @@ def calculate_single_score(cagr, dd, config=None):
 
 
 
+
+def run_walk_forward_optimization(request: OptimizationRequest, df):
+    """
+    Run walk-forward optimization across multiple time windows.
+    
+    Returns aggregated parameter frequency ranking and all window results.
+    """
+    from dateutil.relativedelta import relativedelta
+    from datetime import datetime as dt
+    from collections import Counter
+    
+    # Calculate all windows
+    windows = []
+    current_start = dt.strptime(request.walk_forward_start, '%Y-%m-%d')
+    overall_end = dt.strptime(request.walk_forward_end, '%Y-%m-%d')
+    
+    while True:
+        # Calculate train and test periods for this window
+        train_start = current_start
+        train_end = train_start + relativedelta(months=request.train_months) - relativedelta(days=1)
+        test_start = train_end + relativedelta(days=1)
+        test_end = test_start + relativedelta(months=request.test_months) - relativedelta(days=1)
+        
+        # Check if we've exceeded overall end date
+        if test_end > overall_end:
+            break
+        
+        windows.append({
+            'train_start': train_start.strftime('%Y-%m-%d'),
+            'train_end': train_end.strftime('%Y-%m-%d'),
+            'test_start': test_start.strftime('%Y-%m-%d'),
+            'test_end': test_end.strftime('%Y-%m-%d')
+        })
+        
+        # Move forward by step
+        current_start += relativedelta(months=request.walk_forward_step_months)
+    
+    # Run train/test for each window
+    all_window_results = []
+    parameter_frequency = Counter()
+    
+    for i, window in enumerate(windows):
+        # Create modified request for this window
+        window_request = OptimizationRequest(
+            tickers=request.tickers,
+            start_date=request.start_date,  # Not used in train/test mode
+            end_date=request.end_date,      # Not used in train/test mode
+            brokers=request.brokers,
+            n_tickers_range=request.n_tickers_range,
+            stop_loss_range=request.stop_loss_range,
+            rebalance_period_range=request.rebalance_period_range,
+            momentum_lookback_range=request.momentum_lookback_range,
+            filter_negative_momentum=request.filter_negative_momentum,
+            margin_enabled=request.margin_enabled,
+            strategies=request.strategies,
+            sizing_methods=request.sizing_methods,
+            enable_train_test=True,
+            train_start_date=window['train_start'],
+            train_months=request.train_months,
+            test_months=request.test_months,
+            top_n_for_test=request.top_n_for_test,
+            scoring_config=request.scoring_config,
+            enable_walk_forward=False  # Prevent recursion
+        )
+        
+        # Run train/test for this window
+        window_results = run_optimization_endpoint(window_request)
+        
+        # Extract top N configurations from training results
+        top_configs = window_results['train_results'][:request.top_n_for_test]
+        test_configs = window_results['test_results'][:request.top_n_for_test]
+        scores = window_results.get('scores', [])[:request.top_n_for_test]
+        
+        # Count parameter combinations
+        for config in top_configs:
+            # Create hashable key from parameters
+            param_key = (
+                config['broker'],
+                config['n_tickers'],
+                config['rebalance_period'],
+                config.get('momentum_lookback_days', 0),
+                config.get('filter_negative_momentum', False),
+                config.get('stop_loss_pct', 0),
+                config['strategy'],
+                config['sizing_method']
+            )
+            parameter_frequency[param_key] += 1
+        
+        all_window_results.append({
+            'window_number': i + 1,
+            'window': window,
+            'train_results': top_configs,
+            'test_results': test_configs,
+            'scores': scores
+        })
+    
+    # Rank parameters by frequency
+    ranked_params = []
+    for key, count in parameter_frequency.most_common():
+        ranked_params.append({
+            'parameters': {
+                'broker': key[0],
+                'n_tickers': key[1],
+                'rebalance_period': key[2],
+                'momentum_lookback_days': key[3] if key[3] != 0 else None,
+                'filter_negative_momentum': key[4],
+                'stop_loss_pct': key[5] if key[5] != 0 else None,
+                'strategy': key[6],
+                'sizing_method': key[7]
+            },
+            'frequency': count,
+            'percentage': (count / len(windows)) * 100
+        })
+    
+    return {
+        'walk_forward_mode': True,
+        'total_windows': len(windows),
+        'windows': all_window_results,
+        'ranked_parameters': ranked_params,
+        'train_period_months': request.train_months,
+        'test_period_months': request.test_months,
+        'step_months': request.walk_forward_step_months
+    }
+
+
 @app.post("/api/optimize")
 def run_optimization_endpoint(request: OptimizationRequest):
     df = load_data()
     if df is None:
         raise HTTPException(status_code=404, detail="No data found. Please download data first.")
+    
+    # Handle Walk-Forward Optimization
+    if request.enable_walk_forward:
+        return run_walk_forward_optimization(request, df)
     
     # Handle Train/Test Split
     if request.enable_train_test:
