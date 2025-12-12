@@ -171,7 +171,8 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     };
 
     const handleSaveResults = async () => {
-        if (!results || !results.results) return;
+        // Check if we have results (any mode)
+        if (!results) return;
 
         // Reconstruct params object (similar to handleRunOptimization but we need it here)
         const tickerList = tickers.split(',').map(t => t.trim());
@@ -224,15 +225,28 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
         };
 
         try {
+            // Determine the mode and prepare appropriate data
+            let saveData;
+            if (results.walk_forward_mode) {
+                // Walk-forward mode - save complete walk-forward results
+                saveData = {
+                    params: params,
+                    results: results  // Send entire walk-forward structure
+                };
+            } else {
+                // Normal or train/test mode
+                saveData = {
+                    params: params,
+                    results: results.results || results
+                };
+            }
+
             const response = await fetch('http://127.0.0.1:8000/api/save_optimization_results', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    params: params,
-                    results: results.results
-                }),
+                body: JSON.stringify(saveData),
             });
 
             if (response.ok) {

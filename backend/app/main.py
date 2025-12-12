@@ -698,7 +698,7 @@ OPTIMIZATION_RESULTS_DIR = "/home/mpaton/Projects/my/backTesterPython/backTester
 
 class SaveOptimizationResultsRequest(BaseModel):
     params: OptimizationRequest
-    results: List[dict]
+    results: dict  # Changed from List[dict] to dict to handle all modes
 
 @app.post("/api/save_optimization_results")
 async def save_optimization_results(request: SaveOptimizationResultsRequest):
@@ -714,51 +714,95 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
             f.write(f"Optimization Results - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write("=" * 50 + "\n\n")
             
-            f.write("Parameters:\n")
-            f.write("-" * 20 + "\n")
-            f.write(f"Start Date: {request.params.start_date}\n")
-            f.write(f"End Date: {request.params.end_date}\n")
-            f.write(f"Tickers: {', '.join(request.params.tickers)}\n")
-            f.write(f"Brokers: {', '.join(request.params.brokers)}\n")
-            f.write(f"Strategies: {', '.join(request.params.strategies)}\n")
-            f.write(f"Sizing Methods: {', '.join(request.params.sizing_methods)}\n")
-            f.write(f"Margin Enabled: {request.params.margin_enabled}\n")
-            f.write(f"Filter Negative Momentum: {request.params.filter_negative_momentum}\n")
-            
-            f.write("\nRanges:\n")
-            f.write(f"N Tickers: {request.params.n_tickers_range}\n")
-            f.write(f"Rebalance Period: {request.params.rebalance_period_range}\n")
-            f.write(f"Momentum Lookback: {request.params.momentum_lookback_range}\n")
-            if request.params.stop_loss_range:
-                f.write(f"Stop Loss: {request.params.stop_loss_range}\n")
-            
-            f.write("\n" + "=" * 50 + "\n\n")
-            f.write("Top 300 Results:\n")
-            f.write("-" * 20 + "\n")
-            
-            # Header
-            headers = ["#", "Broker", "N Tickers", "Rebalance", "Lookback", "Filter Neg Mom", "Stop Loss", "Strategy", "Sizing", "CAGR", "Max DD", "Final Value"]
-            # Simple formatting
-            header_str = " | ".join(headers)
-            f.write(header_str + "\n")
-            f.write("-" * len(header_str) + "\n")
-            
-            for res in request.results[:300]:
-                row = [
-                    str(res.get('test_number', '')),
-                    str(res.get('broker', '')),
-                    str(res.get('n_tickers', '')),
-                    str(res.get('rebalance_period', '')),
-                    str(res.get('momentum_lookback_days', '-')),
-                    'Yes' if res.get('filter_negative_momentum') else 'No' if res.get('filter_negative_momentum') is False else '-',
-                    f"{res.get('stop_loss_pct')}%" if res.get('stop_loss_pct') else '-',
-                    str(res.get('strategy', '')),
-                    str(res.get('sizing_method', '')),
-                    f"{res.get('cagr', 0)*100:.2f}%",
-                    f"{res.get('max_drawdown', 0)*100:.2f}%",
-                    f"${res.get('final_value', 0):.2f}"
-                ]
-                f.write(" | ".join(row) + "\n")
+            # Check if walk-forward mode
+            if isinstance(request.results, dict) and request.results.get('walk_forward_mode'):
+                # Walk-Forward Mode
+                f.write("MODE: Walk-Forward Optimization\n")
+                f.write(f"Total Windows: {request.results.get('total_windows')}\n")
+                f.write(f"Train Period: {request.results.get('train_period_months')} months\n")
+                f.write(f"Test Period: {request.results.get('test_period_months')} months\n")
+                f.write(f"Step: {request.results.get('step_months')} months\n\n")
+                
+                # Most Consistent Parameters
+                f.write("=" * 50 + "\n")
+                f.write("MOST CONSISTENT PARAMETERS (Frequency > 1)\n")
+                f.write("=" * 50 + "\n\n")
+                
+                ranked_params = request.results.get('ranked_parameters', [])
+                for i, param in enumerate([p for p in ranked_params if p['frequency'] > 1], 1):
+                    p = param['parameters']
+                    f.write(f"Rank {i}: Frequency {param['frequency']}/{request.results.get('total_windows')} ({param['percentage']:.1f}%)\n")
+                    f.write(f"  Broker: {p['broker']}, N: {p['n_tickers']}, Rebal: {p['rebalance_period']}, ")
+                    f.write(f"Look: {p.get('momentum_lookback_days', '-')}, SL: {p.get('stop_loss_pct', '-')}, ")
+                    f.write(f"Strat: {p['strategy']}, Size: {p['sizing_method']}\n\n")
+                
+                # Individual Windows
+                f.write("\n" + "=" * 50 + "\n")
+                f.write("INDIVIDUAL WINDOWS (Top Results)\n")
+                f.write("=" * 50 + "\n\n")
+                
+                for window in request.results.get('windows', []):
+                    f.write(f"\nWindow {window['window_number']}: {window['window']['train_start']} → {window['window']['test_end']}\n")
+                    f.write(f"Train: {window['window']['train_start']} to {window['window']['train_end']}\n")
+                    f.write(f"Test: {window['window']['test_start']} to {window['window']['test_end']}\n")
+                    f.write("-" * 50 + "\n")
+                    
+                    for i, (train, test, score) in enumerate(zip(window['train_results'], window['test_results'], window['scores']), 1):
+                        f.write(f"{i}. {train['broker']} | N:{train['n_tickers']} | Rebal:{train['rebalance_period']} | ")
+                        f.write(f"Train CAGR:{train['cagr']*100:.2f}% DD:{train['max_drawdown']*100:.2f}% | ")
+                        f.write(f"Test CAGR:{test['cagr']*100:.2f}% DD:{test['max_drawdown']*100:.2f}% | ")
+                        f.write(f"Score:{score:.1f}\n")
+                    f.write("\n")
+                
+            else:
+                # Normal or Train/Test Mode
+                f.write("Parameters:\n")
+                f.write("-" * 20 + "\n")
+                f.write(f"Start Date: {request.params.start_date}\n")
+                f.write(f"End Date: {request.params.end_date}\n")
+                f.write(f"Tickers: {', '.join(request.params.tickers)}\n")
+                f.write(f"Brokers: {', '.join(request.params.brokers)}\n")
+                f.write(f"Strategies: {', '.join(request.params.strategies)}\n")
+                f.write(f"Sizing Methods: {', '.join(request.params.sizing_methods)}\n")
+                f.write(f"Margin Enabled: {request.params.margin_enabled}\n")
+                f.write(f"Filter Negative Momentum: {request.params.filter_negative_momentum}\n")
+                
+                f.write("\nRanges:\n")
+                f.write(f"N Tickers: {request.params.n_tickers_range}\n")
+                f.write(f"Rebalance Period: {request.params.rebalance_period_range}\n")
+                f.write(f"Momentum Lookback: {request.params.momentum_lookback_range}\n")
+                if request.params.stop_loss_range:
+                    f.write(f"Stop Loss: {request.params.stop_loss_range}\n")
+                
+                f.write("\n" + "=" * 50 + "\n\n")
+                f.write("Top 300 Results:\n")
+                f.write("-" * 20 + "\n")
+                
+                # Get results list
+                results_list = request.results if isinstance(request.results, list) else []
+                
+                # Header
+                headers = ["#", "Broker", "N Tickers", "Rebalance", "Lookback", "Filter Neg Mom", "Stop Loss", "Strategy", "Sizing", "CAGR", "Max DD", "Final Value"]
+                header_str = " | ".join(headers)
+                f.write(header_str + "\n")
+                f.write("-" * len(header_str) + "\n")
+                
+                for res in results_list[:300]:
+                    row = [
+                        str(res.get('test_number', '')),
+                        str(res.get('broker', '')),
+                        str(res.get('n_tickers', '')),
+                        str(res.get('rebalance_period', '')),
+                        str(res.get('momentum_lookback_days', '-')),
+                        'Yes' if res.get('filter_negative_momentum') else 'No' if res.get('filter_negative_momentum') is False else '-',
+                        f"{res.get('stop_loss_pct')}%" if res.get('stop_loss_pct') else '-',
+                        str(res.get('strategy', '')),
+                        str(res.get('sizing_method', '')),
+                        f"{res.get('cagr', 0)*100:.2f}%",
+                        f"{res.get('max_drawdown', 0)*100:.2f}%",
+                        f"${res.get('final_value', 0):.2f}"
+                    ]
+                    f.write(" | ".join(row) + "\n")
                 
         return {"message": "Results saved successfully", "filename": filename, "path": filepath}
     except Exception as e:
