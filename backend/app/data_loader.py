@@ -24,6 +24,12 @@ def download_data(tickers: list[str], start_date: str, end_date: str):
     # Download data
     data = yf.download(tickers, start=start_date, end=end_date, group_by='ticker', progress=False)
     
+    # Sort columns to ensure deterministic order
+    data = data.sort_index(axis=1)
+    
+    # Round to 6 decimal places to ensure consistent file output
+    data = data.round(6)
+    
     data.to_csv(DATA_FILE)
     print(f"Data saved to {DATA_FILE}")
     
