@@ -1,0 +1,159 @@
+Optimization Results - 2025-12-14 14:34:38
+==================================================
+
+MODE: Walk-Forward Optimization
+Total Windows: 6
+Train Period: 96 months
+Test Period: 12 months
+Step: 12 months
+
+==================================================
+MOST CONSISTENT PARAMETERS (Frequency > 1)
+==================================================
+
+Rank 1: Frequency 3/6 (50.0%)
+  Broker: bossa, N: 5, Rebal: 4, Look: 60, SL: None, Strat: momentum, Size: var
+
+Rank 2: Frequency 3/6 (50.0%)
+  Broker: bossa, N: 6, Rebal: 6, Look: 60, SL: None, Strat: momentum, Size: var
+
+Rank 3: Frequency 3/6 (50.0%)
+  Broker: bossa, N: 10, Rebal: 2, Look: 100, SL: None, Strat: momentum, Size: var
+
+Rank 4: Frequency 3/6 (50.0%)
+  Broker: bossa, N: 10, Rebal: 1, Look: 60, SL: None, Strat: momentum, Size: var
+
+Rank 5: Frequency 3/6 (50.0%)
+  Broker: bossa, N: 8, Rebal: 2, Look: 60, SL: None, Strat: momentum, Size: var
+
+Rank 6: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 7, Rebal: 6, Look: 60, SL: None, Strat: momentum, Size: var
+
+Rank 7: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 6, Rebal: 5, Look: 120, SL: None, Strat: momentum, Size: var
+
+Rank 8: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 8, Rebal: 6, Look: 60, SL: None, Strat: momentum, Size: var
+
+Rank 9: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 6, Rebal: 3, Look: 60, SL: None, Strat: momentum, Size: var
+
+Rank 10: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 6, Rebal: 2, Look: 40, SL: None, Strat: momentum, Size: var
+
+Rank 11: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 9, Rebal: 1, Look: 100, SL: None, Strat: momentum, Size: var
+
+Rank 12: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 10, Rebal: 1, Look: 100, SL: None, Strat: momentum, Size: var
+
+Rank 13: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 8, Rebal: 1, Look: 60, SL: None, Strat: momentum, Size: var
+
+Rank 14: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 5, Rebal: 5, Look: 120, SL: None, Strat: momentum, Size: var
+
+Rank 15: Frequency 2/6 (33.3%)
+  Broker: bossa, N: 9, Rebal: 2, Look: 100, SL: None, Strat: momentum, Size: var
+
+
+==================================================
+INDIVIDUAL WINDOWS (Top Results)
+==================================================
+
+
+Window 1: 2011-01-01 → 2019-12-31
+Train: 2011-01-01 to 2018-12-31
+Test: 2019-01-01 to 2019-12-31
+--------------------------------------------------
+1. bossa | N:5 | Rebal:4 | Train CAGR:34.38% DD:-21.25% | Test CAGR:23.77% DD:-19.77% | Score:40.0
+2. bossa | N:7 | Rebal:6 | Train CAGR:33.68% DD:-24.99% | Test CAGR:60.49% DD:-10.97% | Score:40.0
+3. bossa | N:6 | Rebal:4 | Train CAGR:32.17% DD:-21.73% | Test CAGR:21.15% DD:-16.72% | Score:40.0
+4. bossa | N:5 | Rebal:6 | Train CAGR:29.91% DD:-29.94% | Test CAGR:48.94% DD:-11.22% | Score:40.0
+5. bossa | N:6 | Rebal:5 | Train CAGR:29.04% DD:-23.89% | Test CAGR:36.19% DD:-12.90% | Score:40.0
+6. bossa | N:8 | Rebal:6 | Train CAGR:28.98% DD:-24.79% | Test CAGR:63.12% DD:-11.77% | Score:40.0
+7. bossa | N:5 | Rebal:4 | Train CAGR:28.45% DD:-23.50% | Test CAGR:26.35% DD:-19.19% | Score:40.0
+8. bossa | N:5 | Rebal:4 | Train CAGR:28.08% DD:-29.65% | Test CAGR:44.09% DD:-17.85% | Score:40.0
+9. bossa | N:9 | Rebal:6 | Train CAGR:27.73% DD:-27.23% | Test CAGR:59.52% DD:-8.86% | Score:40.0
+10. bossa | N:7 | Rebal:5 | Train CAGR:27.18% DD:-21.98% | Test CAGR:36.82% DD:-11.11% | Score:40.0
+
+
+Window 2: 2012-01-01 → 2020-12-31
+Train: 2012-01-01 to 2019-12-31
+Test: 2020-01-01 to 2020-12-31
+--------------------------------------------------
+1. bossa | N:6 | Rebal:6 | Train CAGR:40.34% DD:-30.15% | Test CAGR:77.78% DD:-42.48% | Score:40.6
+2. bossa | N:5 | Rebal:3 | Train CAGR:39.34% DD:-22.53% | Test CAGR:81.28% DD:-38.34% | Score:40.0
+3. bossa | N:7 | Rebal:6 | Train CAGR:36.87% DD:-24.99% | Test CAGR:73.13% DD:-42.24% | Score:40.0
+4. bossa | N:6 | Rebal:3 | Train CAGR:35.59% DD:-25.44% | Test CAGR:104.58% DD:-42.48% | Score:40.0
+5. bossa | N:7 | Rebal:3 | Train CAGR:32.99% DD:-26.92% | Test CAGR:82.07% DD:-42.24% | Score:40.0
+6. bossa | N:8 | Rebal:6 | Train CAGR:32.81% DD:-24.83% | Test CAGR:76.01% DD:-37.91% | Score:40.0
+7. bossa | N:8 | Rebal:3 | Train CAGR:32.36% DD:-22.96% | Test CAGR:81.55% DD:-37.91% | Score:40.0
+8. bossa | N:6 | Rebal:3 | Train CAGR:32.17% DD:-22.37% | Test CAGR:54.38% DD:-38.96% | Score:40.0
+9. bossa | N:5 | Rebal:4 | Train CAGR:31.76% DD:-28.85% | Test CAGR:99.56% DD:-44.33% | Score:40.0
+10. bossa | N:5 | Rebal:4 | Train CAGR:31.18% DD:-24.01% | Test CAGR:183.39% DD:-37.90% | Score:40.0
+
+
+Window 3: 2013-01-01 → 2021-12-31
+Train: 2013-01-01 to 2020-12-31
+Test: 2021-01-01 to 2021-12-31
+--------------------------------------------------
+1. bossa | N:6 | Rebal:6 | Train CAGR:49.56% DD:-35.76% | Test CAGR:73.91% DD:-25.95% | Score:53.3
+2. bossa | N:6 | Rebal:2 | Train CAGR:43.16% DD:-31.93% | Test CAGR:25.06% DD:-16.31% | Score:44.3
+3. bossa | N:5 | Rebal:2 | Train CAGR:43.19% DD:-32.28% | Test CAGR:9.02% DD:-21.83% | Score:43.5
+4. bossa | N:6 | Rebal:3 | Train CAGR:45.63% DD:-35.71% | Test CAGR:61.74% DD:-25.95% | Score:41.7
+5. bossa | N:9 | Rebal:1 | Train CAGR:30.70% DD:-29.58% | Test CAGR:28.08% DD:-15.46% | Score:40.0
+6. bossa | N:10 | Rebal:2 | Train CAGR:30.09% DD:-29.21% | Test CAGR:14.11% DD:-12.90% | Score:40.0
+7. bossa | N:10 | Rebal:1 | Train CAGR:28.02% DD:-29.37% | Test CAGR:25.90% DD:-15.29% | Score:40.0
+8. bossa | N:8 | Rebal:1 | Train CAGR:24.78% DD:-29.01% | Test CAGR:42.81% DD:-24.76% | Score:40.0
+9. bossa | N:10 | Rebal:1 | Train CAGR:22.60% DD:-29.40% | Test CAGR:40.67% DD:-22.66% | Score:40.0
+10. bossa | N:8 | Rebal:2 | Train CAGR:34.50% DD:-30.02% | Test CAGR:53.00% DD:-19.99% | Score:39.9
+
+
+Window 4: 2014-01-01 → 2022-12-31
+Train: 2014-01-01 to 2021-12-31
+Test: 2022-01-01 to 2022-12-31
+--------------------------------------------------
+1. bossa | N:5 | Rebal:5 | Train CAGR:51.19% DD:-38.07% | Test CAGR:-20.54% DD:-40.03% | Score:52.1
+2. bossa | N:6 | Rebal:2 | Train CAGR:42.05% DD:-31.86% | Test CAGR:-1.94% DD:-21.58% | Score:41.2
+3. bossa | N:6 | Rebal:6 | Train CAGR:45.11% DD:-35.75% | Test CAGR:-34.81% DD:-41.13% | Score:40.0
+4. bossa | N:8 | Rebal:2 | Train CAGR:32.49% DD:-29.83% | Test CAGR:-8.27% DD:-27.69% | Score:40.0
+5. bossa | N:9 | Rebal:1 | Train CAGR:28.95% DD:-29.67% | Test CAGR:0.42% DD:-21.60% | Score:40.0
+6. bossa | N:10 | Rebal:2 | Train CAGR:27.57% DD:-28.81% | Test CAGR:-13.59% DD:-29.34% | Score:40.0
+7. bossa | N:10 | Rebal:1 | Train CAGR:27.50% DD:-29.27% | Test CAGR:-0.66% DD:-21.01% | Score:40.0
+8. bossa | N:8 | Rebal:1 | Train CAGR:23.81% DD:-28.78% | Test CAGR:-21.15% DD:-26.73% | Score:40.0
+9. bossa | N:9 | Rebal:1 | Train CAGR:22.32% DD:-29.90% | Test CAGR:-23.50% DD:-29.58% | Score:40.0
+10. bossa | N:10 | Rebal:1 | Train CAGR:21.10% DD:-29.03% | Test CAGR:-26.02% DD:-31.46% | Score:40.0
+
+
+Window 5: 2015-01-01 → 2023-12-31
+Train: 2015-01-01 to 2022-12-31
+Test: 2023-01-01 to 2023-12-31
+--------------------------------------------------
+1. bossa | N:8 | Rebal:2 | Train CAGR:33.30% DD:-29.90% | Test CAGR:45.80% DD:-10.40% | Score:40.0
+2. bossa | N:10 | Rebal:2 | Train CAGR:28.73% DD:-29.08% | Test CAGR:60.76% DD:-13.99% | Score:40.0
+3. bossa | N:9 | Rebal:1 | Train CAGR:10.45% DD:-30.10% | Test CAGR:40.54% DD:-16.81% | Score:39.7
+4. bossa | N:9 | Rebal:2 | Train CAGR:33.02% DD:-30.13% | Test CAGR:66.43% DD:-14.21% | Score:39.7
+5. bossa | N:7 | Rebal:1 | Train CAGR:33.20% DD:-30.53% | Test CAGR:77.37% DD:-14.20% | Score:38.6
+6. bossa | N:10 | Rebal:1 | Train CAGR:21.95% DD:-30.74% | Test CAGR:50.83% DD:-13.23% | Score:38.0
+7. bossa | N:10 | Rebal:1 | Train CAGR:29.34% DD:-30.77% | Test CAGR:69.67% DD:-12.48% | Score:37.9
+8. bossa | N:10 | Rebal:2 | Train CAGR:30.62% DD:-30.86% | Test CAGR:32.91% DD:-12.51% | Score:37.7
+9. bossa | N:8 | Rebal:1 | Train CAGR:34.88% DD:-30.99% | Test CAGR:64.71% DD:-14.85% | Score:37.4
+10. bossa | N:10 | Rebal:1 | Train CAGR:11.98% DD:-31.08% | Test CAGR:36.95% DD:-15.89% | Score:37.1
+
+
+Window 6: 2016-01-01 → 2024-12-31
+Train: 2016-01-01 to 2023-12-31
+Test: 2024-01-01 to 2024-12-31
+--------------------------------------------------
+1. bossa | N:6 | Rebal:5 | Train CAGR:60.41% DD:-34.17% | Test CAGR:54.44% DD:-23.37% | Score:88.9
+2. bossa | N:5 | Rebal:5 | Train CAGR:63.90% DD:-35.11% | Test CAGR:49.50% DD:-27.22% | Score:86.4
+3. bossa | N:7 | Rebal:5 | Train CAGR:53.03% DD:-35.40% | Test CAGR:52.50% DD:-24.41% | Score:64.7
+4. bossa | N:5 | Rebal:5 | Train CAGR:54.12% DD:-39.34% | Test CAGR:73.00% DD:-16.19% | Score:57.5
+5. bossa | N:9 | Rebal:2 | Train CAGR:44.13% DD:-29.49% | Test CAGR:62.10% DD:-16.60% | Score:52.4
+6. bossa | N:8 | Rebal:2 | Train CAGR:44.52% DD:-31.26% | Test CAGR:75.53% DD:-18.23% | Score:50.2
+7. bossa | N:7 | Rebal:2 | Train CAGR:43.89% DD:-31.48% | Test CAGR:60.84% DD:-22.35% | Score:47.7
+8. bossa | N:5 | Rebal:4 | Train CAGR:50.64% DD:-39.30% | Test CAGR:39.93% DD:-17.30% | Score:47.1
+9. bossa | N:6 | Rebal:2 | Train CAGR:45.17% DD:-33.85% | Test CAGR:68.12% DD:-27.31% | Score:45.2
+10. bossa | N:6 | Rebal:5 | Train CAGR:47.71% DD:-36.79% | Test CAGR:66.55% DD:-17.27% | Score:45.0
+
