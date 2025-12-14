@@ -96,12 +96,40 @@ function App() {
     }
   }, []);
 
-  const handleRunOptimization = async (params) => {
+  const handleRunOptimization = async (params, autoSave = false) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await axios.post('http://127.0.0.1:8000/api/optimize', params);
-      setResults(response.data);
+      const results = response.data;
+      setResults(results);
+
+      // Handle Auto-Save
+      if (autoSave) {
+        try {
+          let saveData;
+          if (results.walk_forward_mode) {
+            saveData = {
+              params: params,
+              results: results
+            };
+          } else {
+            saveData = {
+              params: params,
+              results: results.results || results
+            };
+          }
+
+          const saveResponse = await axios.post('http://127.0.0.1:8000/api/save_optimization_results', saveData);
+          console.log('Results auto-saved:', saveResponse.data);
+          // Optional: User notification
+          // alert(`Results auto-saved to: ${saveResponse.data.filename}`); 
+        } catch (saveErr) {
+          console.error('Auto-save failed:', saveErr);
+          setError('Optimization finished, but auto-save failed: ' + saveErr.message);
+        }
+      }
+
     } catch (err) {
       setError(err.message || 'Failed to run optimization');
       console.error(err);

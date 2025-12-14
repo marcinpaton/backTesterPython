@@ -67,6 +67,9 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     const [walkForwardEnd, setWalkForwardEnd] = useState('2025-01-01');
     const [walkForwardStep, setWalkForwardStep] = useState(6);
 
+    // Auto-save
+    const [autoSaveAfterOptimization, setAutoSaveAfterOptimization] = useState(false);
+
 
     const handleRunOptimization = () => {
         // Validate at least one broker is selected
@@ -167,7 +170,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
             walk_forward_step_months: enableWalkForward ? parseInt(walkForwardStep) : null
         };
 
-        onRunOptimization(params);
+        onRunOptimization(params, autoSaveAfterOptimization);
     };
 
     const handleSaveResults = async () => {
@@ -881,7 +884,17 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                 </div>
 
                 {/* Run Button */}
-                <div className="flex justify-center pt-4">
+                <div className="flex flex-col items-center pt-4 space-y-3">
+                    <label className="flex items-center space-x-2">
+                        <input
+                            type="checkbox"
+                            checked={autoSaveAfterOptimization}
+                            onChange={(e) => setAutoSaveAfterOptimization(e.target.checked)}
+                            className="h-4 w-4 text-green-600 border-gray-300 rounded"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Auto-save results after completion</span>
+                    </label>
+
                     <button
                         onClick={handleRunOptimization}
                         disabled={isLoading}
