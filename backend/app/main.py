@@ -1,6 +1,6 @@
 from __future__ import annotations
 from fastapi import FastAPI, HTTPException
-from typing import Optional, List
+from typing import Optional, List, Any
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.data_loader import download_data, load_data
@@ -301,6 +301,10 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     from dateutil.relativedelta import relativedelta
     from datetime import datetime as dt
     from collections import Counter
+    
+    # Validate required parameters for walk-forward
+    if not request.train_months or not request.test_months:
+        raise ValueError("Walk-Forward Optimization requires train_months and test_months to be set. Please enable Train/Test Split.")
     
     # Calculate all windows
     windows = []
@@ -701,7 +705,7 @@ OPTIMIZATION_RESULTS_DIR = os.getenv("OPTIMIZATION_RESULTS_DIR", "/home/mpaton/P
 
 class SaveOptimizationResultsRequest(BaseModel):
     params: OptimizationRequest
-    results: dict  # Changed from List[dict] to dict to handle all modes
+    results: Any  # Accept any structure - dict for walk-forward/train-test, or object with results array for normal optimization
 
 @app.post("/api/save_optimization_results")
 async def save_optimization_results(request: SaveOptimizationResultsRequest):
@@ -795,7 +799,14 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
                 f.write("-" * 20 + "\n")
                 
                 # Get results list
-                results_list = request.results if isinstance(request.results, list) else []
+                # For normal optimization, results is a dict with 'results' key containing the list
+                # For other modes, it might be a list directly
+                if isinstance(request.results, dict) and 'results' in request.results:
+                    results_list = request.results['results']
+                elif isinstance(request.results, list):
+                    results_list = request.results
+                else:
+                    results_list = []
                 
                 # Header
                 headers = ["#", "Broker", "N Tickers", "Rebalance", "Lookback", "Filter Neg Mom", "Stop Loss", "Strategy", "Sizing", "CAGR", "Max DD", "Final Value"]

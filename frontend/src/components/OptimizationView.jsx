@@ -149,8 +149,9 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
             // Train/Test Split parameters
             enable_train_test: enableTrainTest,
             train_start_date: enableTrainTest ? trainStartDate : null,
-            train_months: enableTrainTest ? parseInt(trainYears) * 12 : null,
-            test_months: enableTrainTest ? parseInt(testMonths) : null,
+            // Walk-Forward needs these values too, so send them if either is enabled
+            train_months: (enableTrainTest || enableWalkForward) ? parseInt(trainYears) * 12 : null,
+            test_months: (enableTrainTest || enableWalkForward) ? parseInt(testMonths) : null,
             top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null,
 
             // Scoring Configuration
@@ -224,7 +225,30 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
             filter_negative_momentum: filterNegativeMomentum,
             margin_enabled: marginEnabled,
             strategies: strategies,
-            sizing_methods: sizingMethods
+            sizing_methods: sizingMethods,
+
+            // Train/Test Split parameters (required for validation)
+            enable_train_test: enableTrainTest,
+            train_start_date: enableTrainTest ? trainStartDate : null,
+            train_months: (enableTrainTest || enableWalkForward) ? parseInt(trainYears) * 12 : null,
+            test_months: (enableTrainTest || enableWalkForward) ? parseInt(testMonths) : null,
+            top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null,
+
+            // Scoring Configuration
+            scoring_config: {
+                cagr_min: cagrMin / 100,
+                cagr_max: cagrMax / 100,
+                cagr_weight: parseFloat(cagrWeight),
+                dd_min: ddMin / 100,
+                dd_max: ddMax / 100,
+                dd_weight: parseFloat(ddWeight)
+            },
+
+            // Walk-Forward parameters
+            enable_walk_forward: enableWalkForward,
+            walk_forward_start: enableWalkForward ? walkForwardStart : null,
+            walk_forward_end: enableWalkForward ? walkForwardEnd : null,
+            walk_forward_step_months: enableWalkForward ? parseInt(walkForwardStep) : null
         };
 
         try {
@@ -308,7 +332,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                         <input
                             type="checkbox"
                             checked={enableTrainTest}
-                            onChange={(e) => setEnableTrainTest(e.target.checked)}
+                            onChange={(e) => {
+                                setEnableTrainTest(e.target.checked);
+                                // Auto-disable Walk-Forward when Train/Test Split is disabled
+                                if (!e.target.checked && enableWalkForward) {
+                                    setEnableWalkForward(false);
+                                }
+                            }}
                             className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                         />
                         <span className="text-lg font-semibold text-gray-700">
@@ -502,13 +532,24 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                     <input
                                         type="checkbox"
                                         checked={enableWalkForward}
-                                        onChange={(e) => setEnableWalkForward(e.target.checked)}
-                                        className="h-4 w-4 text-purple-600 border-gray-300 rounded"
+                                        disabled={!enableTrainTest}
+                                        onChange={(e) => {
+                                            setEnableWalkForward(e.target.checked);
+                                            // Auto-enable Train/Test Split when Walk-Forward is enabled
+                                            if (e.target.checked && !enableTrainTest) {
+                                                setEnableTrainTest(true);
+                                            }
+                                        }}
+                                        className="h-4 w-4 text-purple-600 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                     />
                                     <span className="text-sm font-semibold text-gray-700">
                                         Enable Walk-Forward Analysis
                                     </span>
                                 </label>
+
+                                <p className="text-xs text-purple-700 mt-2">
+                                    Note: Walk-Forward requires Train/Test Split to be enabled (uses Training Period and Test Period)
+                                </p>
 
                                 {enableWalkForward && (
                                     <div className="mt-3 space-y-3">

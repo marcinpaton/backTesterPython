@@ -106,17 +106,29 @@ function App() {
 
       // Handle Auto-Save
       if (autoSave) {
+        let saveData; // Declare outside try block so it's accessible in catch
         try {
-          let saveData;
+          console.log('Auto-save params:', params);
+          console.log('Auto-save results:', results);
+
           if (results.walk_forward_mode) {
+            // Walk-forward mode - results is already a dict
+            saveData = {
+              params: params,
+              results: results
+            };
+          } else if (results.train_test_mode) {
+            // Train/Test mode - results is already a dict
             saveData = {
               params: params,
               results: results
             };
           } else {
+            // Normal optimization - results has structure { total_tests, completed_tests, results: [...] }
+            // Backend expects the full structure, not just the array
             saveData = {
               params: params,
-              results: results.results || results
+              results: results  // Send entire results object, not just results.results
             };
           }
 
@@ -126,7 +138,11 @@ function App() {
           // alert(`Results auto-saved to: ${saveResponse.data.filename}`); 
         } catch (saveErr) {
           console.error('Auto-save failed:', saveErr);
-          setError('Optimization finished, but auto-save failed: ' + saveErr.message);
+          console.error('Save data that failed:', saveData);
+          if (saveErr.response) {
+            console.error('Response data:', saveErr.response.data);
+          }
+          setError('Optimization finished, but auto-save failed: ' + (saveErr.response?.data?.detail || saveErr.message));
         }
       }
 
