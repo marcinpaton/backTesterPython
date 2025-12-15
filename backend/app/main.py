@@ -729,7 +729,12 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
                 # Walk-Forward Mode
                 f.write("MODE: Walk-Forward Optimization\n")
                 f.write(f"Total Windows: {request.results.get('total_windows')}\n")
-                f.write(f"Train Period: {request.results.get('train_period_months')} months\n")
+                
+                # Convert train period from months to years for display
+                train_months = request.results.get('train_period_months')
+                train_years = train_months / 12 if train_months else 0
+                f.write(f"Train Period: {train_years:.1f} years ({train_months} months)\n")
+                
                 f.write(f"Test Period: {request.results.get('test_period_months')} months\n")
                 f.write(f"Step: {request.results.get('step_months')} months\n\n")
                 

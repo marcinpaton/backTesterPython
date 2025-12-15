@@ -48,7 +48,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     // Train/Test Split
     const [enableTrainTest, setEnableTrainTest] = useState(true);
     const [trainStartDate, setTrainStartDate] = useState('2011-01-01');
-    const [trainMonths, setTrainMonths] = useState(24);
+    const [trainYears, setTrainYears] = useState(2);
     const [testMonths, setTestMonths] = useState(12);
     const [topNForTest, setTopNForTest] = useState(10);
 
@@ -149,7 +149,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
             // Train/Test Split parameters
             enable_train_test: enableTrainTest,
             train_start_date: enableTrainTest ? trainStartDate : null,
-            train_months: enableTrainTest ? parseInt(trainMonths) : null,
+            train_months: enableTrainTest ? parseInt(trainYears) * 12 : null,
             test_months: enableTrainTest ? parseInt(testMonths) : null,
             top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null,
 
@@ -332,12 +332,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Training Period (months)</label>
+                                    <label className="block text-sm font-medium text-gray-700">Training Period (years)</label>
                                     <input
                                         type="number"
-                                        value={trainMonths}
-                                        onChange={(e) => setTrainMonths(e.target.value)}
+                                        value={trainYears}
+                                        onChange={(e) => setTrainYears(e.target.value)}
                                         min="1"
+                                        step="1"
                                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                     />
                                 </div>
@@ -365,7 +366,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                             </div>
 
                             {/* Date Preview */}
-                            {trainStartDate && trainMonths && testMonths && (
+                            {trainStartDate && trainYears && testMonths && (
                                 <div className="mt-4 p-3 bg-white rounded border border-blue-300">
                                     <p className="text-xs font-semibold text-gray-600 mb-2">📅 Period Preview:</p>
                                     <div className="grid grid-cols-2 gap-3 text-sm">
@@ -375,7 +376,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                                 {(() => {
                                                     const start = new Date(trainStartDate);
                                                     const end = new Date(start);
-                                                    end.setMonth(end.getMonth() + parseInt(trainMonths));
+                                                    end.setMonth(end.getMonth() + parseInt(trainYears) * 12);
                                                     end.setDate(end.getDate() - 1);
                                                     return `${start.toLocaleDateString('en-CA')} to ${end.toLocaleDateString('en-CA')}`;
                                                 })()}
@@ -387,7 +388,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                                 {(() => {
                                                     const trainStart = new Date(trainStartDate);
                                                     const trainEnd = new Date(trainStart);
-                                                    trainEnd.setMonth(trainEnd.getMonth() + parseInt(trainMonths));
+                                                    trainEnd.setMonth(trainEnd.getMonth() + parseInt(trainYears) * 12);
                                                     trainEnd.setDate(trainEnd.getDate() - 1);
                                                     const testStart = new Date(trainEnd);
                                                     testStart.setDate(testStart.getDate() + 1);
@@ -547,13 +548,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                         </div>
 
                                         {/* Window count preview */}
-                                        {walkForwardStart && walkForwardEnd && trainMonths && testMonths && walkForwardStep && (
+                                        {walkForwardStart && walkForwardEnd && trainYears && testMonths && walkForwardStep && (
                                             <div className="p-2 bg-white rounded border border-purple-400">
                                                 <p className="text-xs text-gray-700">
                                                     <strong>Estimated Windows:</strong> {(() => {
                                                         const start = new Date(walkForwardStart);
                                                         const end = new Date(walkForwardEnd);
-                                                        const trainM = parseInt(trainMonths);
+                                                        const trainM = parseInt(trainYears) * 12;
                                                         const testM = parseInt(testMonths);
                                                         const stepM = parseInt(walkForwardStep);
 
@@ -571,7 +572,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                                         return count;
                                                     })()} windows
                                                     <span className="ml-2 text-gray-600">
-                                                        (Train: {trainMonths}mo, Test: {testMonths}mo, Step: {walkForwardStep}mo)
+                                                        (Train: {trainYears}y, Test: {testMonths}mo, Step: {walkForwardStep}mo)
                                                     </span>
                                                 </p>
                                             </div>
