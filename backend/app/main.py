@@ -697,7 +697,7 @@ def run_optimization_endpoint(request: OptimizationRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-OPTIMIZATION_RESULTS_DIR = os.getenv("OPTIMIZATION_RESULTS_DIR", "/home/mpaton/Projects/my/backTesterPython/backTesterPython/optimisation")
+OPTIMIZATION_RESULTS_DIR = os.getenv("OPTIMIZATION_RESULTS_DIR", "/home/mpaton/Projects/my/backTesterPython/backTesterPython/optimization_results")
 
 class SaveOptimizationResultsRequest(BaseModel):
     params: OptimizationRequest
@@ -710,7 +710,14 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
             os.makedirs(OPTIMIZATION_RESULTS_DIR)
             
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-        filename = f"optimization_results_{timestamp}.txt"
+        
+        # Check if walk-forward mode to add train period to filename
+        if isinstance(request.results, dict) and request.results.get('walk_forward_mode'):
+            train_period = request.results.get('train_period_months', '')
+            filename = f"optimization_results_{train_period}_{timestamp}.txt"
+        else:
+            filename = f"optimization_results_{timestamp}.txt"
+        
         filepath = os.path.join(OPTIMIZATION_RESULTS_DIR, filename)
         
         with open(filepath, "w", encoding="utf-8") as f:
@@ -751,7 +758,8 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
                     f.write("-" * 50 + "\n")
                     
                     for i, (train, test, score) in enumerate(zip(window['train_results'], window['test_results'], window['scores']), 1):
-                        f.write(f"{i}. {train['broker']} | N:{train['n_tickers']} | Rebal:{train['rebalance_period']} | ")
+                        lookback = train.get('momentum_lookback_days', '-')
+                        f.write(f"{i}. {train['broker']} | N:{train['n_tickers']} | Rebal:{train['rebalance_period']} | Look:{lookback} | ")
                         f.write(f"Train CAGR:{train['cagr']*100:.2f}% DD:{train['max_drawdown']*100:.2f}% | ")
                         f.write(f"Test CAGR:{test['cagr']*100:.2f}% DD:{test['max_drawdown']*100:.2f}% | ")
                         f.write(f"Score:{score:.1f}\n")
