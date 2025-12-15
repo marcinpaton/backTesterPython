@@ -33,7 +33,7 @@ start_backend() {
     echo "Starting Backend..."
     
     # Set OPTIMIZATION_RESULTS_DIR
-    export OPTIMIZATION_RESULTS_DIR="/home/mpaton/Projects/my/backTesterPython/backTesterPython/optimisation"
+    export OPTIMIZATION_RESULTS_DIR="/home/mpaton/Projects/my/backTesterPython/backTesterPython/optimization_results"
     echo "Optimization Results Dir: $OPTIMIZATION_RESULTS_DIR"
     
     # Prepare the activation command for venv
