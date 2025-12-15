@@ -1,0 +1,181 @@
+# Analiza Wyników Optymalizacji - Top 5 Konfiguracji
+
+## Metodologia Analizy
+
+Przeanalizowano 7 plików z wynikami optymalizacji obejmujących różne okresy:
+- **2016-2018** (2 lata)
+- **2018-2020** (2 lata)
+- **2020-2023** (3 lata)
+- **2022-2025** (3.9 lat)
+- **2016-2021** (5 lat)
+- **2021-2025** (4.9 lat)
+- **2016-2025** (9.9 lat) - **PEŁNY OKRES**
+
+### Kryteria Wyboru
+1. **CAGR > 50%** (priorytet)
+2. **Minimalizacja Max Drawdown** (DD)
+3. **Stabilność wyników** w różnych okresach czasu
+4. **Długoterminowa efektywność** (szczególnie w okresie 2016-2025)
+
+---
+
+## 🏆 TOP 5 Najlepszych Konfiguracji
+
+### #1: **Momentum 80-Day, 5 Tickers, Var Sizing, Bossa**
+**Parametry:**
+- Broker: **Bossa**
+- N Tickers: **5**
+- Rebalance Period: **5 miesięcy**
+- Momentum Lookback: **80 dni**
+- Strategy: **Momentum**
+- Sizing: **Risk Parity (var)**
+- Margin: **Nie**
+
+**Wyniki w różnych okresach:**
+| Okres | CAGR | Max DD | Final Value |
+|-------|------|--------|-------------|
+| 2016-2018 | 73.53% | -18.11% | $30,049 |
+| 2018-2020 | - | - | - |
+| 2020-2023 | - | - | - |
+| 2022-2025 | - | - | - |
+| 2016-2021 | 61.05% | -37.45% | $108,141 |
+| 2021-2025 | - | - | - |
+| **2016-2025** | **62.21%** | **-37.45%** | **$1,180,599** |
+
+**Uzasadnienie:** Najlepszy CAGR w pełnym okresie (62.21%) przy umiarkowanym DD (-37.45%). Stabilny w długim terminie.
+
+---
+
+### #2: **Momentum 80-Day, 5 Tickers, Equal Sizing, Bossa**
+**Parametry:**
+- Broker: **Bossa**
+- N Tickers: **5**
+- Rebalance Period: **5 miesięcy**
+- Momentum Lookback: **80 dni**
+- Strategy: **Momentum**
+- Sizing: **Equal Weight**
+- Margin: **Nie**
+
+**Wyniki w różnych okresach:**
+| Okres | CAGR | Max DD | Final Value |
+|-------|------|--------|-------------|
+| 2016-2018 | 81.32% | -19.28% | $32,809 |
+| 2018-2020 | - | - | - |
+| 2020-2023 | - | - | - |
+| 2022-2025 | - | - | - |
+| 2016-2021 | 67.34% | -38.52% | $130,977 |
+| 2021-2025 | 69.70% | -41.24% | $130,852 |
+| **2016-2025** | **60.63%** | **-41.33%** | **$1,072,168** |
+
+**Uzasadnienie:** Bardzo wysoki CAGR (60.63%) w pełnym okresie. Konsystentnie wysoki w różnych podokresach (67-81%). DD nieco wyższy niż #1, ale nadal akceptowalny.
+
+---
+
+### #3: **Momentum 30-Day, 5 Tickers, Var Sizing, Bossa**
+**Parametry:**
+- Broker: **Bossa**
+- N Tickers: **5**
+- Rebalance Period: **5 miesięcy**
+- Momentum Lookback: **30 dni**
+- Strategy: **Momentum**
+- Sizing: **Risk Parity (var)**
+- Margin: **Nie**
+
+**Wyniki w różnych okresach:**
+| Okres | CAGR | Max DD | Final Value |
+|-------|------|--------|-------------|
+| 2016-2018 | 76.86% | -11.22% | $31,214 |
+| 2018-2020 | - | - | - |
+| 2020-2023 | - | - | - |
+| 2022-2025 | - | - | - |
+| 2016-2021 | 73.15% | -35.97% | $155,362 |
+| 2021-2025 | - | - | - |
+| **2016-2025** | **58.14%** | **-47.23%** | **$919,058** |
+
+**Uzasadnienie:** Wysoki CAGR (58.14%). Bardzo niski DD w krótkim okresie (-11.22% w 2016-2018). Dobra alternatywa dla krótszego momentum lookback.
+
+---
+
+### #4: **Momentum 60-Day, 5 Tickers, Equal Sizing, Bossa**
+**Parametry:**
+- Broker: **Bossa**
+- N Tickers: **5**
+- Rebalance Period: **4 miesiące**
+- Momentum Lookback: **60 dni**
+- Strategy: **Momentum**
+- Sizing: **Equal Weight**
+- Margin: **Nie**
+
+**Wyniki w różnych okresach:**
+| Okres | CAGR | Max DD | Final Value |
+|-------|------|--------|-------------|
+| 2016-2018 | - | - | - |
+| 2018-2020 | - | - | - |
+| 2020-2023 | - | - | - |
+| 2022-2025 | - | - | - |
+| 2016-2021 | 72.12% | -39.24% | $150,795 |
+| 2021-2025 | - | - | - |
+| **2016-2025** | **58.53%** | **-41.35%** | **$941,327** |
+
+**Uzasadnienie:** Bardzo wysoki CAGR (58.53%) przy umiarkowanym DD. Dobry kompromis między lookback 30 a 80 dni.
+
+---
+
+### #5: **Momentum 80-Day, 6 Tickers, Var Sizing, Bossa**
+**Parametry:**
+- Broker: **Bossa**
+- N Tickers: **6**
+- Rebalance Period: **3 miesiące**
+- Momentum Lookback: **80 dni**
+- Strategy: **Momentum**
+- Sizing: **Risk Parity (var)**
+- Margin: **Nie**
+
+**Wyniki w różnych okresach:**
+| Okres | CAGR | Max DD | Final Value |
+|-------|------|--------|-------------|
+| 2016-2018 | - | - | - |
+| 2018-2020 | - | - | - |
+| 2020-2023 | - | - | - |
+| 2022-2025 | 83.40% | -29.90% | $103,829 |
+| 2016-2021 | - | - | - |
+| 2021-2025 | - | - | - |
+| **2016-2025** | **52.70%** | **-33.39%** | **$650,361** |
+
+**Uzasadnienie:** Najniższy DD spośród top 5 (-33.39%). CAGR powyżej 50%. Bardzo wysoki CAGR w okresie 2022-2025 (83.40%). Dobra dywersyfikacja z 6 tickerami.
+
+---
+
+## 📊 Porównanie Top 5
+
+| Rank | Lookback | N Tickers | Rebalance | Sizing | CAGR (2016-2025) | Max DD | Final Value |
+|------|----------|-----------|-----------|--------|------------------|--------|-------------|
+| **#1** | 80 dni | 5 | 5 mies. | Var | **62.21%** | -37.45% | $1,180,599 |
+| **#2** | 80 dni | 5 | 5 mies. | Equal | **60.63%** | -41.33% | $1,072,168 |
+| **#3** | 30 dni | 5 | 5 mies. | Var | **58.14%** | -47.23% | $919,058 |
+| **#4** | 60 dni | 5 | 4 mies. | Equal | **58.53%** | -41.35% | $941,327 |
+| **#5** | 80 dni | 6 | 3 mies. | Var | **52.70%** | **-33.39%** | $650,361 |
+
+---
+
+## 🎯 Kluczowe Wnioski
+
+### Wspólne Cechy Najlepszych Konfiguracji:
+1. **Strategia:** Wszystkie używają **Momentum** (nie Scoring)
+2. **Broker:** Wszystkie używają **Bossa** (lepsze prowizje niż IB dla tych parametrów)
+3. **N Tickers:** Optymalne **5-6 tickerów** (nie więcej)
+4. **Rebalance:** **3-5 miesięcy** (nie za często, nie za rzadko)
+5. **Momentum Lookback:** **30-80 dni** (dłuższy lookback = stabilniejsze wyniki)
+6. **Sizing:** **Risk Parity (var)** często lepsze niż Equal Weight
+7. **Margin:** **Wyłączony** (bez dźwigni)
+
+### Rekomendacje:
+- **Dla maksymalnego CAGR:** Wybierz **#1** (62.21% CAGR, -37.45% DD)
+- **Dla najniższego DD:** Wybierz **#5** (52.70% CAGR, -33.39% DD)
+- **Dla balansu:** Wybierz **#2** lub **#4** (60-58% CAGR, -41% DD)
+
+### Uwagi:
+- Wszystkie konfiguracje znacznie przewyższają cel CAGR > 50%
+- Max DD w zakresie 33-47% jest akceptowalny dla strategii momentum
+- Dłuższy lookback (80 dni) daje lepsze wyniki długoterminowe
+- Risk Parity sizing często przewyższa Equal Weight
