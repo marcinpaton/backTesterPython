@@ -4,8 +4,8 @@ import OptimizationResults from './OptimizationResults';
 const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => {
     const [tickers, setTickers] = useState(
         'AU, GOOG, FSLR, IDXX, WDC, ULS, FRES.L, WWD, KEYS, ISRG, NST.AX, TER, AMD, CLS.TO, CRS, DELTA.BK, FN, MU, STLD, FIX, CRDO, CTRA, APH, ANGPY, VRT, ASML, SDVKY, ANTO.L, KLAC, AEM.TO, ADI, FNV.TO, SHOP.TO, HWM, IFX.DE, UCBJY, UCB.BR, WPM.TO, PRY.MI, MPWR, BWXT, PSTG, EADSY, WPM.L, AIR.PA, FCX, FLEX, IFNNY, PLTR, BSX, NVDA, GD, AMZN, 1177.HK, ARZGY, ANET, EME, FUTU, RR.L, RYCEY, SAAB-B.ST, SCHW, TT, RMD, GEV, ASMIY, ASM.AS, FTNT, NVZMY, ADBE, ADYEN.AS, ADYEY, ARM, AXON, BLK, CDNS, DXCM, GWRE, LNSTY, MA, META, NOW, NSIS-B.CO, NTNX, PGHN.SW, PINS, RHM.DE, RJF, RMD.AX, SAP, SAP.DE, SMCI, SPOT, SYK, TOST, TW, V, VEEV, WDAY');
-    const [startDate, setStartDate] = useState('2020-01-01');
-    const [endDate, setEndDate] = useState('2025-11-15');
+    const [startDate, setStartDate] = useState('2011-01-01');
+    const [endDate, setEndDate] = useState('2025-12-01');
 
     // Broker presets
     const [bossaEnabled, setBossaEnabled] = useState(true);
@@ -13,7 +13,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
 
     // Number of tickers range
     const [nTickersMin, setNTickersMin] = useState(5);
-    const [nTickersMax, setNTickersMax] = useState(5);
+    const [nTickersMax, setNTickersMax] = useState(10);
     const [nTickersStep, setNTickersStep] = useState(1);
 
     // Stop loss range (optional)
@@ -24,13 +24,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
 
     // Rebalance period range (in months)
     const [rebalancePeriodMin, setRebalancePeriodMin] = useState(1);
-    const [rebalancePeriodMax, setRebalancePeriodMax] = useState(1);
+    const [rebalancePeriodMax, setRebalancePeriodMax] = useState(6);
     const [rebalancePeriodStep, setRebalancePeriodStep] = useState(1);
 
     // Momentum lookback period range (in days)
-    const [momentumLookbackMin, setMomentumLookbackMin] = useState(30);
-    const [momentumLookbackMax, setMomentumLookbackMax] = useState(30);
-    const [momentumLookbackStep, setMomentumLookbackStep] = useState(10);
+    const [momentumLookbackMin, setMomentumLookbackMin] = useState(20);
+    const [momentumLookbackMax, setMomentumLookbackMax] = useState(120);
+    const [momentumLookbackStep, setMomentumLookbackStep] = useState(20);
     const [filterNegativeMomentumEnabled, setFilterNegativeMomentumEnabled] = useState(false); // Test with filter=True
     const [filterNegativeMomentumDisabled, setFilterNegativeMomentumDisabled] = useState(true); // Test with filter=False
 
@@ -42,12 +42,12 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     const [momentumEnabled, setMomentumEnabled] = useState(true);
 
     // Position sizing (multi-select)
-    const [equalWeightEnabled, setEqualWeightEnabled] = useState(true);
-    const [riskParityEnabled, setRiskParityEnabled] = useState(false);
+    const [equalWeightEnabled, setEqualWeightEnabled] = useState(false);
+    const [riskParityEnabled, setRiskParityEnabled] = useState(true);
 
     // Train/Test Split
-    const [enableTrainTest, setEnableTrainTest] = useState(false);
-    const [trainStartDate, setTrainStartDate] = useState('2016-01-01');
+    const [enableTrainTest, setEnableTrainTest] = useState(true);
+    const [trainStartDate, setTrainStartDate] = useState('2011-01-01');
     const [trainMonths, setTrainMonths] = useState(24);
     const [testMonths, setTestMonths] = useState(12);
     const [topNForTest, setTopNForTest] = useState(10);
@@ -62,13 +62,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     const [showScoringConfig, setShowScoringConfig] = useState(false);
 
     // Walk-Forward
-    const [enableWalkForward, setEnableWalkForward] = useState(false);
-    const [walkForwardStart, setWalkForwardStart] = useState('2016-01-01');
-    const [walkForwardEnd, setWalkForwardEnd] = useState('2025-01-01');
-    const [walkForwardStep, setWalkForwardStep] = useState(6);
+    const [enableWalkForward, setEnableWalkForward] = useState(true);
+    const [walkForwardStart, setWalkForwardStart] = useState('2011-01-01');
+    const [walkForwardEnd, setWalkForwardEnd] = useState('2025-12-01');
+    const [walkForwardStep, setWalkForwardStep] = useState(12);
 
     // Auto-save
-    const [autoSaveAfterOptimization, setAutoSaveAfterOptimization] = useState(false);
+    const [autoSaveAfterOptimization, setAutoSaveAfterOptimization] = useState(true);
 
 
     const handleRunOptimization = () => {
