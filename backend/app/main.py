@@ -682,8 +682,9 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
         
         # Check if walk-forward mode to add train period to filename
         if isinstance(request.results, dict) and request.results.get('walk_forward_mode'):
-            train_period = request.results.get('train_period_months', '')
-            filename = f"optimization_results_{train_period}_{timestamp}.txt"
+            train_months = request.results.get('train_period_months', 0)
+            train_years = train_months / 12
+            filename = f"optimization_results_{train_years:.0f}y_{timestamp}.txt"
         else:
             filename = f"optimization_results_{timestamp}.txt"
         
