@@ -48,7 +48,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     // Train/Test Split
     const [enableTrainTest, setEnableTrainTest] = useState(true);
     const [trainStartDate, setTrainStartDate] = useState('2011-01-01');
-    const [trainYears, setTrainYears] = useState(2);
+    const [trainYears, setTrainYears] = useState(2);  // User inputs years, converted to months
     const [testMonths, setTestMonths] = useState(12);
     const [topNForTest, setTopNForTest] = useState(10);
 
@@ -148,8 +148,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
 
             // Train/Test Split parameters
             enable_train_test: enableTrainTest,
-            train_start_date: enableTrainTest ? trainStartDate : null,
-            // Walk-Forward needs these values too, so send them if either is enabled
+            train_start_date: enableTrainTest ? startDate : null,
             train_months: (enableTrainTest || enableWalkForward) ? parseInt(trainYears) * 12 : null,
             test_months: (enableTrainTest || enableWalkForward) ? parseInt(testMonths) : null,
             top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null,
@@ -166,8 +165,8 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
 
             // Walk-Forward parameters
             enable_walk_forward: enableWalkForward,
-            walk_forward_start: enableWalkForward ? walkForwardStart : null,
-            walk_forward_end: enableWalkForward ? walkForwardEnd : null,
+            walk_forward_start: enableWalkForward ? startDate : null,
+            walk_forward_end: enableWalkForward ? endDate : null,
             walk_forward_step_months: enableWalkForward ? parseInt(walkForwardStep) : null
         };
 
@@ -229,7 +228,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
 
             // Train/Test Split parameters (required for validation)
             enable_train_test: enableTrainTest,
-            train_start_date: enableTrainTest ? trainStartDate : null,
+            train_start_date: enableTrainTest ? startDate : null,
             train_months: (enableTrainTest || enableWalkForward) ? parseInt(trainYears) * 12 : null,
             test_months: (enableTrainTest || enableWalkForward) ? parseInt(testMonths) : null,
             top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null,
@@ -246,8 +245,8 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
 
             // Walk-Forward parameters
             enable_walk_forward: enableWalkForward,
-            walk_forward_start: enableWalkForward ? walkForwardStart : null,
-            walk_forward_end: enableWalkForward ? walkForwardEnd : null,
+            walk_forward_start: enableWalkForward ? startDate : null,
+            walk_forward_end: enableWalkForward ? endDate : null,
             walk_forward_step_months: enableWalkForward ? parseInt(walkForwardStep) : null
         };
 
@@ -349,18 +348,9 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                     {enableTrainTest && (
                         <div className="mt-4 space-y-4 bg-blue-50 p-4 rounded border border-blue-200">
                             <p className="text-sm text-blue-800 mb-3">
-                                Optimize on training period, then automatically test top N results on test period.
+                                Optimize on training period, then test top N results on test period. Uses Date Range as overall period.
                             </p>
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Training Start Date</label>
-                                    <input
-                                        type="date"
-                                        value={trainStartDate}
-                                        onChange={(e) => setTrainStartDate(e.target.value)}
-                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                    />
-                                </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Training Period (years)</label>
                                     <input
@@ -396,7 +386,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                             </div>
 
                             {/* Date Preview */}
-                            {trainStartDate && trainYears && testMonths && (
+                            {startDate && trainYears && testMonths && (
                                 <div className="mt-4 p-3 bg-white rounded border border-blue-300">
                                     <p className="text-xs font-semibold text-gray-600 mb-2">📅 Period Preview:</p>
                                     <div className="grid grid-cols-2 gap-3 text-sm">
@@ -404,7 +394,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                             <span className="font-medium text-green-700">Training:</span>
                                             <div className="text-gray-700 ml-2">
                                                 {(() => {
-                                                    const start = new Date(trainStartDate);
+                                                    const start = new Date(startDate);
                                                     const end = new Date(start);
                                                     end.setMonth(end.getMonth() + parseInt(trainYears) * 12);
                                                     end.setDate(end.getDate() - 1);
@@ -416,7 +406,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                             <span className="font-medium text-blue-700">Test:</span>
                                             <div className="text-gray-700 ml-2">
                                                 {(() => {
-                                                    const trainStart = new Date(trainStartDate);
+                                                    const trainStart = new Date(startDate);
                                                     const trainEnd = new Date(trainStart);
                                                     trainEnd.setMonth(trainEnd.getMonth() + parseInt(trainYears) * 12);
                                                     trainEnd.setDate(trainEnd.getDate() - 1);
@@ -557,25 +547,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                             Run multiple train/test windows across time period to find most consistent parameters
                                         </p>
 
-                                        <div className="grid grid-cols-3 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700">Overall Start Date</label>
-                                                <input
-                                                    type="date"
-                                                    value={walkForwardStart}
-                                                    onChange={(e) => setWalkForwardStart(e.target.value)}
-                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700">Overall End Date</label>
-                                                <input
-                                                    type="date"
-                                                    value={walkForwardEnd}
-                                                    onChange={(e) => setWalkForwardEnd(e.target.value)}
-                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
-                                                />
-                                            </div>
+                                        <div className="grid grid-cols-1 gap-4">
                                             <div>
                                                 <label className="block text-xs font-medium text-gray-700">Step Size (months)</label>
                                                 <input
@@ -589,12 +561,12 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                         </div>
 
                                         {/* Window count preview */}
-                                        {walkForwardStart && walkForwardEnd && trainYears && testMonths && walkForwardStep && (
+                                        {startDate && endDate && trainYears && testMonths && walkForwardStep && (
                                             <div className="p-2 bg-white rounded border border-purple-400">
                                                 <p className="text-xs text-gray-700">
                                                     <strong>Estimated Windows:</strong> {(() => {
-                                                        const start = new Date(walkForwardStart);
-                                                        const end = new Date(walkForwardEnd);
+                                                        const start = new Date(startDate);
+                                                        const end = new Date(endDate);
                                                         const trainM = parseInt(trainYears) * 12;
                                                         const testM = parseInt(testMonths);
                                                         const stepM = parseInt(walkForwardStep);
