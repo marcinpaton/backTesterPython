@@ -54,19 +54,74 @@ const OptimizationResults = ({ results, onSave }) => {
                         // Average drawdown
                         const avgDD = testDDs.reduce((sum, dd) => sum + dd, 0) / testDDs.length;
 
+                        // Capital simulation: start with 10,000 and apply each window's Test CAGR
+                        const initialCapital = 10000;
+                        let capital = initialCapital;
+                        const capitalGrowth = [initialCapital];
+
+                        testCAGRs.forEach(cagr => {
+                            capital = capital * (1 + cagr);
+                            capitalGrowth.push(capital);
+                        });
+
+                        const finalCapital = capitalGrowth[capitalGrowth.length - 1];
+                        const totalReturn = ((finalCapital - initialCapital) / initialCapital) * 100;
+
                         return (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-xs text-gray-600">Aggregated Test CAGR</p>
-                                    <p className="text-2xl font-bold text-green-700">{(aggregatedCAGR * 100).toFixed(2)}%</p>
-                                    <p className="text-xs text-gray-500 mt-1">Geometric mean of {testCAGRs.length} windows</p>
+                            <>
+                                <div className="grid grid-cols-3 gap-4 mb-4">
+                                    <div>
+                                        <p className="text-xs text-gray-600">Aggregated Test CAGR</p>
+                                        <p className="text-2xl font-bold text-green-700">{(aggregatedCAGR * 100).toFixed(2)}%</p>
+                                        <p className="text-xs text-gray-500 mt-1">Geometric mean of {testCAGRs.length} windows</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-600">Average Test Max Drawdown</p>
+                                        <p className="text-2xl font-bold text-red-700">{(avgDD * 100).toFixed(2)}%</p>
+                                        <p className="text-xs text-gray-500 mt-1">Arithmetic mean of {testDDs.length} windows</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-600">Simulated Final Capital</p>
+                                        <p className="text-2xl font-bold text-blue-700">${finalCapital.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                        <p className="text-xs text-gray-500 mt-1">From $10,000 initial ({totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(1)}%)</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-gray-600">Average Test Max Drawdown</p>
-                                    <p className="text-2xl font-bold text-red-700">{(avgDD * 100).toFixed(2)}%</p>
-                                    <p className="text-xs text-gray-500 mt-1">Arithmetic mean of {testDDs.length} windows</p>
+
+                                {/* Capital growth bar chart */}
+                                <div className="mt-3 p-3 bg-white rounded border border-green-200">
+                                    <p className="text-xs font-semibold text-gray-700 mb-3">Capital Growth Through Windows:</p>
+                                    <div className="flex items-end justify-between gap-1" style={{ height: '160px' }}>
+                                        {/* Initial capital bar */}
+                                        <div className="flex flex-col items-center justify-end flex-1">
+                                            <div className="text-xs font-semibold text-gray-700 mb-1">
+                                                ${initialCapital.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                                            </div>
+                                            <div
+                                                className="w-full bg-gray-400 rounded-t"
+                                                style={{ height: `${Math.max((initialCapital / finalCapital) * 120, 20)}px` }}
+                                            />
+                                            <div className="text-xs text-gray-600 mt-1">Start</div>
+                                        </div>
+
+                                        {/* Window bars */}
+                                        {capitalGrowth.slice(1).map((cap, idx) => {
+                                            const isPositive = idx === 0 ? cap >= initialCapital : cap >= capitalGrowth[idx];
+                                            return (
+                                                <div key={idx} className="flex flex-col items-center justify-end flex-1">
+                                                    <div className="text-xs font-semibold text-gray-700 mb-1">
+                                                        ${cap.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                                                    </div>
+                                                    <div
+                                                        className={`w-full rounded-t ${isPositive ? 'bg-green-500' : 'bg-red-500'}`}
+                                                        style={{ height: `${Math.max((cap / finalCapital) * 120, 20)}px` }}
+                                                    />
+                                                    <div className="text-xs text-gray-600 mt-1">W{idx + 1}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
+                            </>
                         );
                     })()}
                 </div>
