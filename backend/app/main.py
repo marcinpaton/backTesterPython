@@ -300,7 +300,7 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     """
     from dateutil.relativedelta import relativedelta
     from datetime import datetime as dt
-    from collections import Counter
+
     
     # Validate required parameters for walk-forward
     if not request.train_months or not request.test_months:
@@ -334,7 +334,6 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     
     # Run train/test for each window
     all_window_results = []
-    parameter_frequency = Counter()
     
     for i, window in enumerate(windows):
         # Create modified request for this window
@@ -363,25 +362,10 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
         # Run train/test for this window
         window_results = run_optimization_endpoint(window_request)
         
-        # Extract top N configurations from training results for frequency counting
+        # Extract top N configurations from training results
         top_configs = window_results['train_results'][:request.top_n_for_test]
         test_configs = window_results['test_results'][:request.top_n_for_test]
         scores = window_results.get('scores', [])[:request.top_n_for_test]
-        
-        # Count parameter combinations (only from top N)
-        for config in top_configs:
-            # Create hashable key from parameters
-            param_key = (
-                config['broker'],
-                config['n_tickers'],
-                config['rebalance_period'],
-                config.get('momentum_lookback_days', 0),
-                config.get('filter_negative_momentum', False),
-                config.get('stop_loss_pct', 0),
-                config['strategy'],
-                config['sizing_method']
-            )
-            parameter_frequency[param_key] += 1
         
         # Store results for this window
         all_window_results.append({
@@ -395,29 +379,10 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
             'all_scores': window_results.get('all_scores', window_results.get('scores', []))                # ALL scores
         })
     
-    # Rank parameters by frequency
-    ranked_params = []
-    for key, count in parameter_frequency.most_common():
-        ranked_params.append({
-            'parameters': {
-                'broker': key[0],
-                'n_tickers': key[1],
-                'rebalance_period': key[2],
-                'momentum_lookback_days': key[3] if key[3] != 0 else None,
-                'filter_negative_momentum': key[4],
-                'stop_loss_pct': key[5] if key[5] != 0 else None,
-                'strategy': key[6],
-                'sizing_method': key[7]
-            },
-            'frequency': count,
-            'percentage': (count / len(windows)) * 100
-        })
-    
     return {
         'walk_forward_mode': True,
         'total_windows': len(windows),
         'windows': all_window_results,
-        'ranked_parameters': ranked_params,
         'train_period_months': request.train_months,
         'test_period_months': request.test_months,
         'step_months': request.walk_forward_step_months
@@ -741,19 +706,6 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
                 
                 f.write(f"Test Period: {request.results.get('test_period_months')} months\n")
                 f.write(f"Step: {request.results.get('step_months')} months\n\n")
-                
-                # Most Consistent Parameters
-                f.write("=" * 50 + "\n")
-                f.write("MOST CONSISTENT PARAMETERS (Frequency > 1)\n")
-                f.write("=" * 50 + "\n\n")
-                
-                ranked_params = request.results.get('ranked_parameters', [])
-                for i, param in enumerate([p for p in ranked_params if p['frequency'] > 1], 1):
-                    p = param['parameters']
-                    f.write(f"Rank {i}: Frequency {param['frequency']}/{request.results.get('total_windows')} ({param['percentage']:.1f}%)\n")
-                    f.write(f"  Broker: {p['broker']}, N: {p['n_tickers']}, Rebal: {p['rebalance_period']}, ")
-                    f.write(f"Look: {p.get('momentum_lookback_days', '-')}, SL: {p.get('stop_loss_pct', '-')}, ")
-                    f.write(f"Strat: {p['strategy']}, Size: {p['sizing_method']}\n\n")
                 
                 # Individual Windows
                 f.write("\n" + "=" * 50 + "\n")
