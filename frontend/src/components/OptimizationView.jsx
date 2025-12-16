@@ -50,7 +50,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     const [trainStartDate, setTrainStartDate] = useState('2011-01-01');
     const [trainYears, setTrainYears] = useState(2);  // User inputs years, converted to months
     const [testMonths, setTestMonths] = useState(12);
-    const [topNForTest, setTopNForTest] = useState(10);
+    const [topNForTest, setTopNForTest] = useState(3);
 
     // Scoring Configuration
     const [cagrMin, setCagrMin] = useState(40);
@@ -149,8 +149,8 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
             // Train/Test Split parameters
             enable_train_test: enableTrainTest,
             train_start_date: enableTrainTest ? startDate : null,
-            train_months: (enableTrainTest || enableWalkForward) ? parseInt(trainYears) * 12 : null,
-            test_months: (enableTrainTest || enableWalkForward) ? parseInt(testMonths) : null,
+            train_months: enableTrainTest ? parseInt(trainYears) * 12 : null,
+            test_months: enableTrainTest ? parseInt(testMonths) : null,
             top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null,
 
             // Scoring Configuration
@@ -163,11 +163,11 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                 dd_weight: parseFloat(ddWeight)
             },
 
-            // Walk-Forward parameters
-            enable_walk_forward: enableWalkForward,
-            walk_forward_start: enableWalkForward ? startDate : null,
-            walk_forward_end: enableWalkForward ? endDate : null,
-            walk_forward_step_months: enableWalkForward ? parseInt(walkForwardStep) : null
+            // Walk-Forward parameters (always enabled with train/test)
+            enable_walk_forward: enableTrainTest,
+            walk_forward_start: enableTrainTest ? startDate : null,
+            walk_forward_end: enableTrainTest ? endDate : null,
+            walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null
         };
 
         onRunOptimization(params, autoSaveAfterOptimization);
@@ -229,8 +229,8 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
             // Train/Test Split parameters (required for validation)
             enable_train_test: enableTrainTest,
             train_start_date: enableTrainTest ? startDate : null,
-            train_months: (enableTrainTest || enableWalkForward) ? parseInt(trainYears) * 12 : null,
-            test_months: (enableTrainTest || enableWalkForward) ? parseInt(testMonths) : null,
+            train_months: enableTrainTest ? parseInt(trainYears) * 12 : null,
+            test_months: enableTrainTest ? parseInt(testMonths) : null,
             top_n_for_test: enableTrainTest ? parseInt(topNForTest) : null,
 
             // Scoring Configuration
@@ -243,11 +243,11 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                 dd_weight: parseFloat(ddWeight)
             },
 
-            // Walk-Forward parameters
-            enable_walk_forward: enableWalkForward,
-            walk_forward_start: enableWalkForward ? startDate : null,
-            walk_forward_end: enableWalkForward ? endDate : null,
-            walk_forward_step_months: enableWalkForward ? parseInt(walkForwardStep) : null
+            // Walk-Forward parameters (always enabled with train/test)
+            enable_walk_forward: enableTrainTest,
+            walk_forward_start: enableTrainTest ? startDate : null,
+            walk_forward_end: enableTrainTest ? endDate : null,
+            walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null
         };
 
         try {
@@ -516,83 +516,59 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                                 )}
                             </div>
 
-                            {/* Walk-Forward Optimization */}
-                            <div className="mt-4 p-3 bg-purple-50 rounded border border-purple-300">
-                                <label className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={enableWalkForward}
-                                        disabled={!enableTrainTest}
-                                        onChange={(e) => {
-                                            setEnableWalkForward(e.target.checked);
-                                            // Auto-enable Train/Test Split when Walk-Forward is enabled
-                                            if (e.target.checked && !enableTrainTest) {
-                                                setEnableTrainTest(true);
-                                            }
-                                        }}
-                                        className="h-4 w-4 text-purple-600 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                                    />
-                                    <span className="text-sm font-semibold text-gray-700">
-                                        Enable Walk-Forward Analysis
-                                    </span>
-                                </label>
+                            {/* Walk-Forward Analysis - always enabled with Train/Test */}
+                            {enableTrainTest && (
+                                <div className="mt-4 p-4 bg-purple-50 rounded border border-purple-200">
+                                    <h4 className="font-semibold text-purple-900 mb-2">Walk-Forward Analysis</h4>
+                                    <p className="text-xs text-purple-800 mb-3">
+                                        Run multiple train/test windows across time period
+                                    </p>
 
-                                <p className="text-xs text-purple-700 mt-2">
-                                    Note: Walk-Forward requires Train/Test Split to be enabled (uses Training Period and Test Period)
-                                </p>
-
-                                {enableWalkForward && (
-                                    <div className="mt-3 space-y-3">
-                                        <p className="text-xs text-purple-800">
-                                            Run multiple train/test windows across time period to find most consistent parameters
-                                        </p>
-
-                                        <div className="grid grid-cols-1 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700">Step Size (months)</label>
-                                                <input
-                                                    type="number"
-                                                    value={walkForwardStep}
-                                                    onChange={(e) => setWalkForwardStep(e.target.value)}
-                                                    min="1"
-                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
-                                                />
-                                            </div>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700">Step Size (months)</label>
+                                            <input
+                                                type="number"
+                                                value={walkForwardStep}
+                                                onChange={(e) => setWalkForwardStep(e.target.value)}
+                                                min="1"
+                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                            />
                                         </div>
-
-                                        {/* Window count preview */}
-                                        {startDate && endDate && trainYears && testMonths && walkForwardStep && (
-                                            <div className="p-2 bg-white rounded border border-purple-400">
-                                                <p className="text-xs text-gray-700">
-                                                    <strong>Estimated Windows:</strong> {(() => {
-                                                        const start = new Date(startDate);
-                                                        const end = new Date(endDate);
-                                                        const trainM = parseInt(trainYears) * 12;
-                                                        const testM = parseInt(testMonths);
-                                                        const stepM = parseInt(walkForwardStep);
-
-                                                        let count = 0;
-                                                        let current = new Date(start);
-
-                                                        while (true) {
-                                                            const testEnd = new Date(current);
-                                                            testEnd.setMonth(testEnd.getMonth() + trainM + testM);
-                                                            if (testEnd > end) break;
-                                                            count++;
-                                                            current.setMonth(current.getMonth() + stepM);
-                                                        }
-
-                                                        return count;
-                                                    })()} windows
-                                                    <span className="ml-2 text-gray-600">
-                                                        (Train: {trainYears}y, Test: {testMonths}mo, Step: {walkForwardStep}mo)
-                                                    </span>
-                                                </p>
-                                            </div>
-                                        )}
                                     </div>
-                                )}
-                            </div>
+
+                                    {/* Window count preview */}
+                                    {startDate && endDate && trainYears && testMonths && walkForwardStep && (
+                                        <div className="p-2 bg-white rounded border border-purple-400 mt-3">
+                                            <p className="text-xs text-gray-700">
+                                                <strong>Estimated Windows:</strong> {(() => {
+                                                    const start = new Date(startDate);
+                                                    const end = new Date(endDate);
+                                                    const trainM = parseInt(trainYears) * 12;
+                                                    const testM = parseInt(testMonths);
+                                                    const stepM = parseInt(walkForwardStep);
+
+                                                    let count = 0;
+                                                    let current = new Date(start);
+
+                                                    while (true) {
+                                                        const testEnd = new Date(current);
+                                                        testEnd.setMonth(testEnd.getMonth() + trainM + testM);
+                                                        if (testEnd > end) break;
+                                                        count++;
+                                                        current.setMonth(current.getMonth() + stepM);
+                                                    }
+
+                                                    return count;
+                                                })()} windows
+                                                <span className="ml-2 text-gray-600">
+                                                    (Train: {trainYears}y, Test: {testMonths}mo, Step: {walkForwardStep}mo)
+                                                </span>
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
