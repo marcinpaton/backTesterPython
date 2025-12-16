@@ -1,11 +1,15 @@
 from __future__ import annotations
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from typing import Optional, List, Any
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.data_loader import download_data, load_data
 import uvicorn
 import os
+import json
+import asyncio
+from queue import Queue
 from datetime import datetime
 
 app = FastAPI()
@@ -335,6 +339,10 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     # Run train/test for each window
     all_window_results = []
     
+    # Initialize progress tracker for walk-forward (we'll update per window)
+    # Total combinations will be calculated inside each window
+    progress_tracker.start(total=0, window_total=len(windows))
+    
     for i, window in enumerate(windows):
         # Create modified request for this window
         window_request = OptimizationRequest(
@@ -378,6 +386,12 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
             'all_test_results': window_results.get('all_test_results', window_results['test_results']),    # ALL results
             'all_scores': window_results.get('all_scores', window_results.get('scores', []))                # ALL scores
         })
+        
+        # Update window progress (don't update current - it's managed by inner optimization)
+        progress_tracker.update(current=progress_tracker.current, window_current=i + 1)
+    
+    # Mark walk-forward as complete
+    progress_tracker.finish()
     
     return {
         'walk_forward_mode': True,
@@ -387,6 +401,14 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
         'test_period_months': request.test_months,
         'step_months': request.walk_forward_step_months
     }
+
+# Import progress tracker
+from app.progress_tracker import progress_tracker
+
+@app.get("/api/optimization_progress")
+def get_optimization_progress():
+    """Get current optimization progress status"""
+    return progress_tracker.get_status()
 
 
 @app.post("/api/optimize")
@@ -568,7 +590,12 @@ def run_optimization_endpoint(request: OptimizationRequest):
         len(request.filter_negative_momentum) # Only used when momentum is selected
     )
     
+    # Initialize progress tracker (skip if already running - walk-forward mode)
+    if not progress_tracker.get_status()['is_running']:
+        progress_tracker.start(total_combinations)
+    
     current_test = 0
+    last_progress_update = 0
     
     try:
         for broker in request.brokers:
@@ -586,6 +613,12 @@ def run_optimization_endpoint(request: OptimizationRequest):
                                 for lookback_days in lookback_values:
                                     for filter_neg_mom in filter_values:
                                         current_test += 1
+                                        
+                                        # Update progress (every 50 combinations or 10%)
+                                        if (current_test - last_progress_update >= 50) or \
+                                           ((current_test / total_combinations) - (last_progress_update / total_combinations) >= 0.1):
+                                            progress_tracker.update(current_test)
+                                            last_progress_update = current_test
                                         
                                         # Create strategy
                                         if strategy_name == 'momentum':
@@ -655,6 +688,11 @@ def run_optimization_endpoint(request: OptimizationRequest):
         # Sort results by score (descending), then by CAGR and Max Drawdown
         results.sort(key=lambda x: (-x.get('score', 0), -x['cagr'], -x['max_drawdown']))
         
+        # Mark progress as complete (only if NOT in walk-forward mode)
+        # Walk-forward will call finish() after all windows complete
+        if progress_tracker.get_status()['window_total'] is None:
+            progress_tracker.finish()
+        
         return {
             'total_tests': total_combinations,
             'completed_tests': len(results),
@@ -707,6 +745,30 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
                 
                 f.write(f"Test Period: {request.results.get('test_period_months')} months\n")
                 f.write(f"Step: {request.results.get('step_months')} months\n\n")
+                
+                # Calculate Aggregated Performance from top result of each window
+                windows = request.results.get('windows', [])
+                if windows:
+                    test_cagrs = [w['test_results'][0]['cagr'] for w in windows if w.get('test_results')]
+                    test_dds = [w['test_results'][0]['max_drawdown'] for w in windows if w.get('test_results')]
+                    
+                    if test_cagrs:
+                        # Geometric mean: ((1+r1) * (1+r2) * ... * (1+rn))^(1/n) - 1
+                        product = 1
+                        for cagr in test_cagrs:
+                            product *= (1 + cagr)
+                        aggregated_cagr = pow(product, 1 / len(test_cagrs)) - 1
+                        
+                        # Arithmetic mean for drawdown
+                        avg_dd = sum(test_dds) / len(test_dds) if test_dds else 0
+                        
+                        f.write("=" * 50 + "\n")
+                        f.write("AGGREGATED PERFORMANCE (Top Result from Each Window)\n")
+                        f.write("=" * 50 + "\n\n")
+                        f.write(f"Aggregated Test CAGR: {aggregated_cagr * 100:.2f}%\n")
+                        f.write(f"  (Geometric mean of {len(test_cagrs)} windows)\n\n")
+                        f.write(f"Average Test Max Drawdown: {avg_dd * 100:.2f}%\n")
+                        f.write(f"  (Arithmetic mean of {len(test_dds)} windows)\n\n")
                 
                 # Individual Windows
                 f.write("\n" + "=" * 50 + "\n")

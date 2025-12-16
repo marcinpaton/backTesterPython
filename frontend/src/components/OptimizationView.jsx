@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import OptimizationResults from './OptimizationResults';
 
 const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => {
@@ -70,8 +70,56 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
     // Auto-save
     const [autoSaveAfterOptimization, setAutoSaveAfterOptimization] = useState(true);
 
+    // Progress tracking
+    const [progress, setProgress] = useState({ current: 0, total: 0, percentage: 0 });
+    const [windowProgress, setWindowProgress] = useState(null);
+
+    // Poll for progress updates when optimization is running
+    useEffect(() => {
+        if (!isLoading) {
+            setProgress({ current: 0, total: 0, percentage: 0 });
+            setWindowProgress(null);
+            return;
+        }
+
+        const pollProgress = async () => {
+            try {
+                const response = await fetch('http://localhost:8000/api/optimization_progress');
+                const data = await response.json();
+
+                if (data.is_running) {
+                    setProgress({
+                        current: data.current,
+                        total: data.total,
+                        percentage: data.percentage
+                    });
+
+                    if (data.window_current && data.window_total) {
+                        setWindowProgress({
+                            current: data.window_current,
+                            total: data.window_total
+                        });
+                    } else {
+                        setWindowProgress(null);
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling progress:', error);
+            }
+        };
+
+        // Poll every 2 seconds
+        const interval = setInterval(pollProgress, 2000);
+        pollProgress(); // Initial poll
+
+        return () => clearInterval(interval);
+    }, [isLoading]);
 
     const handleRunOptimization = () => {
+        // Reset progress
+        setProgress({ current: 0, total: 0, percentage: 0 });
+        setWindowProgress(null);
+
         // Validate at least one broker is selected
         if (!bossaEnabled && !ibEnabled) {
             alert('Please select at least one broker');
@@ -884,6 +932,54 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
                         />
                         <span className="text-sm font-medium text-gray-700">Auto-save results after completion</span>
                     </label>
+
+                    {/* Progress Display */}
+                    {isLoading && (
+                        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            {/* Walk-Forward: Show window progress */}
+                            {windowProgress ? (
+                                <React.Fragment>
+                                    <div className="flex justify-between items-center gap-4 mb-2">
+                                        <span className="text-sm font-semibold text-blue-900">
+                                            Processing Window {windowProgress.current} of {windowProgress.total}
+                                        </span>
+                                        <span className="text-sm font-bold text-blue-700">
+                                            {((windowProgress.current / windowProgress.total) * 100).toFixed(0)}%
+                                        </span>
+                                    </div>
+                                    {/* Progress Bar for windows */}
+                                    <div className="w-full bg-gray-200 rounded-full h-3">
+                                        <div
+                                            className="bg-purple-600 h-3 rounded-full transition-all duration-300"
+                                            style={{ width: `${(windowProgress.current / windowProgress.total) * 100}%` }}
+                                        />
+                                    </div>
+                                </React.Fragment>
+                            ) : (
+                                /* Normal optimization: Show combination progress */
+                                progress.total > 0 && (
+                                    <React.Fragment>
+                                        <div className="flex justify-between items-center gap-4 mb-2">
+                                            <span className="text-sm font-semibold text-blue-900">
+                                                Testing {progress.current.toLocaleString()} of {progress.total.toLocaleString()} combinations
+                                            </span>
+                                            <span className="text-sm font-bold text-blue-700">
+                                                {progress.percentage.toFixed(1)}%
+                                            </span>
+                                        </div>
+
+                                        {/* Progress Bar */}
+                                        <div className="w-full bg-gray-200 rounded-full h-3">
+                                            <div
+                                                className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                                                style={{ width: `${Math.min(progress.percentage, 100)}%` }}
+                                            />
+                                        </div>
+                                    </React.Fragment>
+                                )
+                            )}
+                        </div>
+                    )}
 
                     <button
                         onClick={handleRunOptimization}
