@@ -39,6 +39,38 @@ const OptimizationResults = ({ results, onSave }) => {
                     </p>
                 </div>
 
+                {/* Aggregated CAGR from all windows */}
+                <div className="mb-6 p-4 bg-green-50 rounded border border-green-300">
+                    <h3 className="text-lg font-bold text-green-900 mb-2">Aggregated Performance (Top Result from Each Window)</h3>
+                    {(() => {
+                        // Calculate geometric mean of Test CAGR from first result of each window
+                        const testCAGRs = windows.map(w => w.test_results[0]?.cagr || 0);
+                        const testDDs = windows.map(w => w.test_results[0]?.max_drawdown || 0);
+
+                        // Geometric mean: ((1+r1) * (1+r2) * ... * (1+rn))^(1/n) - 1
+                        const product = testCAGRs.reduce((acc, cagr) => acc * (1 + cagr), 1);
+                        const aggregatedCAGR = Math.pow(product, 1 / testCAGRs.length) - 1;
+
+                        // Average drawdown
+                        const avgDD = testDDs.reduce((sum, dd) => sum + dd, 0) / testDDs.length;
+
+                        return (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs text-gray-600">Aggregated Test CAGR</p>
+                                    <p className="text-2xl font-bold text-green-700">{(aggregatedCAGR * 100).toFixed(2)}%</p>
+                                    <p className="text-xs text-gray-500 mt-1">Geometric mean of {testCAGRs.length} windows</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-600">Average Test Max Drawdown</p>
+                                    <p className="text-2xl font-bold text-red-700">{(avgDD * 100).toFixed(2)}%</p>
+                                    <p className="text-xs text-gray-500 mt-1">Arithmetic mean of {testDDs.length} windows</p>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+
                 {/* Individual Windows */}
                 <div>
                     <h3 className="text-xl font-bold mb-3">Individual Windows</h3>
