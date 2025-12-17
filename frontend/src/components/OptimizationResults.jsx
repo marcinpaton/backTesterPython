@@ -39,13 +39,18 @@ const OptimizationResults = ({ results, onSave }) => {
                     </p>
                 </div>
 
-                {/* Aggregated CAGR from all windows */}
-                <div className="mb-6 p-4 bg-green-50 rounded border border-green-300">
-                    <h3 className="text-lg font-bold text-green-900 mb-2">Aggregated Performance (Top Result from Each Window)</h3>
-                    {(() => {
-                        // Calculate geometric mean of Test CAGR from first result of each window
-                        const testCAGRs = windows.map(w => w.test_results[0]?.cagr || 0);
-                        const testDDs = windows.map(w => w.test_results[0]?.max_drawdown || 0);
+                {/* Aggregated Performance for all ranking positions */}
+                {(() => {
+                    // Determine how many results to show (minimum across all windows)
+                    const minResults = Math.min(...windows.map(w => w.test_results?.length || 0));
+
+                    // Helper function to render aggregated performance for a specific rank
+                    const renderAggregatedPerformance = (rankIndex) => {
+                        const rankLabel = rankIndex + 1; // 1-indexed for display
+
+                        // Calculate geometric mean of Test CAGR from nth result of each window
+                        const testCAGRs = windows.map(w => w.test_results[rankIndex]?.cagr || 0);
+                        const testDDs = windows.map(w => w.test_results[rankIndex]?.max_drawdown || 0);
 
                         // Geometric mean: ((1+r1) * (1+r2) * ... * (1+rn))^(1/n) - 1
                         const product = testCAGRs.reduce((acc, cagr) => acc * (1 + cagr), 1);
@@ -68,7 +73,25 @@ const OptimizationResults = ({ results, onSave }) => {
                         const totalReturn = ((finalCapital - initialCapital) / initialCapital) * 100;
 
                         return (
-                            <>
+                            <div key={rankIndex} className="mb-6 p-4 bg-green-50 rounded border border-green-300">
+                                <h3 className="text-lg font-bold text-green-900 mb-2">
+                                    Aggregated Performance - Rank #{rankLabel} from Each Window
+                                </h3>
+
+                                {/* Warning for overlapping periods - only show once for rank 1 */}
+                                {rankIndex === 0 && test_period_months > step_months && (
+                                    <div className="mb-3 p-3 bg-yellow-50 border border-yellow-400 rounded">
+                                        <div className="flex items-start">
+                                            <span className="text-yellow-600 mr-2">⚠️</span>
+                                            <div className="text-xs text-yellow-800">
+                                                <p className="font-semibold mb-1">Overlapping Test Periods Detected</p>
+                                                <p>Test period ({test_period_months}mo) is longer than step size ({step_months}mo), causing {test_period_months - step_months} months of overlap between windows.
+                                                    Aggregated CAGR and capital simulation may be misleading as they assume non-overlapping sequential periods.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-3 gap-4 mb-4">
                                     <div>
                                         <p className="text-xs text-gray-600">Aggregated Test CAGR</p>
@@ -121,10 +144,17 @@ const OptimizationResults = ({ results, onSave }) => {
                                         })}
                                     </div>
                                 </div>
-                            </>
+                            </div>
                         );
-                    })()}
-                </div>
+                    };
+
+                    // Render aggregated performance for each ranking position
+                    return (
+                        <>
+                            {Array.from({ length: minResults }, (_, i) => renderAggregatedPerformance(i))}
+                        </>
+                    );
+                })()}
 
                 {/* Individual Windows */}
                 <div>
