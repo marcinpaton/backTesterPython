@@ -58,6 +58,7 @@ function App() {
       if (params.has('rebalance_period_unit')) config.rebalance_period_unit = params.get('rebalance_period_unit');
       if (params.has('start_date')) config.start_date = params.get('start_date');
       if (params.has('end_date')) config.end_date = params.get('end_date');
+      if (params.has('broker')) config.broker = params.get('broker');
       if (params.has('stop_loss_pct')) config.stop_loss_pct = parseFloatVal('stop_loss_pct');
       if (params.has('smart_stop_loss')) config.smart_stop_loss = parseBool('smart_stop_loss');
       if (params.has('transaction_fee_enabled')) config.transaction_fee_enabled = parseBool('transaction_fee_enabled');

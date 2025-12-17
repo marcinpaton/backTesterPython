@@ -23,14 +23,30 @@ const OptimizationResults = ({ results, onSave }) => {
             <div className="mt-6 p-4 bg-white shadow rounded-lg">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-2xl font-bold">Walk-Forward Optimization Results</h2>
-                    {onSave && (
-                        <button
-                            onClick={onSave}
-                            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center"
-                        >
-                            <span className="mr-2">💾</span> Save Results
-                        </button>
-                    )}
+                    <div className="flex gap-2">
+                        {onSave && (
+                            <button
+                                onClick={onSave}
+                                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center"
+                            >
+                                <span className="mr-2">💾</span> Save Results
+                            </button>
+                        )}
+                        <label className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center cursor-pointer">
+                            <span className="mr-2">📂</span> Load Results
+                            <input
+                                type="file"
+                                accept=".txt"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file && window.handleLoadResults) {
+                                        window.handleLoadResults(file);
+                                    }
+                                }}
+                            />
+                        </label>
+                    </div>
                 </div>
 
                 <div className="mb-4 p-3 bg-purple-50 rounded border border-purple-200">
@@ -160,23 +176,23 @@ const OptimizationResults = ({ results, onSave }) => {
                 <div>
                     <h3 className="text-xl font-bold mb-3">Individual Windows</h3>
                     <div className="space-y-2">
-                        {windows.map((window) => (
-                            <div key={window.window_number} className="border border-gray-300 rounded">
+                        {windows.map((wfWindow) => (
+                            <div key={wfWindow.window_number} className="border border-gray-300 rounded">
                                 <button
-                                    onClick={() => setExpandedWindow(expandedWindow === window.window_number ? null : window.window_number)}
+                                    onClick={() => setExpandedWindow(expandedWindow === wfWindow.window_number ? null : wfWindow.window_number)}
                                     className="w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 flex justify-between items-center"
                                 >
                                     <span className="font-medium">
-                                        Window {window.window_number}: {window.window.train_start} → {window.window.test_end}
+                                        Window {wfWindow.window_number}: {wfWindow.window.train_start} → {wfWindow.window.test_end}
                                     </span>
-                                    <span>{expandedWindow === window.window_number ? '▼' : '▶'}</span>
+                                    <span>{expandedWindow === wfWindow.window_number ? '▼' : '▶'}</span>
                                 </button>
 
-                                {expandedWindow === window.window_number && (
+                                {expandedWindow === wfWindow.window_number && (
                                     <div className="p-4 bg-white">
                                         <p className="text-sm mb-2">
-                                            <strong>Train:</strong> {window.window.train_start} to {window.window.train_end} |
-                                            <strong className="ml-2">Test:</strong> {window.window.test_start} to {window.window.test_end}
+                                            <strong>Train:</strong> {wfWindow.window.train_start} to {wfWindow.window.train_end} |
+                                            <strong className="ml-2">Test:</strong> {wfWindow.window.test_start} to {wfWindow.window.test_end}
                                         </p>
 
                                         <div className="overflow-x-auto">
@@ -193,23 +209,82 @@ const OptimizationResults = ({ results, onSave }) => {
                                                         <th className="px-2 py-2 text-left bg-green-100">Test CAGR</th>
                                                         <th className="px-2 py-2 text-left bg-red-100">Test DD</th>
                                                         <th className="px-2 py-2 text-left bg-purple-50">Score</th>
+                                                        <th className="px-2 py-2 text-left bg-blue-50">Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="bg-white divide-y divide-gray-200">
-                                                    {window.train_results.map((result, idx) => (
-                                                        <tr key={idx} className="hover:bg-gray-50">
-                                                            <td className="px-2 py-2">{idx + 1}</td>
-                                                            <td className="px-2 py-2">{result.broker === 'interactive_brokers' ? 'IB' : result.broker}</td>
-                                                            <td className="px-2 py-2">{result.n_tickers}</td>
-                                                            <td className="px-2 py-2">{result.rebalance_period}</td>
-                                                            <td className="px-2 py-2">{result.momentum_lookback_days || '-'}</td>
-                                                            <td className="px-2 py-2 bg-green-50">{(result.cagr * 100).toFixed(2)}%</td>
-                                                            <td className="px-2 py-2 bg-red-50">{(result.max_drawdown * 100).toFixed(2)}%</td>
-                                                            <td className="px-2 py-2 bg-green-100">{(window.test_results[idx]?.cagr * 100).toFixed(2)}%</td>
-                                                            <td className="px-2 py-2 bg-red-100">{(window.test_results[idx]?.max_drawdown * 100).toFixed(2)}%</td>
-                                                            <td className="px-2 py-2 bg-purple-50 font-bold">{window.scores[idx]?.toFixed(1)}</td>
-                                                        </tr>
-                                                    ))}
+                                                    {wfWindow.train_results.map((result, idx) => {
+                                                        const testResult = wfWindow.test_results[idx];
+
+                                                        // Function to open Dashboard with pre-filled parameters
+                                                        const handleRunTest = () => {
+                                                            console.log('Run Test clicked for result:', result);
+
+                                                            // Build URL with parameters (using snake_case to match App.jsx)
+                                                            const params = new URLSearchParams({
+                                                                autoRun: 'true',
+                                                                n_tickers: result.n_tickers,
+                                                                rebalance_period: result.rebalance_period,
+                                                                start_date: wfWindow.window.test_start,
+                                                                end_date: wfWindow.window.test_end,
+                                                                strategy: result.strategy || 'scoring',
+                                                                sizing_method: result.sizing_method || 'equal',
+                                                                margin_enabled: result.margin_enabled || false,
+                                                                filter_negative_momentum: result.filter_negative_momentum || false
+                                                            });
+
+                                                            // Add Bossa preset parameters if broker is bossa
+                                                            if (result.broker === 'bossa') {
+                                                                params.append('transaction_fee_enabled', 'true');
+                                                                params.append('transaction_fee_type', 'percentage');
+                                                                params.append('transaction_fee_value', '0.29');
+                                                                params.append('capital_gains_tax_enabled', 'false');
+                                                            }
+
+                                                            // Add momentum lookback if present
+                                                            if (result.momentum_lookback_days) {
+                                                                params.append('momentum_lookback_days', result.momentum_lookback_days);
+                                                            }
+
+                                                            // Add stop loss if present
+                                                            if (result.stop_loss_pct) {
+                                                                params.append('stop_loss_pct', result.stop_loss_pct);
+                                                            }
+
+                                                            const url = `/?${params.toString()}`;
+                                                            console.log('Opening URL:', url);
+
+                                                            // Open in new tab
+                                                            const newWindow = window.open(url, '_blank');
+                                                            if (!newWindow) {
+                                                                alert('Pop-up blocked! Please allow pop-ups for this site.');
+                                                            }
+                                                        };
+
+                                                        return (
+                                                            <tr key={idx} className="hover:bg-gray-50">
+                                                                <td className="px-2 py-2">{idx + 1}</td>
+                                                                <td className="px-2 py-2">{result.broker === 'interactive_brokers' ? 'IB' : result.broker}</td>
+                                                                <td className="px-2 py-2">{result.n_tickers}</td>
+                                                                <td className="px-2 py-2">{result.rebalance_period}</td>
+                                                                <td className="px-2 py-2">{result.momentum_lookback_days || '-'}</td>
+                                                                <td className="px-2 py-2 bg-green-50">{(result.cagr * 100).toFixed(2)}%</td>
+                                                                <td className="px-2 py-2 bg-red-50">{(result.max_drawdown * 100).toFixed(2)}%</td>
+                                                                <td className="px-2 py-2 bg-green-100">{(testResult?.cagr * 100).toFixed(2)}%</td>
+                                                                <td className="px-2 py-2 bg-red-100">{(testResult?.max_drawdown * 100).toFixed(2)}%</td>
+                                                                <td className="px-2 py-2 bg-purple-50 font-bold">{wfWindow.scores[idx]?.toFixed(1)}</td>
+                                                                <td className="px-2 py-2 bg-blue-50">
+                                                                    <button
+                                                                        onClick={handleRunTest}
+                                                                        className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition"
+                                                                        title="Run test with these parameters"
+                                                                    >
+                                                                        ▶ Run
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
