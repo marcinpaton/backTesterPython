@@ -789,6 +789,13 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
                         f.write(f"Score:{score:.1f}\n")
                     f.write("\n")
                 
+                # Add JSON footer for easy re-loading (walk-forward mode)
+                f.write("\n" + "=" * 80 + "\n")
+                f.write("# JSON DATA (for re-loading results)\n")
+                f.write("=" * 80 + "\n")
+                f.write(json.dumps(request.results, indent=2))
+                f.write("\n")
+                
             else:
                 # Normal or Train/Test Mode
                 f.write("Parameters:\n")
@@ -846,7 +853,49 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
                     ]
                     f.write(" | ".join(row) + "\n")
                 
+                # Add JSON footer for easy re-loading
+                f.write("\n" + "=" * 80 + "\n")
+                f.write("# JSON DATA (for re-loading results)\n")
+                f.write("=" * 80 + "\n")
+                f.write(json.dumps(request.results, indent=2))
+                f.write("\n")
+        
         return {"message": "Results saved successfully", "filename": filename, "path": filepath}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ParseResultsRequest(BaseModel):
+    file_content: str
+
+@app.post("/api/parse_results")
+async def parse_results(request: ParseResultsRequest):
+    """Parse results from saved text file by extracting JSON footer"""
+    try:
+        content = request.file_content
+        
+        # Find JSON data marker
+        json_marker = "# JSON DATA (for re-loading results)"
+        marker_index = content.find(json_marker)
+        
+        if marker_index == -1:
+            raise HTTPException(status_code=400, detail="File does not contain JSON data. Please use a file saved with the Save Results button.")
+        
+        # Extract JSON part (after the separator line following the marker)
+        json_start = content.find("{", marker_index)
+        if json_start == -1:
+            raise HTTPException(status_code=400, detail="Invalid file format - JSON data not found")
+        
+        json_str = content[json_start:].strip()
+        
+        # Parse JSON
+        results = json.loads(json_str)
+        
+        return results
+        
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON format: {str(e)}")
     except Exception as e:
         import traceback
         traceback.print_exc()

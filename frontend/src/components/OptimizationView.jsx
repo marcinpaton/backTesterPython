@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import OptimizationResults from './OptimizationResults';
 
-const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => {
+const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoadResults }) => {
     const [tickers, setTickers] = useState(
         'AU, GOOG, FSLR, IDXX, WDC, ULS, FRES.L, WWD, KEYS, ISRG, NST.AX, TER, AMD, CLS.TO, CRS, DELTA.BK, FN, MU, STLD, FIX, CRDO, CTRA, APH, ANGPY, VRT, ASML, SDVKY, ANTO.L, KLAC, AEM.TO, ADI, FNV.TO, SHOP.TO, HWM, IFX.DE, UCBJY, UCB.BR, WPM.TO, PRY.MI, MPWR, BWXT, PSTG, EADSY, WPM.L, AIR.PA, FCX, FLEX, IFNNY, PLTR, BSX, NVDA, GD, AMZN, 1177.HK, ARZGY, ANET, EME, FUTU, RR.L, RYCEY, SAAB-B.ST, SCHW, TT, RMD, GEV, ASMIY, ASM.AS, FTNT, NVZMY, ADBE, ADYEN.AS, ADYEY, ARM, AXON, BLK, CDNS, DXCM, GWRE, LNSTY, MA, META, NOW, NSIS-B.CO, NTNX, PGHN.SW, PINS, RHM.DE, RJF, RMD.AX, SAP, SAP.DE, SMCI, SPOT, SYK, TOST, TW, V, VEEV, WDAY');
     const [startDate, setStartDate] = useState('2011-01-01');
@@ -221,6 +221,45 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
         onRunOptimization(params, autoSaveAfterOptimization);
     };
 
+    const handleLoadResults = async (file) => {
+        try {
+            const text = await file.text();
+
+            // Send to backend for parsing
+            const response = await fetch('http://localhost:8000/api/parse_results', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ file_content: text })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to parse results file');
+            }
+
+            const parsedResults = await response.json();
+
+            // Update results state using the callback prop
+            if (onLoadResults) {
+                onLoadResults(parsedResults);
+            }
+
+            alert('Results loaded successfully!');
+        } catch (error) {
+            console.error('Error loading results:', error);
+            alert('Error loading results file. Please check the file format.');
+        }
+    };
+
+    // Expose handleLoadResults to window for file input
+    useEffect(() => {
+        window.handleLoadResults = handleLoadResults;
+        return () => {
+            delete window.handleLoadResults;
+        };
+    }, []);
+
     const handleSaveResults = async () => {
         // Check if we have results (any mode)
         if (!results) return;
@@ -339,12 +378,28 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results }) => 
         <div className="p-4 bg-white shadow rounded-lg">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Parameter Optimization</h2>
-                <button
-                    onClick={onBack}
-                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
-                >
-                    ← Back to Dashboard
-                </button>
+                <div className="flex gap-2">
+                    <label className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center cursor-pointer">
+                        <span className="mr-2">📂</span> Load Results
+                        <input
+                            type="file"
+                            accept=".txt"
+                            className="hidden"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                    handleLoadResults(file);
+                                }
+                            }}
+                        />
+                    </label>
+                    <button
+                        onClick={onBack}
+                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+                    >
+                        ← Back to Dashboard
+                    </button>
+                </div>
             </div>
 
             <div className="space-y-6">

@@ -192,6 +192,7 @@ function App() {
             isLoading={isLoading}
             onBack={() => setCurrentView('dashboard')}
             results={results}
+            onLoadResults={setResults}
           />
         )}
       </div>
