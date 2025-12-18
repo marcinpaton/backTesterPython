@@ -176,7 +176,20 @@ const OptimizationResults = ({ results, onSave }) => {
                                         {/* Portfolio Simulation */}
                                         {wfWindow.portfolio_state && !wfWindow.portfolio_state.error && (
                                             <div className="mt-4 p-4 bg-blue-50 rounded border border-blue-300">
-                                                <h4 className="font-semibold text-sm mb-3 text-blue-800">📊 Portfolio Simulation</h4>
+                                                <h4 className="font-semibold text-sm mb-3 text-blue-800">📊 Portfolio Simulation (Real Trading)</h4>
+
+                                                {/* Simulation Period */}
+                                                <div className="mb-3 p-3 bg-white rounded shadow-sm">
+                                                    <p className="text-xs font-semibold mb-2 text-gray-700">Simulation Period:</p>
+                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                        <div>
+                                                            <span className="text-gray-600">Start Date:</span> <span className="font-medium">{wfWindow.portfolio_state.sim_start_date}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-gray-600">End Date:</span> <span className="font-medium">{wfWindow.portfolio_state.sim_end_date}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
 
                                                 {/* Best Parameters Used */}
                                                 <div className="mb-3 p-3 bg-white rounded shadow-sm">
@@ -195,110 +208,30 @@ const OptimizationResults = ({ results, onSave }) => {
                                                             <span className="text-gray-600">Rebalance:</span> <span className="font-medium">{wfWindow.portfolio_state.best_params.rebalance_period} month(s)</span>
                                                         </div>
                                                         <div>
-                                                            <span className="text-gray-600">Buy Date:</span> <span className="font-medium">{wfWindow.portfolio_state.buy_date}</span>
+                                                            <span className="text-gray-600">Sizing:</span> <span className="font-medium">{wfWindow.portfolio_state.best_params.sizing_method}</span>
                                                         </div>
-                                                        {wfWindow.portfolio_state.sell_date && (
-                                                            <div>
-                                                                <span className="text-gray-600">Sell Date:</span> <span className="font-medium">{wfWindow.portfolio_state.sell_date}</span>
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
 
-                                                {/* Positions Table */}
-                                                {wfWindow.portfolio_state.positions && wfWindow.portfolio_state.positions.length > 0 && (
-                                                    <div className="mb-3 overflow-x-auto">
-                                                        <p className="text-xs font-semibold mb-2 text-gray-700">Positions Bought:</p>
-                                                        <table className="min-w-full text-xs bg-white rounded shadow-sm">
-                                                            <thead className="bg-gray-100">
-                                                                <tr>
-                                                                    <th className="px-2 py-1 text-left">Ticker</th>
-                                                                    <th className="px-2 py-1 text-right">Shares</th>
-                                                                    <th className="px-2 py-1 text-right">Buy Price</th>
-                                                                    <th className="px-2 py-1 text-right">Cost</th>
-                                                                    <th className="px-2 py-1 text-right">Fee</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {wfWindow.portfolio_state.positions.map((pos, idx) => (
-                                                                    <tr key={idx} className="border-t">
-                                                                        <td className="px-2 py-1 font-medium">{pos.ticker}</td>
-                                                                        <td className="px-2 py-1 text-right">{pos.shares.toFixed(2)}</td>
-                                                                        <td className="px-2 py-1 text-right">${pos.buy_price.toFixed(2)}</td>
-                                                                        <td className="px-2 py-1 text-right">${pos.cost_basis.toFixed(2)}</td>
-                                                                        <td className="px-2 py-1 text-right text-red-600">${pos.fee.toFixed(2)}</td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                )}
-
-                                                {/* Sold Positions (for last window) */}
-                                                {wfWindow.portfolio_state.final_positions_sold && wfWindow.portfolio_state.final_positions_sold.length > 0 && (
-                                                    <div className="mb-3 overflow-x-auto">
-                                                        <p className="text-xs font-semibold mb-2 text-gray-700">Final Positions Sold:</p>
-                                                        <table className="min-w-full text-xs bg-white rounded shadow-sm">
-                                                            <thead className="bg-gray-100">
-                                                                <tr>
-                                                                    <th className="px-2 py-1 text-left">Ticker</th>
-                                                                    <th className="px-2 py-1 text-right">Shares</th>
-                                                                    <th className="px-2 py-1 text-right">Buy Price</th>
-                                                                    <th className="px-2 py-1 text-right">Sell Price</th>
-                                                                    <th className="px-2 py-1 text-right">P&L</th>
-                                                                    <th className="px-2 py-1 text-right">P&L %</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {wfWindow.portfolio_state.final_positions_sold.map((pos, idx) => (
-                                                                    <tr key={idx} className="border-t">
-                                                                        <td className="px-2 py-1 font-medium">{pos.ticker}</td>
-                                                                        <td className="px-2 py-1 text-right">{pos.shares.toFixed(2)}</td>
-                                                                        <td className="px-2 py-1 text-right">${pos.buy_price.toFixed(2)}</td>
-                                                                        <td className="px-2 py-1 text-right">${pos.sell_price ? pos.sell_price.toFixed(2) : 'N/A'}</td>
-                                                                        <td className={`px-2 py-1 text-right font-medium ${pos.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                            ${pos.pnl.toFixed(2)}
-                                                                        </td>
-                                                                        <td className={`px-2 py-1 text-right font-medium ${pos.pnl_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                            {pos.pnl_pct.toFixed(2)}%
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                )}
-
-                                                {/* Capital Summary */}
-                                                <div className="grid grid-cols-3 gap-2">
+                                                {/* Performance Summary */}
+                                                <div className="grid grid-cols-4 gap-2">
                                                     <div className="p-2 bg-white rounded shadow-sm">
-                                                        <p className="text-xs text-gray-600">Cash After Buy</p>
-                                                        <p className="font-bold text-sm">${wfWindow.portfolio_state.capital_after.toFixed(2)}</p>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded shadow-sm">
-                                                        <p className="text-xs text-gray-600">Portfolio Value</p>
-                                                        <p className="font-bold text-sm">${wfWindow.portfolio_state.portfolio_value.toFixed(2)}</p>
+                                                        <p className="text-xs text-gray-600">Final Capital</p>
+                                                        <p className="font-bold text-sm">${wfWindow.portfolio_state.final_capital.toFixed(2)}</p>
                                                     </div>
                                                     <div className={`p-2 bg-white rounded shadow-sm ${wfWindow.portfolio_state.total_return_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                         <p className="text-xs text-gray-600">Total Return</p>
                                                         <p className="font-bold text-sm">{wfWindow.portfolio_state.total_return_pct.toFixed(2)}%</p>
                                                     </div>
-                                                </div>
-
-                                                {/* Final Summary (for last window) */}
-                                                {wfWindow.portfolio_state.final_capital !== undefined && (
-                                                    <div className="mt-3 p-3 bg-green-50 rounded border border-green-300">
-                                                        <p className="text-xs font-semibold mb-2 text-green-800">Final Portfolio Summary:</p>
-                                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                                            <div>
-                                                                <span className="text-gray-600">Final Capital:</span> <span className="font-bold text-green-700">${wfWindow.portfolio_state.final_capital.toFixed(2)}</span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-gray-600">Total Return:</span> <span className={`font-bold ${wfWindow.portfolio_state.final_total_return_pct >= 0 ? 'text-green-700' : 'text-red-700'}`}>{wfWindow.portfolio_state.final_total_return_pct.toFixed(2)}%</span>
-                                                            </div>
-                                                        </div>
+                                                    <div className="p-2 bg-white rounded shadow-sm text-red-600">
+                                                        <p className="text-xs text-gray-600">Max Drawdown</p>
+                                                        <p className="font-bold text-sm">{wfWindow.portfolio_state.max_drawdown_pct.toFixed(2)}%</p>
                                                     </div>
-                                                )}
+                                                    <div className="p-2 bg-white rounded shadow-sm">
+                                                        <p className="text-xs text-gray-600">Sharpe Ratio</p>
+                                                        <p className="font-bold text-sm">{wfWindow.portfolio_state.sharpe_ratio.toFixed(2)}</p>
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
