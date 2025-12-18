@@ -159,6 +159,7 @@ class OptimizationRequest(BaseModel):
     walk_forward_start: Optional[str] = None  # Overall start date
     walk_forward_end: Optional[str] = None    # Overall end date  
     walk_forward_step_months: Optional[int] = 6  # Step size in months
+    walk_forward_dynamic_step: bool = False  # If True, step size is determined by winning strategy's rebalance period
 
 # Helper function to run a single backtest for optimization
 def run_single_backtest(df, config, start_date, end_date, margin_enabled):
@@ -334,17 +335,34 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     Returns aggregated parameter frequency ranking and all window results.
     """
     from dateutil.relativedelta import relativedelta
-    from datetime import datetime as dt
+    from datetime import datetime as dt, timedelta
 
     
     # Validate required parameters for walk-forward
     if not request.train_months or not request.test_months:
         raise ValueError("Walk-Forward Optimization requires train_months and test_months to be set. Please enable Train/Test Split.")
     
-    # Calculate all windows
-    windows = []
+    # Run train/test for each window iteratively
+    all_window_results = []
+    
     current_start = dt.strptime(request.walk_forward_start, '%Y-%m-%d')
     overall_end = dt.strptime(request.walk_forward_end, '%Y-%m-%d')
+    
+    # Initialize progress tracker (estimate total windows conservatively)
+    # If dynamic, we can't know for sure, so we'll just update window count as we go
+    estimated_step = request.walk_forward_step_months
+    estimated_windows = 0
+    temp_start = current_start
+    while True:
+        temp_test_end = temp_start + relativedelta(months=request.train_months + request.test_months) - relativedelta(days=1)
+        if temp_test_end > overall_end:
+            break
+        estimated_windows += 1
+        temp_start += relativedelta(months=estimated_step)
+            
+    progress_tracker.start(total=0, window_total=estimated_windows)
+    
+    window_index = 0
     
     while True:
         # Calculate train and test periods for this window
@@ -356,26 +374,14 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
         # Check if we've exceeded overall end date
         if test_end > overall_end:
             break
-        
-        windows.append({
+            
+        window = {
             'train_start': train_start.strftime('%Y-%m-%d'),
             'train_end': train_end.strftime('%Y-%m-%d'),
             'test_start': test_start.strftime('%Y-%m-%d'),
             'test_end': test_end.strftime('%Y-%m-%d')
-        })
+        }
         
-        # Move forward by step
-        current_start += relativedelta(months=request.walk_forward_step_months)
-    
-    # Run train/test for each window
-    all_window_results = []
-    
-    
-    # Initialize progress tracker for walk-forward (we'll update per window)
-    # Total combinations will be calculated inside each window
-    progress_tracker.start(total=0, window_total=len(windows))
-    
-    for i, window in enumerate(windows):
         # Create modified request for this window
         window_request = OptimizationRequest(
             tickers=request.tickers,
@@ -409,7 +415,7 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
         
         # Store results for this window
         all_window_results.append({
-            'window_number': i + 1,
+            'window_number': window_index + 1,
             'window': window,
             'train_results': top_configs,  # Top N for display
             'test_results': test_configs,   # Top N for display
@@ -419,21 +425,25 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
             'all_scores': window_results.get('all_scores', window_results.get('scores', []))                # ALL scores
         })
         
-        # === PORTFOLIO SIMULATION ===
+        # === PORTFOLIO SIMULATION & DYNAMIC STEP CALCULATION ===
         # Use existing backtest mechanism to simulate real trading
         all_scores_list = window_results.get('all_scores', window_results.get('scores', []))
         all_train_results = window_results.get('all_train_results', window_results['train_results'])
+        
+        step_months_for_next = request.walk_forward_step_months # Default to fixed step
         
         if all_scores_list and len(all_scores_list) > 0:
             # Find index of best score
             best_idx = all_scores_list.index(max(all_scores_list))
             best_result = all_train_results[best_idx]
             
-            # Calculate simulation period (from day after test_end to rebalance_period later)
-            from datetime import datetime as dt, timedelta
-            from dateutil.relativedelta import relativedelta
-            import pandas as pd
+            # --- DYNAMIC STEP LOGIC ---
+            if request.walk_forward_dynamic_step:
+                # Use winning strategy's rebalance period as the step for next window
+                step_months_for_next = best_result.get('rebalance_period', 1)
+                print(f"DEBUG: Dynamic Step - Window {window_index+1} winner rebalance: {step_months_for_next} months. Next window will shift by this amount.")
             
+            # Calculate simulation period (from day after test_end to rebalance_period later)
             test_end_date = dt.strptime(window['test_end'], '%Y-%m-%d')
             sim_start_date = test_end_date + timedelta(days=1)
             sim_end_date = sim_start_date + relativedelta(months=best_result.get('rebalance_period', 1))
@@ -441,7 +451,7 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
             # Check if simulation period is within available data
             last_available_date = df.index.max()
             if pd.to_datetime(sim_start_date) > last_available_date:
-                print(f"DEBUG: Skipping portfolio simulation for window {i+1} - start date beyond available data")
+                print(f"DEBUG: Skipping portfolio simulation for window {window_index+1} - start date beyond available data")
                 all_window_results[-1]['portfolio_state'] = {
                     'error': f'Simulation start date {sim_start_date.strftime("%Y-%m-%d")} is beyond available data'
                 }
@@ -483,7 +493,7 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
                             'max_drawdown_pct': sim_result.get('max_drawdown', 0) * 100,
                             'sharpe_ratio': sim_result.get('sharpe_ratio', 0)
                         }
-                        print(f"DEBUG: Portfolio simulation completed for window {i+1}")
+                        print(f"DEBUG: Portfolio simulation completed for window {window_index+1}")
                         print(f"DEBUG: Final capital=${sim_result.get('final_value', 10000):.2f}, Return={sim_result.get('cagr', 0)*100:.2f}%")
                     else:
                         all_window_results[-1]['portfolio_state'] = {
@@ -492,21 +502,25 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
                         
                 except Exception as e:
                     import traceback
-                    print(f"ERROR: Portfolio simulation failed for window {i+1}: {e}")
+                    print(f"ERROR: Portfolio simulation failed for window {window_index+1}: {e}")
                     traceback.print_exc()
                     all_window_results[-1]['portfolio_state'] = {
                         'error': str(e)
                     }
         
-        # Update window progress (don't update current - it's managed by inner optimization)
-        progress_tracker.update(current=progress_tracker.current, window_current=i + 1)
+        # Update progress
+        progress_tracker.update(current=progress_tracker.current, window_current=window_index + 1)
+        
+        # Move forward for next iteration
+        current_start += relativedelta(months=step_months_for_next)
+        window_index += 1
     
     # Mark walk-forward as complete
     progress_tracker.finish()
     
     return {
         'walk_forward_mode': True,
-        'total_windows': len(windows),
+        'total_windows': len(all_window_results),
         'windows': all_window_results,
         'train_period_months': request.train_months,
         'test_period_months': request.test_months,

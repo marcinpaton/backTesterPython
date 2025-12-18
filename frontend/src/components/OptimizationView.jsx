@@ -75,6 +75,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
     const [walkForwardStart, setWalkForwardStart] = useState('2011-01-01');
     const [walkForwardEnd, setWalkForwardEnd] = useState('2025-12-01');
     const [walkForwardStep, setWalkForwardStep] = useState(12);
+    const [walkForwardDynamicStep, setWalkForwardDynamicStep] = useState(false);
 
     // Auto-save
     const [autoSaveAfterOptimization, setAutoSaveAfterOptimization] = useState(true);
@@ -230,7 +231,8 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
             enable_walk_forward: enableTrainTest,
             walk_forward_start: enableTrainTest ? startDate : null,
             walk_forward_end: enableTrainTest ? endDate : null,
-            walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null
+            walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null,
+            walk_forward_dynamic_step: enableTrainTest ? walkForwardDynamicStep : false
         };
 
         onRunOptimization(params, autoSaveAfterOptimization);
@@ -714,13 +716,25 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
 
                                     <div className="grid grid-cols-1 gap-4">
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-700">Step Size (months)</label>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <label className="block text-xs font-medium text-gray-700">Step Size (months)</label>
+                                                <label className="flex items-center space-x-1 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={walkForwardDynamicStep}
+                                                        onChange={(e) => setWalkForwardDynamicStep(e.target.checked)}
+                                                        className="h-3 w-3 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                                    />
+                                                    <span className="text-xs font-medium text-purple-700">Dynamic (use winner's rebalance)</span>
+                                                </label>
+                                            </div>
                                             <input
                                                 type="number"
                                                 value={walkForwardStep}
                                                 onChange={(e) => setWalkForwardStep(e.target.value)}
                                                 min="1"
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                disabled={walkForwardDynamicStep}
+                                                className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm ${walkForwardDynamicStep ? 'bg-gray-100 text-gray-500' : ''}`}
                                             />
                                         </div>
                                     </div>
