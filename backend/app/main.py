@@ -224,14 +224,14 @@ def run_single_backtest(df, config, start_date, end_date, margin_enabled):
 
 def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd, config=None):
     """
-    Calculate score for train/test optimization based ONLY on train results.
+    Calculate score for train/test optimization based on BOTH train and test results.
     
     Uses configurable thresholds and weights from ScoringConfig.
     
-    Score = Train_CAGR_score + Train_DD_score
-    Maximum: cagr_weight + dd_weight
+    Score = Train_CAGR_score + Train_DD_score + Test_CAGR_score + Test_DD_score
+    Maximum: 2 * (cagr_weight + dd_weight)
     
-    Note: Test results are calculated but excluded from the score to prevent look-ahead bias.
+    Both train and test results are included to evaluate both in-sample and out-of-sample performance.
     """
     if config is None:
         config = ScoringConfig()  # Use defaults
@@ -253,14 +253,18 @@ def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd, config=
         else:
             return ((dd - config.dd_min) / (config.dd_max - config.dd_min)) * config.dd_weight
     
-    # Calculate scores for train and test
+    # Calculate scores for both train and test
     train_cagr_score = calc_cagr_score(train_cagr)
     train_dd_score = calc_dd_score(train_dd)
-    # test_cagr_score = calc_cagr_score(test_cagr)
-    # test_dd_score = calc_dd_score(test_dd)
+    test_cagr_score = calc_cagr_score(test_cagr)
+    test_dd_score = calc_dd_score(test_dd)
     
-    # ONLY use Train score for selection to prevent look-ahead bias
-    return train_cagr_score + train_dd_score
+    # Sum of Train and Test scores
+    # This evaluates both in-sample (train) and out-of-sample (test) performance
+    train_score = train_cagr_score + train_dd_score
+    test_score = test_cagr_score + test_dd_score
+    
+    return train_score + test_score
 
 def calculate_single_score(cagr, dd, config=None):
     """
