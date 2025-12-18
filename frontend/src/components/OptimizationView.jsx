@@ -52,13 +52,22 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
     const [testMonths, setTestMonths] = useState(12);
     const [topNForTest, setTopNForTest] = useState(3);
 
-    // Scoring Configuration
-    const [cagrMin, setCagrMin] = useState(40);
-    const [cagrMax, setCagrMax] = useState(60);
-    const [cagrWeight, setCagrWeight] = useState(60);
-    const [ddMin, setDdMin] = useState(-45);
-    const [ddMax, setDdMax] = useState(-30);
-    const [ddWeight, setDdWeight] = useState(40);
+    // Scoring Configuration - Train
+    const [cagrMin, setCagrMin] = useState(0);
+    const [cagrMax, setCagrMax] = useState(100);
+    const [cagrWeight, setCagrWeight] = useState(0);
+    const [ddMin, setDdMin] = useState(-50);
+    const [ddMax, setDdMax] = useState(0);
+    const [ddWeight, setDdWeight] = useState(0);
+
+    // Scoring Configuration - Test
+    const [testCagrMin, setTestCagrMin] = useState(0);
+    const [testCagrMax, setTestCagrMax] = useState(100);
+    const [testCagrWeight, setTestCagrWeight] = useState(70);
+    const [testDdMin, setTestDdMin] = useState(-50);
+    const [testDdMax, setTestDdMax] = useState(0);
+    const [testDdWeight, setTestDdWeight] = useState(30);
+
     const [showScoringConfig, setShowScoringConfig] = useState(false);
 
     // Walk-Forward
@@ -208,7 +217,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
                 cagr_weight: parseFloat(cagrWeight),
                 dd_min: ddMin / 100,
                 dd_max: ddMax / 100,
-                dd_weight: parseFloat(ddWeight)
+                dd_weight: parseFloat(ddWeight),
+                test_cagr_min: testCagrMin / 100,
+                test_cagr_max: testCagrMax / 100,
+                test_cagr_weight: parseFloat(testCagrWeight),
+                test_dd_min: testDdMin / 100,
+                test_dd_max: testDdMax / 100,
+                test_dd_weight: parseFloat(testDdWeight)
             },
 
             // Walk-Forward parameters (always enabled with train/test)
@@ -327,7 +342,13 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
                 cagr_weight: parseFloat(cagrWeight),
                 dd_min: ddMin / 100,
                 dd_max: ddMax / 100,
-                dd_weight: parseFloat(ddWeight)
+                dd_weight: parseFloat(ddWeight),
+                test_cagr_min: testCagrMin / 100,
+                test_cagr_max: testCagrMax / 100,
+                test_cagr_weight: parseFloat(testCagrWeight),
+                test_dd_min: testDdMin / 100,
+                test_dd_max: testDdMax / 100,
+                test_dd_weight: parseFloat(testDdWeight)
             },
 
             // Walk-Forward parameters (always enabled with train/test)
@@ -542,7 +563,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
                                         <div className="grid grid-cols-3 gap-4">
                                             {/* CAGR Settings */}
                                             <div className="col-span-3">
-                                                <p className="font-medium text-sm mb-2 text-green-700">CAGR Thresholds & Weight</p>
+                                                <p className="font-medium text-sm mb-2 text-green-700">Train CAGR Thresholds & Weight</p>
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-medium text-gray-700">Min CAGR (%)</label>
@@ -574,7 +595,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
 
                                             {/* DD Settings */}
                                             <div className="col-span-3">
-                                                <p className="font-medium text-sm mb-2 mt-2 text-red-700">Max DD Thresholds & Weight</p>
+                                                <p className="font-medium text-sm mb-2 mt-2 text-red-700">Train Max DD Thresholds & Weight</p>
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-medium text-gray-700">Min DD (%)</label>
@@ -603,14 +624,78 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
                                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
                                                 />
                                             </div>
+
+                                            {/* Test CAGR Settings */}
+                                            <div className="col-span-3">
+                                                <p className="font-medium text-sm mb-2 mt-4 text-green-700 border-t pt-3">Test CAGR Thresholds & Weight</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Min Test CAGR (%)</label>
+                                                <input
+                                                    type="number"
+                                                    value={testCagrMin}
+                                                    onChange={(e) => setTestCagrMin(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Max Test CAGR (%)</label>
+                                                <input
+                                                    type="number"
+                                                    value={testCagrMax}
+                                                    onChange={(e) => setTestCagrMax(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Weight (points)</label>
+                                                <input
+                                                    type="number"
+                                                    value={testCagrWeight}
+                                                    onChange={(e) => setTestCagrWeight(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+
+                                            {/* Test DD Settings */}
+                                            <div className="col-span-3">
+                                                <p className="font-medium text-sm mb-2 mt-2 text-red-700">Test Max DD Thresholds & Weight</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Min Test DD (%)</label>
+                                                <input
+                                                    type="number"
+                                                    value={testDdMin}
+                                                    onChange={(e) => setTestDdMin(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Max Test DD (%)</label>
+                                                <input
+                                                    type="number"
+                                                    value={testDdMax}
+                                                    onChange={(e) => setTestDdMax(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-700">Weight (points)</label>
+                                                <input
+                                                    type="number"
+                                                    value={testDdWeight}
+                                                    onChange={(e) => setTestDdWeight(e.target.value)}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                                                />
+                                            </div>
                                         </div>
 
                                         <div className="mt-3 p-2 bg-white rounded border border-yellow-400">
                                             <p className="text-xs text-gray-700">
-                                                <strong>Max Score:</strong> {enableTrainTest ? (parseFloat(cagrWeight) + parseFloat(ddWeight)) * 2 : parseFloat(cagrWeight) + parseFloat(ddWeight)} points
+                                                <strong>Max Score:</strong> {enableTrainTest ? (parseFloat(cagrWeight) + parseFloat(ddWeight) + parseFloat(testCagrWeight) + parseFloat(testDdWeight)) : parseFloat(cagrWeight) + parseFloat(ddWeight)} points
                                                 {enableTrainTest && (
                                                     <span className="ml-2 text-gray-600">
-                                                        (Train: {parseFloat(cagrWeight) + parseFloat(ddWeight)}, Test: {parseFloat(cagrWeight) + parseFloat(ddWeight)})
+                                                        (Train: {parseFloat(cagrWeight) + parseFloat(ddWeight)}, Test: {parseFloat(testCagrWeight) + parseFloat(testDdWeight)})
                                                     </span>
                                                 )}
                                             </p>

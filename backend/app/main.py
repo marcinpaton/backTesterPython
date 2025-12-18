@@ -5,6 +5,7 @@ from typing import Optional, List, Any
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.data_loader import download_data, load_data
+from app.portfolio_simulator import PortfolioSimulator
 import uvicorn
 import os
 import json
@@ -159,6 +160,79 @@ class OptimizationRequest(BaseModel):
     walk_forward_start: Optional[str] = None  # Overall start date
     walk_forward_end: Optional[str] = None    # Overall end date  
     walk_forward_step_months: Optional[int] = 6  # Step size in months
+
+# Helper function to rank tickers by momentum on a specific date
+def get_ranked_tickers_for_date(df, date, momentum_lookback_days, filter_negative_momentum=False):
+    """
+    Rank tickers by momentum score on a specific date.
+    
+    Args:
+        df: Price dataframe with MultiIndex columns (ticker, price_type)
+        date: Date to rank tickers (YYYY-MM-DD)
+        momentum_lookback_days: Lookback period for momentum calculation
+        filter_negative_momentum: Whether to filter out negative momentum tickers
+        
+    Returns:
+        List of tickers ranked by momentum (best first)
+    """
+    from datetime import datetime as dt, timedelta
+    import pandas as pd
+    
+    # Convert date string to datetime
+    target_date = pd.to_datetime(date)
+    lookback_start = target_date - timedelta(days=momentum_lookback_days)
+    
+    # Get unique tickers from MultiIndex columns
+    tickers = df.columns.get_level_values(0).unique().tolist()
+    
+    print(f"DEBUG get_ranked_tickers: date={date}, lookback_days={momentum_lookback_days}, total_tickers={len(tickers)}")
+    print(f"DEBUG get_ranked_tickers: target_date={target_date}, lookback_start={lookback_start}")
+    
+    ticker_scores = []
+    
+    for ticker in tickers:
+        try:
+            # Get close prices for this ticker
+            ticker_prices = df[(ticker, 'Close')]
+            
+            # Get price on target date
+            if target_date not in ticker_prices.index:
+                continue
+            current_price = ticker_prices.loc[target_date]
+            if pd.isna(current_price):
+                continue
+            
+            # Get price at lookback start (or closest available)
+            lookback_prices = ticker_prices[ticker_prices.index <= lookback_start]
+            if lookback_prices.empty:
+                continue
+            lookback_price = lookback_prices.iloc[-1]  # Get last available price before lookback_start
+            if pd.isna(lookback_price):
+                continue
+            
+            # Calculate momentum
+            momentum = ((current_price - lookback_price) / lookback_price) * 100
+            
+            # Filter negative momentum if requested
+            if filter_negative_momentum and momentum < 0:
+                continue
+            
+            ticker_scores.append({
+                'ticker': ticker,
+                'momentum': momentum,
+                'current_price': current_price
+            })
+        except Exception as e:
+            print(f"Warning: Could not calculate momentum for {ticker}: {e}")
+            continue
+    
+    # Sort by momentum (descending)
+    ticker_scores.sort(key=lambda x: x['momentum'], reverse=True)
+    
+    print(f"DEBUG get_ranked_tickers: Successfully ranked {len(ticker_scores)} tickers")
+    
+    # Return just ticker names
+    return [t['ticker'] for t in ticker_scores]
 
 # Helper function to run a single backtest for optimization
 def run_single_backtest(df, config, start_date, end_date, margin_enabled):
@@ -370,6 +444,9 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     # Run train/test for each window
     all_window_results = []
     
+    # Initialize portfolio simulator for walk-forward
+    portfolio_simulator = PortfolioSimulator(initial_capital=10000.0)
+    
     # Initialize progress tracker for walk-forward (we'll update per window)
     # Total combinations will be calculated inside each window
     progress_tracker.start(total=0, window_total=len(windows))
@@ -417,6 +494,125 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
             'all_test_results': window_results.get('all_test_results', window_results['test_results']),    # ALL results
             'all_scores': window_results.get('all_scores', window_results.get('scores', []))                # ALL scores
         })
+        
+        # === PORTFOLIO SIMULATION ===
+        # Get best result (highest score) from ALL results
+        all_scores_list = window_results.get('all_scores', window_results.get('scores', []))
+        all_train_results = window_results.get('all_train_results', window_results['train_results'])
+        all_test_results = window_results.get('all_test_results', window_results['test_results'])
+        
+        print(f"DEBUG: Window {i+1} - Portfolio Simulation Starting")
+        print(f"DEBUG: all_scores_list length: {len(all_scores_list) if all_scores_list else 0}")
+        
+        if all_scores_list and len(all_scores_list) > 0:
+            # Find index of best score
+            best_idx = all_scores_list.index(max(all_scores_list))
+            best_train_result = all_train_results[best_idx]
+            best_test_result = all_test_results[best_idx]
+            
+            # Extract parameters from best result
+            best_params = {
+                'broker': best_train_result.get('broker', 'bossa'),
+                'n_tickers': best_train_result.get('n_tickers', 5),
+                'momentum_lookback_days': best_train_result.get('momentum_lookback_days', 30),
+                'rebalance_period': best_train_result.get('rebalance_period', 1),
+                'sizing_method': best_train_result.get('sizing_method', 'equal'),
+                'filter_negative_momentum': best_train_result.get('filter_negative_momentum', False)
+            }
+            
+            # Calculate buy date (next day after test_end)
+            from datetime import datetime as dt, timedelta
+            test_end_date = dt.strptime(window['test_end'], '%Y-%m-%d')
+            buy_date = test_end_date + timedelta(days=1)
+            buy_date_str = buy_date.strftime('%Y-%m-%d')
+            
+            # Prepare broker config for fees
+            broker_config = {
+                'transaction_fee_enabled': False,
+                'transaction_fee_type': 'percentage',
+                'transaction_fee_value': 0.0
+            }
+            
+            # Apply Bossa fees if broker is Bossa
+            if best_params['broker'] == 'bossa':
+                broker_config = {
+                    'transaction_fee_enabled': True,
+                    'transaction_fee_type': 'percentage',
+                    'transaction_fee_value': 0.29
+                }
+            
+            # Sell existing positions (if any)
+            capital_before_sell = portfolio_simulator.capital
+            sell_result = portfolio_simulator.sell_all_positions(buy_date_str, df, broker_config)
+            
+            # Rank tickers by momentum on buy_date
+            try:
+                ranked_tickers = get_ranked_tickers_for_date(
+                    df, 
+                    buy_date_str, 
+                    best_params['momentum_lookback_days'],
+                    best_params['filter_negative_momentum']
+                )
+                
+                print(f"DEBUG: Ranked tickers on {buy_date_str}: {len(ranked_tickers)} tickers")
+                print(f"DEBUG: Top 10 tickers: {ranked_tickers[:10]}")
+                
+                # Buy new positions
+                buy_result = portfolio_simulator.buy_tickers(
+                    buy_date_str,
+                    ranked_tickers,
+                    best_params['n_tickers'],
+                    df,
+                    broker_config,
+                    'equal'  # Always use equal weight for portfolio simulation
+                )
+                
+                # Calculate portfolio value
+                portfolio_value = portfolio_simulator.get_portfolio_value(buy_date_str, df)
+                total_return_pct = ((portfolio_value - portfolio_simulator.initial_capital) / portfolio_simulator.initial_capital) * 100
+                
+                print(f"DEBUG: Portfolio value={portfolio_value}, capital_after={portfolio_simulator.capital}, total_return_pct={total_return_pct}")
+                
+                # Store portfolio state in window results
+                all_window_results[-1]['portfolio_state'] = {
+                    'buy_date': buy_date_str,
+                    'best_params': best_params,
+                    'positions': buy_result.get('positions_bought', []),
+                    'capital_before': capital_before_sell,
+                    'capital_after': portfolio_simulator.capital,
+                    'portfolio_value': portfolio_value,
+                    'total_return_pct': total_return_pct,
+                    'positions_sold': sell_result.get('positions_sold', [])
+                }
+                
+                print(f"DEBUG: Portfolio state added to window {i+1}")
+                print(f"DEBUG: Positions bought: {len(buy_result.get('positions_bought', []))}")
+                
+                # For last window, sell positions after rebalance period
+                if i == len(windows) - 1:
+                    rebalance_months = best_params['rebalance_period']
+                    from dateutil.relativedelta import relativedelta
+                    sell_date = buy_date + relativedelta(months=rebalance_months)
+                    sell_date_str = sell_date.strftime('%Y-%m-%d')
+                    
+                    # Sell all positions
+                    final_sell_result = portfolio_simulator.sell_all_positions(sell_date_str, df, broker_config)
+                    
+                    # Update portfolio state with final sale
+                    all_window_results[-1]['portfolio_state']['sell_date'] = sell_date_str
+                    all_window_results[-1]['portfolio_state']['final_positions_sold'] = final_sell_result.get('positions_sold', [])
+                    all_window_results[-1]['portfolio_state']['final_capital'] = portfolio_simulator.capital
+                    all_window_results[-1]['portfolio_state']['final_total_return_pct'] = ((portfolio_simulator.capital - portfolio_simulator.initial_capital) / portfolio_simulator.initial_capital) * 100
+                    
+            except Exception as e:
+                import traceback
+                print(f"ERROR: Portfolio simulation failed for window {i+1}")
+                print(f"ERROR: {type(e).__name__}: {e}")
+                print("ERROR: Full traceback:")
+                traceback.print_exc()
+                all_window_results[-1]['portfolio_state'] = {
+                    'error': str(e)
+                }
         
         # Update window progress (don't update current - it's managed by inner optimization)
         progress_tracker.update(current=progress_tracker.current, window_current=i + 1)
