@@ -176,7 +176,50 @@ const OptimizationResults = ({ results, onSave }) => {
                                         {/* Portfolio Simulation */}
                                         {wfWindow.portfolio_state && !wfWindow.portfolio_state.error && (
                                             <div className="mt-4 p-4 bg-blue-50 rounded border border-blue-300">
-                                                <h4 className="font-semibold text-sm mb-3 text-blue-800">📊 Portfolio Simulation (Real Trading)</h4>
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <h4 className="font-semibold text-sm text-blue-800">📊 Portfolio Simulation (Real Trading)</h4>
+                                                    <button
+                                                        onClick={() => {
+                                                            const params = new URLSearchParams({
+                                                                autoRun: 'true',
+                                                                n_tickers: wfWindow.portfolio_state.best_params.n_tickers,
+                                                                rebalance_period: wfWindow.portfolio_state.best_params.rebalance_period,
+                                                                start_date: wfWindow.portfolio_state.sim_start_date,
+                                                                end_date: wfWindow.portfolio_state.sim_end_date,
+                                                                strategy: wfWindow.portfolio_state.best_params.strategy || 'scoring',
+                                                                sizing_method: wfWindow.portfolio_state.best_params.sizing_method || 'equal',
+                                                                // Infer margin_enabled from training results as it's not in best_params
+                                                                margin_enabled: wfWindow.train_results?.[0]?.margin_enabled || false,
+                                                                filter_negative_momentum: wfWindow.portfolio_state.best_params.filter_negative_momentum || false
+                                                            });
+
+                                                            if (wfWindow.portfolio_state.best_params.broker === 'bossa') {
+                                                                params.append('transaction_fee_enabled', 'true');
+                                                                params.append('transaction_fee_type', 'percentage');
+                                                                params.append('transaction_fee_value', '0.29');
+                                                                params.append('capital_gains_tax_enabled', 'false');
+                                                            }
+
+                                                            if (wfWindow.portfolio_state.best_params.momentum_lookback_days) {
+                                                                params.append('momentum_lookback_days', wfWindow.portfolio_state.best_params.momentum_lookback_days);
+                                                            }
+
+                                                            if (wfWindow.portfolio_state.best_params.stop_loss_pct) {
+                                                                params.append('stop_loss_pct', wfWindow.portfolio_state.best_params.stop_loss_pct);
+                                                            }
+
+                                                            const url = `/?${params.toString()}`;
+                                                            const newWindow = window.open(url, '_blank');
+                                                            if (!newWindow) {
+                                                                alert('Pop-up blocked! Please allow pop-ups for this site.');
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition flex items-center shadow-sm"
+                                                        title="Run simulation with these parameters in Dashboard"
+                                                    >
+                                                        <span className="mr-1">▶</span> Run Simulation
+                                                    </button>
+                                                </div>
 
                                                 {/* Simulation Period */}
                                                 <div className="mb-3 p-3 bg-white rounded shadow-sm">
