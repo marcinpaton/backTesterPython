@@ -114,12 +114,21 @@ class OptimizationRangeRequest(BaseModel):
 
 class ScoringConfig(BaseModel):
     """Configuration for scoring calculation"""
-    cagr_min: float = 0.40  # 40%
-    cagr_max: float = 0.60  # 60%
-    cagr_weight: float = 60.0
-    dd_min: float = -0.45  # -45%
-    dd_max: float = -0.30  # -30%
-    dd_weight: float = 40.0
+    # Train metrics
+    cagr_min: float = 0.0  # 0%
+    cagr_max: float = 1.0  # 100%
+    cagr_weight: float = 0.0
+    dd_min: float = -0.50  # -50%
+    dd_max: float = 0.0  # 0%
+    dd_weight: float = 0.0
+    
+    # Test metrics (separate configuration)
+    test_cagr_min: float = 0.0  # 0%
+    test_cagr_max: float = 1.0  # 100%
+    test_cagr_weight: float = 70.0
+    test_dd_min: float = -0.50  # -50%
+    test_dd_max: float = 0.0  # 0%
+    test_dd_weight: float = 30.0
 
 class OptimizationRequest(BaseModel):
     tickers: List[str]
@@ -227,16 +236,17 @@ def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd, config=
     Calculate score for train/test optimization based on BOTH train and test results.
     
     Uses configurable thresholds and weights from ScoringConfig.
+    Train and Test metrics can have separate configurations.
     
     Score = Train_CAGR_score + Train_DD_score + Test_CAGR_score + Test_DD_score
-    Maximum: 2 * (cagr_weight + dd_weight)
+    Maximum: (cagr_weight + dd_weight) + (test_cagr_weight + test_dd_weight)
     
     Both train and test results are included to evaluate both in-sample and out-of-sample performance.
     """
     if config is None:
         config = ScoringConfig()  # Use defaults
     
-    def calc_cagr_score(cagr):
+    def calc_train_cagr_score(cagr):
         if cagr < config.cagr_min:
             return 0
         elif cagr > config.cagr_max:
@@ -244,7 +254,7 @@ def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd, config=
         else:
             return ((cagr - config.cagr_min) / (config.cagr_max - config.cagr_min)) * config.cagr_weight
     
-    def calc_dd_score(dd):
+    def calc_train_dd_score(dd):
         # Note: max_drawdown is negative, so dd_max (less negative) is better than dd_min (more negative)
         if dd < config.dd_min:  # Worse than min threshold
             return 0
@@ -253,11 +263,28 @@ def calculate_train_test_score(train_cagr, train_dd, test_cagr, test_dd, config=
         else:
             return ((dd - config.dd_min) / (config.dd_max - config.dd_min)) * config.dd_weight
     
-    # Calculate scores for both train and test
-    train_cagr_score = calc_cagr_score(train_cagr)
-    train_dd_score = calc_dd_score(train_dd)
-    test_cagr_score = calc_cagr_score(test_cagr)
-    test_dd_score = calc_dd_score(test_dd)
+    def calc_test_cagr_score(cagr):
+        if cagr < config.test_cagr_min:
+            return 0
+        elif cagr > config.test_cagr_max:
+            return config.test_cagr_weight
+        else:
+            return ((cagr - config.test_cagr_min) / (config.test_cagr_max - config.test_cagr_min)) * config.test_cagr_weight
+    
+    def calc_test_dd_score(dd):
+        # Note: max_drawdown is negative, so dd_max (less negative) is better than dd_min (more negative)
+        if dd < config.test_dd_min:  # Worse than min threshold
+            return 0
+        elif dd > config.test_dd_max:  # Better than max threshold
+            return config.test_dd_weight
+        else:
+            return ((dd - config.test_dd_min) / (config.test_dd_max - config.test_dd_min)) * config.test_dd_weight
+    
+    # Calculate scores for both train and test using their respective configurations
+    train_cagr_score = calc_train_cagr_score(train_cagr)
+    train_dd_score = calc_train_dd_score(train_dd)
+    test_cagr_score = calc_test_cagr_score(test_cagr)
+    test_dd_score = calc_test_dd_score(test_dd)
     
     # Sum of Train and Test scores
     # This evaluates both in-sample (train) and out-of-sample (test) performance
