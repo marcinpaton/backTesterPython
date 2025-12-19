@@ -75,7 +75,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, results, onLoa
     const [walkForwardStart, setWalkForwardStart] = useState('2011-01-01');
     const [walkForwardEnd, setWalkForwardEnd] = useState('2025-12-01');
     const [walkForwardStep, setWalkForwardStep] = useState(12);
-    const [walkForwardDynamicStep, setWalkForwardDynamicStep] = useState(false);
+    const [walkForwardDynamicStep, setWalkForwardDynamicStep] = useState(true);
 
     // Auto-save
     const [autoSaveAfterOptimization, setAutoSaveAfterOptimization] = useState(true);

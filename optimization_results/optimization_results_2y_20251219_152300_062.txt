@@ -1,0 +1,270 @@
+Optimization Results - 2025-12-19 15:23:00
+==================================================
+
+MODE: Walk-Forward Optimization
+Total Windows: 2
+Train Period: 2.0 years (24 months)
+Test Period: 12 months
+Step: 12 months
+
+==================================================
+AGGREGATED PERFORMANCE (Top Result from Each Window)
+==================================================
+
+Aggregated Test CAGR: 16.65%
+  (Geometric mean of 2 windows)
+
+Average Test Max Drawdown: -14.15%
+  (Arithmetic mean of 2 windows)
+
+
+==================================================
+INDIVIDUAL WINDOWS (Top Results)
+==================================================
+
+
+Window 1: 2011-01-01 → 2013-12-31
+Train: 2011-01-01 to 2012-12-31
+Test: 2013-01-01 to 2013-12-31
+--------------------------------------------------
+1. bossa | N:5 | Rebal:1 | Look:20 | Train CAGR:8.84% DD:-30.60% | Test CAGR:42.61% DD:-6.81% | Score:55.7
+
+
+Window 2: 2012-01-01 → 2014-12-31
+Train: 2012-01-01 to 2013-12-31
+Test: 2014-01-01 to 2014-12-31
+--------------------------------------------------
+1. bossa | N:5 | Rebal:1 | Look:20 | Train CAGR:27.91% DD:-13.26% | Test CAGR:-4.59% DD:-21.50% | Score:17.1
+
+
+================================================================================
+# JSON DATA (for re-loading results)
+================================================================================
+{
+  "walk_forward_mode": true,
+  "total_windows": 2,
+  "windows": [
+    {
+      "window_number": 1,
+      "window": {
+        "train_start": "2011-01-01",
+        "train_end": "2012-12-31",
+        "test_start": "2013-01-01",
+        "test_end": "2013-12-31"
+      },
+      "train_results": [
+        {
+          "test_number": 1,
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "strategy": "momentum",
+          "sizing_method": "var",
+          "margin_enabled": false,
+          "cagr": 0.08836489356335853,
+          "max_drawdown": -0.3060051197856997,
+          "final_value": 11804.3078446301,
+          "total_return": 0.1838518071800528,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false,
+          "score": 0
+        }
+      ],
+      "test_results": [
+        {
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "strategy": "momentum",
+          "sizing_method": "var",
+          "margin_enabled": false,
+          "cagr": 0.42613289894191797,
+          "max_drawdown": -0.06805586289969441,
+          "final_value": 14202.849204805301,
+          "total_return": 0.42440147504180614,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false
+        }
+      ],
+      "scores": [
+        55.745951151952596
+      ],
+      "all_train_results": [
+        {
+          "test_number": 1,
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "strategy": "momentum",
+          "sizing_method": "var",
+          "margin_enabled": false,
+          "cagr": 0.08836489356335853,
+          "max_drawdown": -0.3060051197856997,
+          "final_value": 11804.3078446301,
+          "total_return": 0.1838518071800528,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false,
+          "score": 0
+        }
+      ],
+      "all_test_results": [
+        {
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "strategy": "momentum",
+          "sizing_method": "var",
+          "margin_enabled": false,
+          "cagr": 0.42613289894191797,
+          "max_drawdown": -0.06805586289969441,
+          "final_value": 14202.849204805301,
+          "total_return": 0.42440147504180614,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false
+        }
+      ],
+      "all_scores": [
+        55.745951151952596
+      ],
+      "portfolio_state": {
+        "sim_start_date": "2014-01-01",
+        "sim_end_date": "2014-02-01",
+        "best_params": {
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false,
+          "strategy": "momentum",
+          "sizing_method": "var"
+        },
+        "initial_capital": 10000,
+        "final_capital": 9963.257110382197,
+        "total_return_pct": -0.36742889617802577,
+        "max_drawdown_pct": -6.099527919877026,
+        "sharpe_ratio": 0
+      }
+    },
+    {
+      "window_number": 2,
+      "window": {
+        "train_start": "2012-01-01",
+        "train_end": "2013-12-31",
+        "test_start": "2014-01-01",
+        "test_end": "2014-12-31"
+      },
+      "train_results": [
+        {
+          "test_number": 1,
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "strategy": "momentum",
+          "sizing_method": "var",
+          "margin_enabled": false,
+          "cagr": 0.2790812450325766,
+          "max_drawdown": -0.13264574551727573,
+          "final_value": 16296.785515073407,
+          "total_return": 0.6343958665674719,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false,
+          "score": 0
+        }
+      ],
+      "test_results": [
+        {
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "strategy": "momentum",
+          "sizing_method": "var",
+          "margin_enabled": false,
+          "cagr": -0.04591176167631994,
+          "max_drawdown": -0.2149740911632302,
+          "final_value": 9514.917787292101,
+          "total_return": -0.045758288326125086,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false
+        }
+      ],
+      "scores": [
+        17.10155453020619
+      ],
+      "all_train_results": [
+        {
+          "test_number": 1,
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "strategy": "momentum",
+          "sizing_method": "var",
+          "margin_enabled": false,
+          "cagr": 0.2790812450325766,
+          "max_drawdown": -0.13264574551727573,
+          "final_value": 16296.785515073407,
+          "total_return": 0.6343958665674719,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false,
+          "score": 0
+        }
+      ],
+      "all_test_results": [
+        {
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "strategy": "momentum",
+          "sizing_method": "var",
+          "margin_enabled": false,
+          "cagr": -0.04591176167631994,
+          "max_drawdown": -0.2149740911632302,
+          "final_value": 9514.917787292101,
+          "total_return": -0.045758288326125086,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false
+        }
+      ],
+      "all_scores": [
+        17.10155453020619
+      ],
+      "portfolio_state": {
+        "sim_start_date": "2015-01-01",
+        "sim_end_date": "2015-02-01",
+        "best_params": {
+          "broker": "bossa",
+          "n_tickers": 5,
+          "rebalance_period": 1,
+          "stop_loss_pct": null,
+          "momentum_lookback_days": 20,
+          "filter_negative_momentum": false,
+          "strategy": "momentum",
+          "sizing_method": "var"
+        },
+        "initial_capital": 9963.257110382197,
+        "final_capital": 10309.641472116797,
+        "total_return_pct": 3.4766177154421714,
+        "max_drawdown_pct": -3.1436299410298325,
+        "sharpe_ratio": 0
+      }
+    }
+  ],
+  "train_period_months": 24,
+  "test_period_months": 12,
+  "step_months": 12,
+  "portfolio_summary": {
+    "initial_capital": 10000,
+    "final_capital": 10309.641472116797,
+    "total_return_pct": 3.0964147211679665,
+    "start_date": "2014-01-01",
+    "end_date": "2015-02-01"
+  }
+}
