@@ -225,8 +225,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                                                 end_date: wfWindow.portfolio_state.sim_end_date,
                                                                 strategy: wfWindow.portfolio_state.best_params.strategy || 'scoring',
                                                                 sizing_method: wfWindow.portfolio_state.best_params.sizing_method || 'equal',
-                                                                // Infer margin_enabled from training results as it's not in best_params
-                                                                margin_enabled: wfWindow.train_results?.[0]?.margin_enabled || false,
+                                                                margin_enabled: wfWindow.portfolio_state.best_params.margin_enabled || false,
                                                                 filter_negative_momentum: wfWindow.portfolio_state.best_params.filter_negative_momentum || false
                                                             });
 
@@ -274,18 +273,15 @@ const OptimizationResults = ({ results, onSave }) => {
                                                 {/* Best Parameters Used */}
                                                 <div className="mb-3 p-3 bg-white rounded shadow-sm">
                                                     <p className="text-xs font-semibold mb-2 text-gray-700">Best Parameters Used:</p>
-                                                    <div className="grid grid-cols-3 gap-2 text-xs">
+                                                    <div className="grid grid-cols-4 gap-2 text-xs">
                                                         <div>
                                                             <span className="text-gray-600">Broker:</span> <span className="font-medium">{wfWindow.portfolio_state.best_params.broker}</span>
                                                         </div>
                                                         <div>
-                                                            <span className="text-gray-600">N Tickers:</span> <span className="font-medium">{wfWindow.portfolio_state.best_params.n_tickers}</span>
+                                                            <span className="text-gray-600">Tickers:</span> <span className="font-medium">{wfWindow.portfolio_state.best_params.n_tickers}</span>
                                                         </div>
                                                         <div>
                                                             <span className="text-gray-600">Lookback:</span> <span className="font-medium">{wfWindow.portfolio_state.best_params.momentum_lookback_days} days</span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-gray-600">Rebalance:</span> <span className="font-medium">{wfWindow.portfolio_state.best_params.rebalance_period} month(s)</span>
                                                         </div>
                                                         <div>
                                                             <span className="text-gray-600">Sizing:</span> <span className="font-medium">{wfWindow.portfolio_state.best_params.sizing_method}</span>
@@ -294,26 +290,25 @@ const OptimizationResults = ({ results, onSave }) => {
                                                 </div>
 
                                                 {/* Performance Summary */}
-                                                <div className="grid grid-cols-5 gap-2">
-                                                    <div className="p-2 bg-white rounded shadow-sm">
-                                                        <p className="text-xs text-gray-600">Initial Capital</p>
-                                                        <p className="font-bold text-sm">${wfWindow.portfolio_state.initial_capital.toFixed(2)}</p>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded shadow-sm">
-                                                        <p className="text-xs text-gray-600">Final Capital</p>
-                                                        <p className="font-bold text-sm">${wfWindow.portfolio_state.final_capital.toFixed(2)}</p>
-                                                    </div>
-                                                    <div className={`p-2 bg-white rounded shadow-sm ${wfWindow.portfolio_state.total_return_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        <p className="text-xs text-gray-600">Window Return</p>
-                                                        <p className="font-bold text-sm">{wfWindow.portfolio_state.total_return_pct.toFixed(2)}%</p>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded shadow-sm text-red-600">
-                                                        <p className="text-xs text-gray-600">Max Drawdown</p>
-                                                        <p className="font-bold text-sm">{wfWindow.portfolio_state.max_drawdown_pct.toFixed(2)}%</p>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded shadow-sm">
-                                                        <p className="text-xs text-gray-600">Sharpe Ratio</p>
-                                                        <p className="font-bold text-sm">{wfWindow.portfolio_state.sharpe_ratio.toFixed(2)}</p>
+                                                <div className="mb-3 p-3 bg-gradient-to-r from-blue-50 to-green-50 rounded shadow-sm border border-blue-200">
+                                                    <p className="text-xs font-semibold mb-2 text-blue-900">📊 Performance Summary</p>
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        <div className="p-2 bg-white rounded shadow-sm">
+                                                            <p className="text-xs text-gray-600">Initial Capital</p>
+                                                            <p className="font-bold text-sm">${wfWindow.portfolio_state.initial_capital.toFixed(2)}</p>
+                                                        </div>
+                                                        <div className="p-2 bg-white rounded shadow-sm">
+                                                            <p className="text-xs text-gray-600">Final Capital</p>
+                                                            <p className="font-bold text-sm">${wfWindow.portfolio_state.final_capital.toFixed(2)}</p>
+                                                        </div>
+                                                        <div className={`p-2 bg-white rounded shadow-sm ${wfWindow.portfolio_state.total_return_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                            <p className="text-xs text-gray-600">Window Return</p>
+                                                            <p className="font-bold text-sm">{wfWindow.portfolio_state.total_return_pct >= 0 ? '+' : ''}{wfWindow.portfolio_state.total_return_pct.toFixed(2)}%</p>
+                                                        </div>
+                                                        <div className={`p-2 bg-white rounded shadow-sm ${wfWindow.portfolio_state.max_drawdown_pct <= -10 ? 'text-red-600' : 'text-yellow-600'}`}>
+                                                            <p className="text-xs text-gray-600">Max Drawdown</p>
+                                                            <p className="font-bold text-sm">{wfWindow.portfolio_state.max_drawdown_pct.toFixed(2)}%</p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -324,7 +319,7 @@ const OptimizationResults = ({ results, onSave }) => {
                         ))}
                     </div>
                 </div>
-            </div>
+            </div >
         );
     }
 

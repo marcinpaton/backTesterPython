@@ -474,7 +474,8 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
                         'momentum_lookback_days': best_result.get('momentum_lookback_days', 30),
                         'filter_negative_momentum': best_result.get('filter_negative_momentum', False),
                         'strategy': best_result.get('strategy', 'momentum'),
-                        'sizing_method': best_result.get('sizing_method', 'equal')
+                        'sizing_method': best_result.get('sizing_method', 'equal'),
+                        'margin_enabled': best_result.get('margin_enabled', request.margin_enabled)
                     }
                     
                     sim_result = run_single_backtest(
@@ -488,7 +489,9 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
                     
                     if sim_result:
                         final_capital = sim_result.get('final_value', current_capital)
-                        window_return_pct = ((final_capital - current_capital) / current_capital) * 100
+                        # Use total_return from backtest (same as Dashboard)
+                        # total_return is a decimal (e.g., -0.0008), convert to percentage
+                        window_return_pct = sim_result.get('total_return', 0) * 100
                         
                         # Store portfolio simulation results
                         all_window_results[-1]['portfolio_state'] = {
@@ -497,9 +500,8 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
                             'best_params': config,
                             'initial_capital': current_capital,  # Capital at start of this window
                             'final_capital': final_capital,
-                            'total_return_pct': window_return_pct,  # Return for this window only
-                            'max_drawdown_pct': sim_result.get('max_drawdown', 0) * 100,
-                            'sharpe_ratio': sim_result.get('sharpe_ratio', 0)
+                            'total_return_pct': window_return_pct,  # Return for this window (from backtest)
+                            'max_drawdown_pct': sim_result.get('max_drawdown', 0) * 100
                         }
                         
                         # Update capital for next window
