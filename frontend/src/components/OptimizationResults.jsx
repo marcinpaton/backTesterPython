@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const OptimizationResults = ({ results, onSave }) => {
     const [sortBy, setSortBy] = useState('score'); // Default sort by score
@@ -205,7 +205,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                         {windows
                                             .filter(w => w.portfolio_state && !w.portfolio_state.error)
                                             .map((w, idx) => (
-                                                <Bar
+                                                <Cell
                                                     key={idx}
                                                     fill={w.portfolio_state.total_return_pct >= 0 ? '#10b981' : '#ef4444'}
                                                 />
