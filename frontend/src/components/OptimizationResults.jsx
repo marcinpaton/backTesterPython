@@ -55,6 +55,43 @@ const OptimizationResults = ({ results, onSave }) => {
                     </p>
                 </div>
 
+                {/* Overall Portfolio Performance */}
+                {results.portfolio_summary && (
+                    <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border-2 border-green-300 shadow-md">
+                        <h3 className="text-lg font-bold mb-3 text-green-900 flex items-center">
+                            <span className="mr-2">📈</span> Overall Portfolio Performance
+                        </h3>
+
+                        {/* Simulation Period */}
+                        <div className="mb-3 p-2 bg-white rounded border border-blue-200">
+                            <p className="text-xs font-semibold text-gray-700 mb-1">Simulation Period:</p>
+                            <p className="text-sm text-gray-900">
+                                <span className="font-medium">{results.portfolio_summary.start_date}</span>
+                                <span className="mx-2 text-gray-500">→</span>
+                                <span className="font-medium">{results.portfolio_summary.end_date}</span>
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="p-3 bg-white rounded-lg shadow">
+                                <p className="text-xs text-gray-600 mb-1">Initial Capital</p>
+                                <p className="font-bold text-xl text-gray-900">${results.portfolio_summary.initial_capital.toLocaleString()}</p>
+                            </div>
+                            <div className="p-3 bg-white rounded-lg shadow">
+                                <p className="text-xs text-gray-600 mb-1">Final Capital</p>
+                                <p className="font-bold text-xl text-gray-900">${results.portfolio_summary.final_capital.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            </div>
+                            <div className={`p-3 bg-white rounded-lg shadow ${results.portfolio_summary.total_return_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                <p className="text-xs text-gray-600 mb-1">Total Return</p>
+                                <p className="font-bold text-xl">{results.portfolio_summary.total_return_pct >= 0 ? '+' : ''}{results.portfolio_summary.total_return_pct.toFixed(2)}%</p>
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-3 italic">
+                            * Cumulative performance across all {total_windows} windows with capital continuity
+                        </p>
+                    </div>
+                )}
+
 
                 {/* Individual Windows */}
                 <div>
@@ -257,13 +294,17 @@ const OptimizationResults = ({ results, onSave }) => {
                                                 </div>
 
                                                 {/* Performance Summary */}
-                                                <div className="grid grid-cols-4 gap-2">
+                                                <div className="grid grid-cols-5 gap-2">
+                                                    <div className="p-2 bg-white rounded shadow-sm">
+                                                        <p className="text-xs text-gray-600">Initial Capital</p>
+                                                        <p className="font-bold text-sm">${wfWindow.portfolio_state.initial_capital.toFixed(2)}</p>
+                                                    </div>
                                                     <div className="p-2 bg-white rounded shadow-sm">
                                                         <p className="text-xs text-gray-600">Final Capital</p>
                                                         <p className="font-bold text-sm">${wfWindow.portfolio_state.final_capital.toFixed(2)}</p>
                                                     </div>
                                                     <div className={`p-2 bg-white rounded shadow-sm ${wfWindow.portfolio_state.total_return_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        <p className="text-xs text-gray-600">Total Return</p>
+                                                        <p className="text-xs text-gray-600">Window Return</p>
                                                         <p className="font-bold text-sm">{wfWindow.portfolio_state.total_return_pct.toFixed(2)}%</p>
                                                     </div>
                                                     <div className="p-2 bg-white rounded shadow-sm text-red-600">

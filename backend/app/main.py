@@ -162,7 +162,7 @@ class OptimizationRequest(BaseModel):
     walk_forward_dynamic_step: bool = False  # If True, step size is determined by winning strategy's rebalance period
 
 # Helper function to run a single backtest for optimization
-def run_single_backtest(df, config, start_date, end_date, margin_enabled):
+def run_single_backtest(df, config, start_date, end_date, margin_enabled, initial_capital=10000):
     broker_configs = {
         'bossa': {
             'transaction_fee_enabled': True,
@@ -194,7 +194,7 @@ def run_single_backtest(df, config, start_date, end_date, margin_enabled):
     portfolio = run_backtest(
         strategy,
         df,
-        10000,  # Fixed initial capital
+        initial_capital,  # Use provided initial capital
         start_date,
         end_date,
         config['stop_loss_pct'] / 100 if config['stop_loss_pct'] else None,
@@ -345,6 +345,9 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     # Run train/test for each window iteratively
     all_window_results = []
     
+    # Track capital across windows for realistic simulation
+    current_capital = 10000  # Initial capital for first window
+    
     current_start = dt.strptime(request.walk_forward_start, '%Y-%m-%d')
     overall_end = dt.strptime(request.walk_forward_end, '%Y-%m-%d')
     
@@ -479,25 +482,37 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
                         config,
                         sim_start_date.strftime('%Y-%m-%d'),
                         sim_end_date.strftime('%Y-%m-%d'),
-                        request.margin_enabled
+                        request.margin_enabled,
+                        initial_capital=current_capital  # Use capital from previous window
                     )
                     
                     if sim_result:
+                        final_capital = sim_result.get('final_value', current_capital)
+                        window_return_pct = ((final_capital - current_capital) / current_capital) * 100
+                        
                         # Store portfolio simulation results
                         all_window_results[-1]['portfolio_state'] = {
                             'sim_start_date': sim_start_date.strftime('%Y-%m-%d'),
                             'sim_end_date': sim_end_date.strftime('%Y-%m-%d'),
                             'best_params': config,
-                            'final_capital': sim_result.get('final_value', 10000),
-                            'total_return_pct': sim_result.get('cagr', 0) * 100,
+                            'initial_capital': current_capital,  # Capital at start of this window
+                            'final_capital': final_capital,
+                            'total_return_pct': window_return_pct,  # Return for this window only
                             'max_drawdown_pct': sim_result.get('max_drawdown', 0) * 100,
                             'sharpe_ratio': sim_result.get('sharpe_ratio', 0)
                         }
+                        
+                        # Update capital for next window
+                        current_capital = final_capital
+                        
                         print(f"DEBUG: Portfolio simulation completed for window {window_index+1}")
-                        print(f"DEBUG: Final capital=${sim_result.get('final_value', 10000):.2f}, Return={sim_result.get('cagr', 0)*100:.2f}%")
+                        print(f"DEBUG: Initial=${sim_result.get('final_value', current_capital):.2f}, Final=${final_capital:.2f}, Return={window_return_pct:.2f}%")
+                        print(f"DEBUG: Carrying forward capital=${current_capital:.2f} to next window")
                     else:
+                        # Keep current capital if simulation failed
                         all_window_results[-1]['portfolio_state'] = {
-                            'error': 'Backtest returned no results'
+                            'error': 'Backtest returned no results',
+                            'capital_carried_forward': current_capital
                         }
                         
                 except Exception as e:
@@ -518,13 +533,39 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     # Mark walk-forward as complete
     progress_tracker.finish()
     
+    # Calculate overall portfolio performance and actual simulation period
+    total_return_pct = ((current_capital - 10000) / 10000) * 100
+    
+    # Get actual simulation dates from first and last windows
+    simulation_start_date = request.walk_forward_start  # Fallback
+    simulation_end_date = request.walk_forward_end      # Fallback
+    
+    # Find first window with successful simulation
+    for window in all_window_results:
+        if 'portfolio_state' in window and 'sim_start_date' in window['portfolio_state']:
+            simulation_start_date = window['portfolio_state']['sim_start_date']
+            break
+    
+    # Find last window with successful simulation (iterate backwards)
+    for window in reversed(all_window_results):
+        if 'portfolio_state' in window and 'sim_end_date' in window['portfolio_state']:
+            simulation_end_date = window['portfolio_state']['sim_end_date']
+            break
+    
     return {
         'walk_forward_mode': True,
         'total_windows': len(all_window_results),
         'windows': all_window_results,
         'train_period_months': request.train_months,
         'test_period_months': request.test_months,
-        'step_months': request.walk_forward_step_months
+        'step_months': request.walk_forward_step_months,
+        'portfolio_summary': {
+            'initial_capital': 10000,
+            'final_capital': current_capital,
+            'total_return_pct': total_return_pct,
+            'start_date': simulation_start_date,
+            'end_date': simulation_end_date
+        }
     }
 
 # Import progress tracker
