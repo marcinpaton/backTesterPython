@@ -351,19 +351,6 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     current_start = dt.strptime(request.walk_forward_start, '%Y-%m-%d')
     overall_end = dt.strptime(request.walk_forward_end, '%Y-%m-%d')
     
-    # Initialize progress tracker (estimate total windows conservatively)
-    # If dynamic, we can't know for sure, so we'll just update window count as we go
-    estimated_step = request.walk_forward_step_months
-    estimated_windows = 0
-    temp_start = current_start
-    while True:
-        temp_test_end = temp_start + relativedelta(months=request.train_months + request.test_months) - relativedelta(days=1)
-        if temp_test_end > overall_end:
-            break
-        estimated_windows += 1
-        temp_start += relativedelta(months=estimated_step)
-            
-    progress_tracker.start(total=0, window_total=estimated_windows)
     
     window_index = 0
     
@@ -525,15 +512,14 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
                         'error': str(e)
                     }
         
-        # Update progress
-        progress_tracker.update(current=progress_tracker.current, window_current=window_index + 1)
+
         
         # Move forward for next iteration
         current_start += relativedelta(months=step_months_for_next)
         window_index += 1
     
-    # Mark walk-forward as complete
-    progress_tracker.finish()
+    # Mark walk-forward as complete - tracker removed
+
     
     # Calculate overall portfolio performance and actual simulation period
     total_return_pct = ((current_capital - 10000) / 10000) * 100
@@ -589,13 +575,7 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
         'portfolio_summary': portfolio_summary
     }
 
-# Import progress tracker
-from app.progress_tracker import progress_tracker
 
-@app.get("/api/optimization_progress")
-def get_optimization_progress():
-    """Get current optimization progress status"""
-    return progress_tracker.get_status()
 
 
 @app.post("/api/optimize")
@@ -777,9 +757,8 @@ def run_optimization_endpoint(request: OptimizationRequest):
         len(request.filter_negative_momentum) # Only used when momentum is selected
     )
     
-    # Initialize progress tracker (skip if already running - walk-forward mode)
-    if not progress_tracker.get_status()['is_running']:
-        progress_tracker.start(total_combinations)
+    # Initialize progress tracker - removed
+
     
     current_test = 0
     last_progress_update = 0
@@ -801,11 +780,7 @@ def run_optimization_endpoint(request: OptimizationRequest):
                                     for filter_neg_mom in filter_values:
                                         current_test += 1
                                         
-                                        # Update progress (every 50 combinations or 10%)
-                                        if (current_test - last_progress_update >= 50) or \
-                                           ((current_test / total_combinations) - (last_progress_update / total_combinations) >= 0.1):
-                                            progress_tracker.update(current_test)
-                                            last_progress_update = current_test
+
                                         
                                         # Create strategy
                                         if strategy_name == 'momentum':
@@ -875,10 +850,7 @@ def run_optimization_endpoint(request: OptimizationRequest):
         # Sort results by score (descending), then by CAGR and Max Drawdown
         results.sort(key=lambda x: (-x.get('score', 0), -x['cagr'], -x['max_drawdown']))
         
-        # Mark progress as complete (only if NOT in walk-forward mode)
-        # Walk-forward will call finish() after all windows complete
-        if progress_tracker.get_status()['window_total'] is None:
-            progress_tracker.finish()
+
         
         return {
             'total_tests': total_combinations,
