@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const OptimizationResults = ({ results, onSave }) => {
     const [sortBy, setSortBy] = useState('score'); // Default sort by score
@@ -102,7 +102,8 @@ const OptimizationResults = ({ results, onSave }) => {
                                         .map((w, idx) => ({
                                             window: `W${idx + 1}`,
                                             date: w.portfolio_state.sim_end_date,
-                                            capital: w.portfolio_state.final_capital
+                                            capital: w.portfolio_state.final_capital,
+                                            return: w.portfolio_state.total_return_pct
                                         }))
                                     }
                                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -120,8 +121,23 @@ const OptimizationResults = ({ results, onSave }) => {
                                         tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
                                     />
                                     <Tooltip
-                                        formatter={(value) => `$${value.toFixed(2)}`}
-                                        labelFormatter={(label) => `Date: ${label}`}
+                                        content={({ active, payload }) => {
+                                            if (active && payload && payload.length) {
+                                                const data = payload[0].payload;
+                                                return (
+                                                    <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                                                        <p className="text-xs font-semibold text-gray-700 mb-1">{data.date}</p>
+                                                        <p className="text-xs text-gray-600">
+                                                            <span className="font-medium">Final Capital:</span> ${data.capital.toFixed(2)}
+                                                        </p>
+                                                        <p className={`text-xs ${data.return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                            <span className="font-medium">Window Return:</span> {data.return >= 0 ? '+' : ''}{data.return.toFixed(2)}%
+                                                        </p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
                                     />
                                     <Legend />
                                     <Line
@@ -133,6 +149,70 @@ const OptimizationResults = ({ results, onSave }) => {
                                         dot={{ fill: '#10b981', r: 4 }}
                                     />
                                 </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Window Returns Chart */}
+                        <div className="mt-4 p-3 bg-white rounded-lg shadow">
+                            <p className="text-sm font-semibold text-gray-700 mb-3">Window Returns (%)</p>
+                            <ResponsiveContainer width="100%" height={250}>
+                                <BarChart
+                                    data={windows
+                                        .filter(w => w.portfolio_state && !w.portfolio_state.error)
+                                        .map((w, idx) => ({
+                                            window: `W${idx + 1}`,
+                                            date: w.portfolio_state.sim_end_date,
+                                            return: w.portfolio_state.total_return_pct
+                                        }))
+                                    }
+                                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis
+                                        dataKey="date"
+                                        tick={{ fontSize: 11 }}
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={80}
+                                    />
+                                    <YAxis
+                                        tick={{ fontSize: 11 }}
+                                        tickFormatter={(value) => `${value.toFixed(1)}%`}
+                                    />
+                                    <Tooltip
+                                        content={({ active, payload }) => {
+                                            if (active && payload && payload.length) {
+                                                const data = payload[0].payload;
+                                                return (
+                                                    <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                                                        <p className="text-xs font-semibold text-gray-700 mb-1">{data.date}</p>
+                                                        <p className={`text-xs font-medium ${data.return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                            Return: {data.return >= 0 ? '+' : ''}{data.return.toFixed(2)}%
+                                                        </p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
+                                    />
+                                    <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
+                                    <Bar
+                                        dataKey="return"
+                                        fill="#3b82f6"
+                                        name="Window Return"
+                                        barSize={40}
+                                    >
+                                        {windows
+                                            .filter(w => w.portfolio_state && !w.portfolio_state.error)
+                                            .map((w, idx) => (
+                                                <Bar
+                                                    key={idx}
+                                                    fill={w.portfolio_state.total_return_pct >= 0 ? '#10b981' : '#ef4444'}
+                                                />
+                                            ))
+                                        }
+                                    </Bar>
+                                </BarChart>
                             </ResponsiveContainer>
                         </div>
 
