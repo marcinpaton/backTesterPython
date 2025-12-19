@@ -553,6 +553,31 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
         if 'portfolio_state' in window and 'sim_end_date' in window['portfolio_state']:
             simulation_end_date = window['portfolio_state']['sim_end_date']
             break
+            
+    # Calculate overall portfolio performance
+    overall_initial = 10000  # Starting capital
+    overall_final = current_capital
+    overall_return_pct = ((overall_final - overall_initial) / overall_initial) * 100
+    
+    # Calculate CAGR for overall portfolio
+    # CAGR = (final_value / initial_value)^(1/years) - 1
+    start_date = dt.strptime(all_window_results[0]['portfolio_state']['sim_start_date'], '%Y-%m-%d')
+    end_date = dt.strptime(all_window_results[-1]['portfolio_state']['sim_end_date'], '%Y-%m-%d')
+    years = (end_date - start_date).days / 365.25
+    
+    if years > 0:
+        overall_cagr = ((overall_final / overall_initial) ** (1 / years) - 1) * 100
+    else:
+        overall_cagr = 0
+    
+    portfolio_summary = {
+        'initial_capital': overall_initial,
+        'final_capital': overall_final,
+        'total_return_pct': overall_return_pct,
+        'cagr': overall_cagr,
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d')
+    }
     
     return {
         'walk_forward_mode': True,
@@ -561,13 +586,7 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
         'train_period_months': request.train_months,
         'test_period_months': request.test_months,
         'step_months': request.walk_forward_step_months,
-        'portfolio_summary': {
-            'initial_capital': 10000,
-            'final_capital': current_capital,
-            'total_return_pct': total_return_pct,
-            'start_date': simulation_start_date,
-            'end_date': simulation_end_date
-        }
+        'portfolio_summary': portfolio_summary
     }
 
 # Import progress tracker

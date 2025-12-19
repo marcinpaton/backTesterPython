@@ -72,7 +72,7 @@ const OptimizationResults = ({ results, onSave }) => {
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-4 gap-4">
                             <div className="p-3 bg-white rounded-lg shadow">
                                 <p className="text-xs text-gray-600 mb-1">Initial Capital</p>
                                 <p className="font-bold text-xl text-gray-900">${results.portfolio_summary.initial_capital.toLocaleString()}</p>
@@ -84,6 +84,10 @@ const OptimizationResults = ({ results, onSave }) => {
                             <div className={`p-3 bg-white rounded-lg shadow ${results.portfolio_summary.total_return_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 <p className="text-xs text-gray-600 mb-1">Total Return</p>
                                 <p className="font-bold text-xl">{results.portfolio_summary.total_return_pct >= 0 ? '+' : ''}{results.portfolio_summary.total_return_pct.toFixed(2)}%</p>
+                            </div>
+                            <div className={`p-3 bg-white rounded-lg shadow ${results.portfolio_summary.cagr >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                <p className="text-xs text-gray-600 mb-1">CAGR</p>
+                                <p className="font-bold text-xl">{results.portfolio_summary.cagr >= 0 ? '+' : ''}{results.portfolio_summary.cagr.toFixed(2)}%</p>
                             </div>
                         </div>
                         <p className="text-xs text-gray-600 mt-3 italic">
@@ -226,7 +230,8 @@ const OptimizationResults = ({ results, onSave }) => {
                                                                 strategy: wfWindow.portfolio_state.best_params.strategy || 'scoring',
                                                                 sizing_method: wfWindow.portfolio_state.best_params.sizing_method || 'equal',
                                                                 margin_enabled: wfWindow.portfolio_state.best_params.margin_enabled || false,
-                                                                filter_negative_momentum: wfWindow.portfolio_state.best_params.filter_negative_momentum || false
+                                                                filter_negative_momentum: wfWindow.portfolio_state.best_params.filter_negative_momentum || false,
+                                                                initial_capital: wfWindow.portfolio_state.initial_capital
                                                             });
 
                                                             if (wfWindow.portfolio_state.best_params.broker === 'bossa') {

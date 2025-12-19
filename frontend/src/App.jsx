@@ -71,6 +71,7 @@ function App() {
       if (params.has('sizing_method')) config.sizing_method = params.get('sizing_method');
       if (params.has('momentum_lookback_days')) config.momentum_lookback_days = parseIntVal('momentum_lookback_days');
       if (params.has('filter_negative_momentum')) config.filter_negative_momentum = parseBool('filter_negative_momentum');
+      if (params.has('initial_capital')) config.initial_capital = parseFloatVal('initial_capital');
 
       // Add defaults for missing required params if needed, or rely on ConfigurationForm defaults if undefined
       // But we need to execute runBacktest with complete params.
