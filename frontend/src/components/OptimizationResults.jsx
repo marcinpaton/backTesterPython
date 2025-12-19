@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const OptimizationResults = ({ results, onSave }) => {
     const [sortBy, setSortBy] = useState('score'); // Default sort by score
@@ -90,6 +91,51 @@ const OptimizationResults = ({ results, onSave }) => {
                                 <p className="font-bold text-xl">{results.portfolio_summary.cagr >= 0 ? '+' : ''}{results.portfolio_summary.cagr.toFixed(2)}%</p>
                             </div>
                         </div>
+
+                        {/* Capital Growth Chart */}
+                        <div className="mt-4 p-3 bg-white rounded-lg shadow">
+                            <p className="text-sm font-semibold text-gray-700 mb-3">Capital Growth Over Time</p>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart
+                                    data={windows
+                                        .filter(w => w.portfolio_state && !w.portfolio_state.error)
+                                        .map((w, idx) => ({
+                                            window: `W${idx + 1}`,
+                                            date: w.portfolio_state.sim_end_date,
+                                            capital: w.portfolio_state.final_capital
+                                        }))
+                                    }
+                                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis
+                                        dataKey="date"
+                                        tick={{ fontSize: 11 }}
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={80}
+                                    />
+                                    <YAxis
+                                        tick={{ fontSize: 11 }}
+                                        tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
+                                    />
+                                    <Tooltip
+                                        formatter={(value) => `$${value.toFixed(2)}`}
+                                        labelFormatter={(label) => `Date: ${label}`}
+                                    />
+                                    <Legend />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="capital"
+                                        stroke="#10b981"
+                                        strokeWidth={2}
+                                        name="Final Capital"
+                                        dot={{ fill: '#10b981', r: 4 }}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+
                         <p className="text-xs text-gray-600 mt-3 italic">
                             * Cumulative performance across all {total_windows} windows with capital continuity
                         </p>
