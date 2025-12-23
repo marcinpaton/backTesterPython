@@ -3,6 +3,7 @@ import axios from 'axios';
 import ConfigurationForm from './components/ConfigurationForm';
 import ResultsDashboard from './components/ResultsDashboard';
 import OptimizationView from './components/OptimizationView';
+import OptimizationAnalysisPage from './components/OptimizationAnalysisPage';
 
 function App() {
   const [results, setResults] = useState(null);
@@ -161,14 +162,24 @@ function App() {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Investment Strategy Backtester 🙂</h1>
-          {currentView === 'dashboard' && (
-            <button
-              onClick={() => setCurrentView('optimization')}
-              className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition font-semibold"
-            >
-              Optimization
-            </button>
-          )}
+          <div className="flex gap-2">
+            {currentView === 'dashboard' && (
+              <>
+                <button
+                  onClick={() => setCurrentView('analysis')}
+                  className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition font-semibold"
+                >
+                  Analysis
+                </button>
+                <button
+                  onClick={() => setCurrentView('optimization')}
+                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition font-semibold"
+                >
+                  Optimization
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {error && (
@@ -188,11 +199,18 @@ function App() {
             />
             <ResultsDashboard results={results} />
           </>
+        ) : currentView === 'analysis' ? (
+          <OptimizationAnalysisPage
+            results={results}
+            onLoadResults={setResults} // Allow loading results directly here
+            onBack={() => setCurrentView('dashboard')}
+          />
         ) : (
           <OptimizationView
             onRunOptimization={handleRunOptimization}
             isLoading={isLoading}
             onBack={() => setCurrentView('dashboard')}
+            onGoToAnalysis={() => setCurrentView('analysis')}
             results={results}
             onLoadResults={setResults}
           />

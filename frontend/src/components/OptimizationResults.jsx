@@ -227,7 +227,7 @@ const OptimizationResults = ({ results, onSave }) => {
                 <div>
                     <h3 className="text-xl font-bold mb-3">Individual Windows</h3>
                     <div className="space-y-2">
-                        {windows.map((wfWindow) => (
+                        {windows.filter(w => w.portfolio_state).map((wfWindow) => (
                             <div key={wfWindow.window_number} className="border border-gray-300 rounded">
                                 <button
                                     onClick={() => setExpandedWindow(expandedWindow === wfWindow.window_number ? null : wfWindow.window_number)}
