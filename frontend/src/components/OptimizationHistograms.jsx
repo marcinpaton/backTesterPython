@@ -15,11 +15,12 @@ const OptimizationHistograms = ({ results }) => {
         let extractedData = [];
 
         // Helper to extract relevant fields
-        const extractFields = (result, score) => ({
+        const extractFields = (result, score, extraContext = {}) => ({
             cagr: result.cagr * 100, // Convert to %
             n_tickers: result.n_tickers,
             rebalance_period: result.rebalance_period,
             momentum_lookback_days: result.momentum_lookback_days || 'N/A',
+            test_period_months: result.test_period_months || extraContext.test_period_months || 'N/A',
             score: score
         });
 
@@ -38,7 +39,7 @@ const OptimizationHistograms = ({ results }) => {
 
                 if (sourceList) {
                     sourceList.forEach((res, idx) => {
-                        extractedData.push(extractFields(res, window.scores?.[idx] || 0));
+                        extractedData.push(extractFields(res, window.scores?.[idx] || 0, { test_period_months: window.test_period_months }));
                     });
                 }
             });
@@ -59,9 +60,8 @@ const OptimizationHistograms = ({ results }) => {
 
         } else {
             // Normal Mode
-            // Only 'test' (which is the main result) applies really, but let's handle it
-            // 'train' doesn't exist here usually (unless specifically mapped)
-            const sourceList = results.results || [];
+            extractFields; // Unchanged logic implicit
+            const sourceList = results.results || results.results?.results || []; // Handle potential structure 
             sourceList.forEach(res => {
                 extractedData.push(extractFields(res, res.score || 0));
             });
@@ -76,15 +76,10 @@ const OptimizationHistograms = ({ results }) => {
 
         // 1. Determine Range
         const cagrs = rawData.map(d => d.cagr);
-        const minCagr = Math.floor(Math.min(...cagrs));
-        const maxCagr = Math.ceil(Math.max(...cagrs));
+        // ... (rest is same logic, just groupKey changes)
 
         // 2. Create Bins
         const bins = {};
-        // Initialize bins (optional, but good for continuous axis)
-        // for (let i = minCagr; i <= maxCagr; i += binSize) {
-        //     bins[i] = {}; 
-        // }
 
         // 3. Group and Count
         rawData.forEach(item => {
@@ -105,8 +100,6 @@ const OptimizationHistograms = ({ results }) => {
             bins[binFloor][groupKey]++;
         });
 
-        // 4. Format for Recharts
-        // Recharts expects array of objects: [{ bin: 10, '5': 4, '10': 2 }, { bin: 11, ... }]
         const chartData = Object.values(bins).sort((a, b) => a.bin - b.bin);
         return chartData;
 
@@ -136,7 +129,7 @@ const OptimizationHistograms = ({ results }) => {
         <div className="p-4 bg-white rounded-lg border border-gray-200 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded text-sm">
 
-                {/* Data Period */}
+                {/* ... Period & Record Selection ... */}
                 <div>
                     <label className="block font-medium text-gray-700 mb-1">Results Period</label>
                     <div className="flex rounded-md shadow-sm" role="group">
@@ -155,7 +148,6 @@ const OptimizationHistograms = ({ results }) => {
                     </div>
                 </div>
 
-                {/* Record Selection */}
                 <div>
                     <label className="block font-medium text-gray-700 mb-1">Records Included</label>
                     <div className="flex rounded-md shadow-sm" role="group">
@@ -186,6 +178,7 @@ const OptimizationHistograms = ({ results }) => {
                         className="block w-full text-xs border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-1.5 border"
                     >
                         <option value="none">None (Total Count)</option>
+                        <option value="test_period_months">Test Period (months)</option>
                         <option value="n_tickers">N Tickers</option>
                         <option value="rebalance_period">Rebalance Period</option>
                         <option value="momentum_lookback_days">Momentum Lookback</option>
@@ -225,7 +218,7 @@ const OptimizationHistograms = ({ results }) => {
                             label={{ value: 'Frequency (Count)', angle: -90, position: 'insideLeft' }}
                         />
                         <Tooltip
-                            formatter={(value, name) => [value, groupingParam === 'none' ? 'Count' : `${groupingParam === 'momentum_lookback_days' ? 'Lookback:' : groupingParam === 'rebalance_period' ? 'Rebal:' : 'N:'} ${name}`]}
+                            formatter={(value, name) => [value, groupingParam === 'none' ? 'Count' : `${groupingParam === 'momentum_lookback_days' ? 'Lookback:' : groupingParam === 'test_period_months' ? 'Period:' : groupingParam === 'rebalance_period' ? 'Rebal:' : 'N:'} ${name}`]}
                             labelFormatter={(label) => `CAGR Range: ${label}% - ${label + binSize}%`}
                         />
                         <Legend />

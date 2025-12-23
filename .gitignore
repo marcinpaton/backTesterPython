@@ -13,3 +13,4 @@ dist/
 # IDE
 .vscode/
 .idea/
+backend/data/stock_prices.csv
