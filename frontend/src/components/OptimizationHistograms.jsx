@@ -7,7 +7,8 @@ const OptimizationHistograms = ({ results }) => {
         test: true,
         simulation: true,
         training: false,
-        better_than_winner: false
+        better_than_winner: false,
+        all_simulations: false
     });
     const [recordType, setRecordType] = useState('top'); // 'top' (per window) or 'all' (if available)
     const [groupingParam, setGroupingParam] = useState('none'); // 'none', 'n_tickers', 'rebalance_period', 'momentum_lookback_days'
@@ -67,17 +68,41 @@ const OptimizationHistograms = ({ results }) => {
                     }
                 }
 
-                // Better Than Winner (Simulation)
-                if (selectedPeriods.better_than_winner) {
-                    const winnerCagr = window.test_results?.[0]?.cagr;
-                    if (winnerCagr !== undefined) {
-                        const sourceList = window.all_test_results || window.test_results;
-                        if (sourceList) {
-                            sourceList.forEach((res) => {
-                                if (res.cagr > winnerCagr) {
-                                    extractedData.push(extractFields(res, 0, { test_period_months: window.test_period_months }));
-                                }
-                            });
+                // Portfolio Simulation Data (Real Trading)
+                if (selectedPeriods.better_than_winner || selectedPeriods.all_simulations) {
+                    const portfolioState = window.portfolio_state;
+
+                    if (portfolioState && !portfolioState.error) {
+                        // Calculate CAGR for Portfolio Simulation using exact dates
+                        const startDate = new Date(portfolioState.sim_start_date);
+                        const endDate = new Date(portfolioState.sim_end_date);
+                        const diffTime = Math.abs(endDate - startDate);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                        let simCagr = 0;
+                        if (diffDays > 0) {
+                            const years = diffDays / 365.25;
+                            const totalRet = portfolioState.total_return_pct / 100;
+                            simCagr = (Math.pow(1 + totalRet, 1 / years) - 1);
+                        }
+
+                        const resultObj = {
+                            cagr: simCagr * 100,
+                            n_tickers: portfolioState.best_params.n_tickers,
+                            rebalance_period: portfolioState.best_params.rebalance_period,
+                            momentum_lookback_days: portfolioState.best_params.momentum_lookback_days || 'N/A',
+                            test_period_months: portfolioState.best_params.rebalance_period || window.test_period_months || 'N/A',
+                            score: 0
+                        };
+
+                        // 1. Profitable Simulations (formerly Better Than Winner)
+                        if (selectedPeriods.better_than_winner && simCagr > 0) {
+                            extractedData.push(resultObj);
+                        }
+
+                        // 2. All Simulations
+                        if (selectedPeriods.all_simulations) {
+                            extractedData.push(resultObj);
                         }
                     }
                 }
@@ -255,7 +280,17 @@ const OptimizationHistograms = ({ results }) => {
                                 onChange={(e) => setSelectedPeriods(prev => ({ ...prev, better_than_winner: e.target.checked }))}
                                 className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                             />
-                            <span className="ml-2 text-gray-700">Better Than Winner (Sim)</span>
+                            <span className="ml-2 text-gray-700">Profitable Simulations (Sim)</span>
+                        </label>
+
+                        <label className="inline-flex items-center">
+                            <input
+                                type="checkbox"
+                                checked={selectedPeriods.all_simulations}
+                                onChange={(e) => setSelectedPeriods(prev => ({ ...prev, all_simulations: e.target.checked }))}
+                                className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="ml-2 text-gray-700">All Simulations (Sim)</span>
                         </label>
                     </div>
                 </div>
