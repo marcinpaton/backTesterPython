@@ -3,7 +3,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 
 const OptimizationHistograms = ({ results }) => {
     // State for controls
-    const [periodType, setPeriodType] = useState('test'); // 'test' or 'train' or 'simulation' (if WF)
+    const [selectedPeriods, setSelectedPeriods] = useState({
+        test: true,
+        simulation: true,
+        training: false
+    });
     const [recordType, setRecordType] = useState('top'); // 'top' (per window) or 'all' (if available)
     const [groupingParam, setGroupingParam] = useState('none'); // 'none', 'n_tickers', 'rebalance_period', 'momentum_lookback_days'
     const [binSize, setBinSize] = useState(1); // 1% default
@@ -27,48 +31,63 @@ const OptimizationHistograms = ({ results }) => {
         if (results.walk_forward_mode) {
             // Walk-Forward Mode
             results.windows.forEach(window => {
-                // Determine source list based on recordType
-                let sourceList;
-                if (recordType === 'top') {
-                    // Top results per window
-                    sourceList = periodType === 'test' ? window.test_results : window.train_results;
-                } else {
-                    // All results (if available)
-                    sourceList = periodType === 'test' ? (window.all_test_results || window.test_results) : (window.all_train_results || window.train_results);
+                // Training Data
+                if (selectedPeriods.training) {
+                    const sourceList = recordType === 'top' ? window.train_results : (window.all_train_results || window.train_results);
+                    if (sourceList) {
+                        sourceList.forEach((res, idx) => {
+                            extractedData.push(extractFields(res, window.scores?.[idx] || 0, { test_period_months: window.test_period_months }));
+                        });
+                    }
                 }
 
-                if (sourceList) {
-                    sourceList.forEach((res, idx) => {
-                        extractedData.push(extractFields(res, window.scores?.[idx] || 0, { test_period_months: window.test_period_months }));
-                    });
+                // Simulation Data (WF Test Windows)
+                if (selectedPeriods.simulation) {
+                    const sourceList = recordType === 'top' ? window.test_results : (window.all_test_results || window.test_results);
+                    if (sourceList) {
+                        sourceList.forEach((res, idx) => {
+                            extractedData.push(extractFields(res, window.scores?.[idx] || 0, { test_period_months: window.test_period_months }));
+                        });
+                    }
                 }
             });
         } else if (results.train_test_mode) {
             // Train/Test Mode
-            let sourceList;
-            if (recordType === 'top') {
-                sourceList = periodType === 'test' ? results.test_results : results.train_results;
-            } else {
-                sourceList = periodType === 'test' ? (results.all_test_results || results.test_results) : (results.all_train_results || results.train_results);
+
+            // Training Data
+            if (selectedPeriods.training) {
+                const sourceList = recordType === 'top' ? results.train_results : (results.all_train_results || results.train_results);
+                if (sourceList) {
+                    sourceList.forEach((res, idx) => {
+                        extractedData.push(extractFields(res, results.scores?.[idx] || 0));
+                    });
+                }
             }
 
-            if (sourceList) {
-                sourceList.forEach((res, idx) => {
-                    extractedData.push(extractFields(res, results.scores?.[idx] || 0));
-                });
+            // Test Data
+            if (selectedPeriods.test) {
+                const sourceList = recordType === 'top' ? results.test_results : (results.all_test_results || results.test_results);
+                if (sourceList) {
+                    sourceList.forEach((res, idx) => {
+                        extractedData.push(extractFields(res, results.scores?.[idx] || 0));
+                    });
+                }
             }
 
         } else {
             // Normal Mode
-            extractFields; // Unchanged logic implicit
-            const sourceList = results.results || results.results?.results || []; // Handle potential structure 
-            sourceList.forEach(res => {
-                extractedData.push(extractFields(res, res.score || 0));
-            });
+            // Maps to 'test' usually as it's the "Result"
+            if (selectedPeriods.test) {
+                // Normal Mode - implicit extractFields usage
+                const sourceList = results.results || results.results?.results || [];
+                sourceList.forEach(res => {
+                    extractedData.push(extractFields(res, res.score || 0));
+                });
+            }
         }
 
         return extractedData;
-    }, [results, periodType, recordType]);
+    }, [results, selectedPeriods, recordType]);
 
     // Calculate Histogram Data
     const histogramData = useMemo(() => {
@@ -130,21 +149,45 @@ const OptimizationHistograms = ({ results }) => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded text-sm">
 
                 {/* ... Period & Record Selection ... */}
+                {/* Data Period */}
                 <div>
                     <label className="block font-medium text-gray-700 mb-1">Results Period</label>
-                    <div className="flex rounded-md shadow-sm" role="group">
-                        <button
-                            onClick={() => setPeriodType('test')}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-l-lg border ${periodType === 'test' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                        >
-                            Test / Simulation
-                        </button>
-                        <button
-                            onClick={() => setPeriodType('train')}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-r-lg border ${periodType === 'train' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                        >
-                            Training
-                        </button>
+                    <div className="flex flex-col space-y-2">
+                        {/* Show Test for Normal/TrainTest (NOT WF) */}
+                        {!results.walk_forward_mode && (
+                            <label className="inline-flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedPeriods.test}
+                                    onChange={(e) => setSelectedPeriods(prev => ({ ...prev, test: e.target.checked }))}
+                                    className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                />
+                                <span className="ml-2 text-gray-700">Test (OOS)</span>
+                            </label>
+                        )}
+
+                        {/* Show Simulation for WF */}
+                        {results.walk_forward_mode && (
+                            <label className="inline-flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedPeriods.simulation}
+                                    onChange={(e) => setSelectedPeriods(prev => ({ ...prev, simulation: e.target.checked }))}
+                                    className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                />
+                                <span className="ml-2 text-gray-700">Simulation (Walk-Forward OOS)</span>
+                            </label>
+                        )}
+
+                        <label className="inline-flex items-center">
+                            <input
+                                type="checkbox"
+                                checked={selectedPeriods.training}
+                                onChange={(e) => setSelectedPeriods(prev => ({ ...prev, training: e.target.checked }))}
+                                className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="ml-2 text-gray-700">Training (In-Sample)</span>
+                        </label>
                     </div>
                 </div>
 
