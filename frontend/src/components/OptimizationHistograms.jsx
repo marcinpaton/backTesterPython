@@ -6,7 +6,8 @@ const OptimizationHistograms = ({ results }) => {
     const [selectedPeriods, setSelectedPeriods] = useState({
         test: true,
         simulation: true,
-        training: false
+        training: false,
+        better_than_winner: false
     });
     const [recordType, setRecordType] = useState('top'); // 'top' (per window) or 'all' (if available)
     const [groupingParam, setGroupingParam] = useState('none'); // 'none', 'n_tickers', 'rebalance_period', 'momentum_lookback_days'
@@ -19,14 +20,29 @@ const OptimizationHistograms = ({ results }) => {
         let extractedData = [];
 
         // Helper to extract relevant fields
-        const extractFields = (result, score, extraContext = {}) => ({
-            cagr: result.cagr * 100, // Convert to %
-            n_tickers: result.n_tickers,
-            rebalance_period: result.rebalance_period,
-            momentum_lookback_days: result.momentum_lookback_days || 'N/A',
-            test_period_months: result.test_period_months || extraContext.test_period_months || 'N/A',
-            score: score
-        });
+        const extractFields = (result, score, extraContext = {}) => {
+            let cagr = result.cagr;
+            if (cagr === undefined && result.total_return_pct !== undefined) {
+                // Calculate CAGR from Total Return if missing
+                const months = result.test_period_months || extraContext.test_period_months;
+                if (months && months > 0) {
+                    const totalRet = result.total_return_pct / 100;
+                    const years = months / 12;
+                    cagr = (Math.pow(1 + totalRet, 1 / years) - 1); // keep as decimal here to match cagr * 100 below? 
+                    // Wait, existing code expects result.cagr to be decimal (e.g. 0.25), then * 100.
+                    // checks existing: cagr: result.cagr * 100
+                }
+            }
+
+            return {
+                cagr: (cagr !== undefined ? cagr : 0) * 100, // Convert to %
+                n_tickers: result.n_tickers,
+                rebalance_period: result.rebalance_period,
+                momentum_lookback_days: result.momentum_lookback_days || 'N/A',
+                test_period_months: result.test_period_months || extraContext.test_period_months || 'N/A',
+                score: score
+            };
+        };
 
         if (results.walk_forward_mode) {
             // Walk-Forward Mode
@@ -48,6 +64,21 @@ const OptimizationHistograms = ({ results }) => {
                         sourceList.forEach((res, idx) => {
                             extractedData.push(extractFields(res, window.scores?.[idx] || 0, { test_period_months: window.test_period_months }));
                         });
+                    }
+                }
+
+                // Better Than Winner (Simulation)
+                if (selectedPeriods.better_than_winner) {
+                    const winnerCagr = window.test_results?.[0]?.cagr;
+                    if (winnerCagr !== undefined) {
+                        const sourceList = window.all_test_results || window.test_results;
+                        if (sourceList) {
+                            sourceList.forEach((res) => {
+                                if (res.cagr > winnerCagr) {
+                                    extractedData.push(extractFields(res, 0, { test_period_months: window.test_period_months }));
+                                }
+                            });
+                        }
                     }
                 }
             });
@@ -74,6 +105,21 @@ const OptimizationHistograms = ({ results }) => {
                 }
             }
 
+            // Better Than Winner
+            if (selectedPeriods.better_than_winner) {
+                const winnerCagr = results.test_results?.[0]?.cagr;
+                if (winnerCagr !== undefined) {
+                    const sourceList = results.all_test_results || results.test_results;
+                    if (sourceList) {
+                        sourceList.forEach(res => {
+                            if (res.cagr > winnerCagr) {
+                                extractedData.push(extractFields(res, 0));
+                            }
+                        });
+                    }
+                }
+            }
+
         } else {
             // Normal Mode
             // Maps to 'test' usually as it's the "Result"
@@ -83,6 +129,19 @@ const OptimizationHistograms = ({ results }) => {
                 sourceList.forEach(res => {
                     extractedData.push(extractFields(res, res.score || 0));
                 });
+            }
+
+            // Better Than Winner
+            if (selectedPeriods.better_than_winner) {
+                const list = results.results || results.results?.results || [];
+                const winnerCagr = list[0]?.cagr;
+                if (winnerCagr !== undefined) {
+                    list.forEach(res => {
+                        if (res.cagr > winnerCagr) {
+                            extractedData.push(extractFields(res, 0));
+                        }
+                    });
+                }
             }
         }
 
@@ -187,6 +246,16 @@ const OptimizationHistograms = ({ results }) => {
                                 className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                             />
                             <span className="ml-2 text-gray-700">Training (In-Sample)</span>
+                        </label>
+
+                        <label className="inline-flex items-center">
+                            <input
+                                type="checkbox"
+                                checked={selectedPeriods.better_than_winner}
+                                onChange={(e) => setSelectedPeriods(prev => ({ ...prev, better_than_winner: e.target.checked }))}
+                                className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="ml-2 text-gray-700">Better Than Winner (Sim)</span>
                         </label>
                     </div>
                 </div>
