@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 const OptimizationHistograms = ({ results }) => {
     // State for controls
@@ -29,9 +29,7 @@ const OptimizationHistograms = ({ results }) => {
                 if (months && months > 0) {
                     const totalRet = result.total_return_pct / 100;
                     const years = months / 12;
-                    cagr = (Math.pow(1 + totalRet, 1 / years) - 1); // keep as decimal here to match cagr * 100 below? 
-                    // Wait, existing code expects result.cagr to be decimal (e.g. 0.25), then * 100.
-                    // checks existing: cagr: result.cagr * 100
+                    cagr = (Math.pow(1 + totalRet, 1 / years) - 1);
                 }
             }
 
@@ -147,9 +145,7 @@ const OptimizationHistograms = ({ results }) => {
 
         } else {
             // Normal Mode
-            // Maps to 'test' usually as it's the "Result"
             if (selectedPeriods.test) {
-                // Normal Mode - implicit extractFields usage
                 const sourceList = results.results || results.results?.results || [];
                 sourceList.forEach(res => {
                     extractedData.push(extractFields(res, res.score || 0));
@@ -177,17 +173,32 @@ const OptimizationHistograms = ({ results }) => {
     const histogramData = useMemo(() => {
         if (!rawData.length) return [];
 
-        // 1. Determine Range
         const cagrs = rawData.map(d => d.cagr);
-        // ... (rest is same logic, just groupKey changes)
 
-        // 2. Create Bins
+        // Handle case with no data or single point
+        if (cagrs.length === 0) return [];
+
+        const minCagr = Math.floor(Math.min(...cagrs) / binSize) * binSize;
+        const maxCagr = Math.ceil(Math.max(...cagrs) / binSize) * binSize;
+
+        // Initialize bins
         const bins = {};
+        // Adjust loop to ensure we cover the full range
+        // Handle edge case where minCagr > maxCagr (shouldn't happen with sorted)
+        const start = isFinite(minCagr) ? minCagr : 0;
+        const end = isFinite(maxCagr) ? maxCagr : 0;
 
-        // 3. Group and Count
+        for (let b = start; b <= end; b += binSize) {
+            bins[b] = { bin: b };
+        }
+
+        // Fill bins
         rawData.forEach(item => {
             // Calculate bin floor
-            const binFloor = Math.floor(item.cagr / binSize) * binSize;
+            const val = item.cagr;
+            if (!isFinite(val)) return;
+
+            const binFloor = Math.floor(val / binSize) * binSize;
 
             if (!bins[binFloor]) bins[binFloor] = { bin: binFloor };
 
@@ -205,10 +216,61 @@ const OptimizationHistograms = ({ results }) => {
 
         const chartData = Object.values(bins).sort((a, b) => a.bin - b.bin);
         return chartData;
-
     }, [rawData, binSize, groupingParam]);
 
-    // Identify unique keys for Bar generation (e.g., "5", "10" for n_tickers)
+    // Calculate Percentile Data (Reverse CDF)
+    const percentileData = useMemo(() => {
+        if (!histogramData.length) return [];
+
+        const dataPoints = [];
+
+        // Identify all unique group keys used in histogramData
+        const groupKeys = new Set();
+        histogramData.forEach(item => {
+            Object.keys(item).forEach(k => {
+                if (k !== 'bin') groupKeys.add(k);
+            });
+        });
+
+        // Current counts for accumulation
+        const currentCounts = {};
+        const totalCounts = {};
+
+        // Initialize totals
+        groupKeys.forEach(k => {
+            currentCounts[k] = 0;
+            totalCounts[k] = 0;
+        });
+
+        // 1. Calculate Grand Totals first
+        histogramData.forEach(binItem => {
+            groupKeys.forEach(k => {
+                if (binItem[k]) totalCounts[k] += binItem[k];
+            });
+        });
+
+        // 2. Iterate from RIGHT (Highest CAGR) to LEFT
+        // We want: % of records with CAGR >= X
+        const reversedData = [...histogramData].sort((a, b) => b.bin - a.bin);
+
+        reversedData.forEach(binItem => {
+            const point = { bin: binItem.bin };
+
+            groupKeys.forEach(k => {
+                if (binItem[k]) {
+                    currentCounts[k] += binItem[k];
+                }
+                const pct = totalCounts[k] > 0 ? (currentCounts[k] / totalCounts[k]) * 100 : 0;
+                point[k] = parseFloat(pct.toFixed(1));
+            });
+            dataPoints.push(point);
+        });
+
+        // Sort back by bin for Chart X-Axis
+        return dataPoints.sort((a, b) => a.bin - b.bin);
+
+    }, [histogramData]);
+
     const dataKeys = useMemo(() => {
         const keys = new Set();
         histogramData.forEach(item => {
@@ -217,7 +279,6 @@ const OptimizationHistograms = ({ results }) => {
             });
         });
         return Array.from(keys).sort((a, b) => {
-            // Try numeric sort
             const numA = parseFloat(a);
             const numB = parseFloat(b);
             if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
@@ -231,8 +292,7 @@ const OptimizationHistograms = ({ results }) => {
     return (
         <div className="p-4 bg-white rounded-lg border border-gray-200 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded text-sm">
-
-                {/* ... Period & Record Selection ... */}
+                {/* ... (Controls remain same) ... */}
                 {/* Data Period */}
                 <div>
                     <label className="block font-medium text-gray-700 mb-1">Results Period</label>
@@ -348,8 +408,9 @@ const OptimizationHistograms = ({ results }) => {
                 </div>
             </div>
 
-            {/* Chart */}
-            <div className="h-96 w-full">
+            {/* Histogram Chart */}
+            <h3 className="text-md font-semibold text-gray-800 mb-2">Distribution Histogram</h3>
+            <div className="h-80 w-full mb-8">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                         data={histogramData}
@@ -380,11 +441,52 @@ const OptimizationHistograms = ({ results }) => {
                         ))}
                     </BarChart>
                 </ResponsiveContainer>
+                <p className="text-center text-xs text-gray-500">
+                    X-axis: CAGR bins. Y-axis: Number of records.
+                </p>
             </div>
-            <p className="text-center text-sm text-gray-500 mt-2">
-                Histogram showing distribution of CAGR results.
-                X-axis: CAGR bins (approx {binSize}%). Y-axis: Number of occurrences.
-            </p>
+
+            {/* Percentile Chart */}
+            <h3 className="text-md font-semibold text-gray-800 mb-2 mt-6 border-t pt-4">Percentile Ranking (Reverse CDF)</h3>
+            <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                        data={percentileData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                    >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                            dataKey="bin"
+                            label={{ value: 'CAGR >= X (%)', position: 'bottom', offset: 0 }}
+                            tickFormatter={(val) => `${val}%`}
+                        />
+                        <YAxis
+                            label={{ value: '% of Records (Reverse CDF)', angle: -90, position: 'insideLeft' }}
+                            domain={[0, 100]}
+                        />
+                        <Tooltip
+                            formatter={(value, name) => [`${value}%`, groupingParam === 'none' ? 'All Records' : `${groupingParam === 'momentum_lookback_days' ? 'Lookback:' : groupingParam === 'test_period_months' ? 'Period:' : groupingParam === 'rebalance_period' ? 'Rebal:' : 'N:'} ${name}`]}
+                            labelFormatter={(label) => `CAGR >= ${label}%`}
+                        />
+                        <Legend />
+                        {dataKeys.map((key, index) => (
+                            <Line
+                                key={key}
+                                type="monotone"
+                                dataKey={key}
+                                stroke={colors[index % colors.length]}
+                                strokeWidth={2}
+                                dot={false}
+                                name={groupingParam === 'none' ? 'Total' : `${key}`}
+                            />
+                        ))}
+                    </LineChart>
+                </ResponsiveContainer>
+                <p className="text-center text-xs text-gray-500">
+                    Chart shows the percentage of records that achieved a CAGR greater than or equal to the X-axis value.
+                    Higher and further to the right is better.
+                </p>
+            </div>
         </div>
     );
 };
