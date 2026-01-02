@@ -68,15 +68,11 @@ class MomentumStrategy(Strategy):
     def get_detailed_momentum(self, available_tickers: list[str], current_date: datetime) -> list[dict]:
         """
         Calculate momentum and return detailed stats (start/end dates, prices).
-        Finds the last valid price for EACH ticker on or before current_date and start_date.
+        Uses exact "trading days" lookback by selecting the N-th valid price backwards.
         """
-        # Calculate ideal start date based on lookback
-        ideal_start_date = current_date - timedelta(days=self.lookback_days)
-        
-        # Get slices of data up to the relevant dates
+        # Get data slice up to current_date
         # Note: loc[:date] includes the date if present
         slice_current = self.close_prices.loc[:current_date]
-        slice_start = self.close_prices.loc[:ideal_start_date]
         
         if slice_current.empty:
             return []
@@ -85,29 +81,29 @@ class MomentumStrategy(Strategy):
         for ticker in available_tickers:
             if ticker not in self.close_prices.columns:
                 continue
-                
-            # Find actual end date (latest valid price on or before current_date)
-            # This handles both global holidays (slice ends early) and individual ticker gaps
+            
             try:
-                # Optimized access: check last valid index in the slice
-                # Accessing the series slice_current[ticker] might be slow if loop is huge, 
-                # but for ~100 tickers it's fine.
-                series_current = slice_current[ticker]
-                end_dt = series_current.last_valid_index()
+                # Get valid prices for this ticker up to current_date
+                # dropna() ensures we only count actual trading days for this specific ticker
+                ticker_prices = slice_current[ticker].dropna()
                 
-                if end_dt is None:
+                # Check if we have enough history
+                # We need lookback_days amount of history BEFORE the current price
+                # So total length must be at least lookback_days + 1
+                if len(ticker_prices) < self.lookback_days + 1:
                     continue
                 
-                # Find actual start date (latest valid price on or before ideal_start_date)
-                series_start = slice_start[ticker]
-                start_dt = series_start.last_valid_index()
+                # Get End Price (Current)
+                # It's the last available valid price on or before current_date
+                end_price = ticker_prices.iloc[-1]
+                end_dt = ticker_prices.index[-1]
                 
-                if start_dt is None:
-                    continue
-                    
-                # Get prices
-                end_price = series_current.loc[end_dt]
-                start_price = series_start.loc[start_dt]
+                # Get Start Price (N trading days ago)
+                # If lookback is 120, we want the price 120 steps back from the end
+                # Index: -1 is current, -2 is 1 day ago... -(1 + lookback) is lookback days ago
+                start_price_idx = -1 - self.lookback_days
+                start_price = ticker_prices.iloc[start_price_idx]
+                start_dt = ticker_prices.index[start_price_idx]
                 
                 if pd.isna(end_price) or pd.isna(start_price) or start_price == 0:
                     continue
@@ -121,10 +117,18 @@ class MomentumStrategy(Strategy):
                 # Filter negative momentum if enabled
                 if self.filter_negative_momentum and ret < 0:
                     continue
+
+                # Calculate score (0-90)
+                # 0% -> 0 pts
+                # 180% (1.8) -> 90 pts
+                # Linear in between: score = ret * 50
+                raw_score = ret * 50
+                score = max(0, min(90, raw_score))
                 
                 detailed_scores.append({
                     "ticker": ticker,
                     "momentum": ret,
+                    "score": round(score, 2),
                     "start_date": start_dt.strftime('%Y-%m-%d'),
                     "end_date": end_dt.strftime('%Y-%m-%d'),
                     "start_price": start_price,
@@ -135,8 +139,8 @@ class MomentumStrategy(Strategy):
                 # print(f"Error processing ticker {ticker}: {e}")
                 continue
         
-        # Sort by return descending
-        detailed_scores.sort(key=lambda x: x['momentum'], reverse=True)
+        # Sort by score descending (and momentum as secondary for consistency)
+        detailed_scores.sort(key=lambda x: (x['score'], x['momentum']), reverse=True)
         return detailed_scores
 
     def select_tickers(self, available_tickers: list[str], current_date: datetime) -> list[tuple[str, float]]:

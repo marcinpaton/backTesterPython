@@ -8,10 +8,8 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     );
 
     // Date states
-    // Default analysis date to yesterday
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const [analysisDate, setAnalysisDate] = useState(yesterday.toISOString().split('T')[0]);
+    // Default analysis date to today
+    const [analysisDate, setAnalysisDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Download params
     const [startDate, setStartDate] = useState('2020-01-01');
@@ -195,6 +193,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticker</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Momentum</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -213,10 +212,13 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                                 <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${item.momentum >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                     {(item.momentum * 100).toFixed(2)}%
                                                 </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                                                    {item.score !== undefined ? item.score.toFixed(1) : '-'}
+                                                </td>
                                             </tr>
                                             {expandedRow === item.ticker && (
                                                 <tr>
-                                                    <td colSpan="3" className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                                                    <td colSpan="4" className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                                                         <div className="text-sm text-gray-700">
                                                             <div className="grid grid-cols-2 gap-4 max-w-lg">
                                                                 <div>
