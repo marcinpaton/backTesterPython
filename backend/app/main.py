@@ -35,6 +35,45 @@ def download_stock_data(request: DownloadRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class MomentumScanRequest(BaseModel):
+    tickers: List[str]
+    analysis_date: str
+    momentum_lookback_days: int
+    n_best_tickers: int
+
+@app.post("/api/momentum_scan")
+def scan_momentum(request: MomentumScanRequest):
+    df = load_data()
+    if df is None:
+        raise HTTPException(status_code=404, detail="No data found. Please download data first.")
+    
+    # Initialize Momentum Strategy
+    # We only need it for selection, rebalance period doesn't matter here so passing dummy 1 month
+    strategy = MomentumStrategy(
+        n_tickers=request.n_best_tickers,
+        rebalance_period=1, 
+        rebalance_period_unit='months', 
+        data=df, 
+        lookback_days=request.momentum_lookback_days,
+        filter_negative_momentum=False # Return raw momentum even if negative, user can see valid vs bad
+    )
+    
+    try:
+        analysis_dt = datetime.strptime(request.analysis_date, '%Y-%m-%d')
+        
+        # Use new detailed method - strategy handles loose date matching per ticker
+        detailed_results = strategy.get_detailed_momentum(request.tickers, analysis_dt)
+        
+        # Take top N
+        best_results = detailed_results[:request.n_best_tickers]
+        
+        return best_results
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/data")
 def get_data():
     df = load_data()

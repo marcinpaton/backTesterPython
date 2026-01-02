@@ -65,63 +65,85 @@ class MomentumStrategy(Strategy):
         else:
             return data
 
-    def select_tickers(self, available_tickers: list[str], current_date: datetime) -> list[tuple[str, float]]:
-        # Calculate return over lookback period
-        start_date = current_date - timedelta(days=self.lookback_days)
+    def get_detailed_momentum(self, available_tickers: list[str], current_date: datetime) -> list[dict]:
+        """
+        Calculate momentum and return detailed stats (start/end dates, prices).
+        Finds the last valid price for EACH ticker on or before current_date and start_date.
+        """
+        # Calculate ideal start date based on lookback
+        ideal_start_date = current_date - timedelta(days=self.lookback_days)
         
-        # Get price at current_date (or closest previous)
-        # We use 'asof' logic or just loc if we are sure dates match. 
-        # The backtester loop iterates over existing dates in data, so current_date should exist.
+        # Get slices of data up to the relevant dates
+        # Note: loc[:date] includes the date if present
+        slice_current = self.close_prices.loc[:current_date]
+        slice_start = self.close_prices.loc[:ideal_start_date]
         
-        if current_date not in self.close_prices.index:
-            # Should not happen if driven by backtester loop on same data, but for safety
-            return []
-
-        current_prices = self.close_prices.loc[current_date]
-        
-        # Get price at start_date (or closest previous)
-        # We need to find the index location of current_date and go back ~20 trading days?
-        # Or just use asof logic on the index.
-        
-        # Using searchsorted to find position
-        idx_loc = self.close_prices.index.searchsorted(start_date)
-        if idx_loc == 0 and self.close_prices.index[0] > start_date:
-             # Not enough history
-             return []
-             
-        # If exact match not found, searchsorted returns where it should be inserted.
-        # We want the closest date BEFORE or ON start_date.
-        # If self.close_prices.index[idx_loc] > start_date, we take idx_loc - 1
-        
-        # Easier way: truncate and take last
-        past_slice = self.close_prices.loc[:start_date]
-        if past_slice.empty:
+        if slice_current.empty:
             return []
             
-        past_prices = past_slice.iloc[-1]
-        
-        momentum_scores = []
+        detailed_scores = []
         for ticker in available_tickers:
-            if ticker in current_prices and ticker in past_prices:
-                p_curr = current_prices[ticker]
-                p_past = past_prices[ticker]
+            if ticker not in self.close_prices.columns:
+                continue
                 
-                if pd.isna(p_curr) or pd.isna(p_past) or p_past == 0:
+            # Find actual end date (latest valid price on or before current_date)
+            # This handles both global holidays (slice ends early) and individual ticker gaps
+            try:
+                # Optimized access: check last valid index in the slice
+                # Accessing the series slice_current[ticker] might be slow if loop is huge, 
+                # but for ~100 tickers it's fine.
+                series_current = slice_current[ticker]
+                end_dt = series_current.last_valid_index()
+                
+                if end_dt is None:
+                    continue
+                
+                # Find actual start date (latest valid price on or before ideal_start_date)
+                series_start = slice_start[ticker]
+                start_dt = series_start.last_valid_index()
+                
+                if start_dt is None:
                     continue
                     
-                ret = (p_curr - p_past) / p_past
+                # Get prices
+                end_price = series_current.loc[end_dt]
+                start_price = series_start.loc[start_dt]
+                
+                if pd.isna(end_price) or pd.isna(start_price) or start_price == 0:
+                    continue
+                
+                # Check for float precision issues or non-float types
+                end_price = float(end_price)
+                start_price = float(start_price)
+                
+                ret = (end_price - start_price) / start_price
                 
                 # Filter negative momentum if enabled
                 if self.filter_negative_momentum and ret < 0:
                     continue
-                    
-                momentum_scores.append((ticker, ret))
+                
+                detailed_scores.append({
+                    "ticker": ticker,
+                    "momentum": ret,
+                    "start_date": start_dt.strftime('%Y-%m-%d'),
+                    "end_date": end_dt.strftime('%Y-%m-%d'),
+                    "start_price": start_price,
+                    "end_price": end_price
+                })
+                
+            except Exception as e:
+                # print(f"Error processing ticker {ticker}: {e}")
+                continue
         
         # Sort by return descending
-        momentum_scores.sort(key=lambda x: x[1], reverse=True)
+        detailed_scores.sort(key=lambda x: x['momentum'], reverse=True)
+        return detailed_scores
+
+    def select_tickers(self, available_tickers: list[str], current_date: datetime) -> list[tuple[str, float]]:
+        detailed_scores = self.get_detailed_momentum(available_tickers, current_date)
         
-        # Select top N
-        selected = momentum_scores[:self.n_tickers]
+        # Convert to expected format list[tuple[str, float]]
+        selected = [(item['ticker'], item['momentum']) for item in detailed_scores[:self.n_tickers]]
         return selected
 
     def should_rebalance(self, current_date: datetime, last_rebalance_date: datetime) -> bool:
