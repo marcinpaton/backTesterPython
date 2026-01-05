@@ -22,6 +22,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
   const [initialCapital, setInitialCapital] = useState(initialValues?.initial_capital || 10000);
   const [momentumLookbackDays, setMomentumLookbackDays] = useState(initialValues?.momentum_lookback_days || 30);
   const [filterNegativeMomentum, setFilterNegativeMomentum] = useState(initialValues?.filter_negative_momentum || false);
+  const [smaPeriod, setSmaPeriod] = useState(initialValues?.sma_period !== undefined ? initialValues.sma_period : -1);
 
   // Effect to update state if initialValues changes (e.g., when navigation happens)
   useEffect(() => {
@@ -45,6 +46,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
       if (initialValues.initial_capital) setInitialCapital(initialValues.initial_capital);
       if (initialValues.momentum_lookback_days) setMomentumLookbackDays(initialValues.momentum_lookback_days);
       if (initialValues.filter_negative_momentum !== undefined) setFilterNegativeMomentum(initialValues.filter_negative_momentum);
+      if (initialValues.sma_period !== undefined) setSmaPeriod(initialValues.sma_period);
     }
   }, [initialValues]);
 
@@ -72,7 +74,8 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
       strategy: strategy,
       sizing_method: sizingMethod,
       momentum_lookback_days: parseInt(momentumLookbackDays),
-      filter_negative_momentum: filterNegativeMomentum
+      filter_negative_momentum: filterNegativeMomentum,
+      sma_period: parseInt(smaPeriod)
     });
   };
 
@@ -344,17 +347,32 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
           <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
             <label className="block text-sm font-medium text-gray-700 mb-2">Momentum Settings</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500">Lookback Period (days)</label>
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  Momentum Lookback (days)
+                </label>
                 <input
                   type="number"
                   value={momentumLookbackDays}
                   onChange={(e) => setMomentumLookbackDays(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Number of days to look back for calculating momentum (default: 30 days)
                 </p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  SMA Filter Period (days)
+                </label>
+                <input
+                  type="number"
+                  value={smaPeriod}
+                  onChange={(e) => setSmaPeriod(e.target.value)}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  title="Tickers with price below this SMA will be excluded. Set to -1 to disable."
+                />
               </div>
               <div className="flex items-center mt-6">
                 <label className="flex items-center space-x-2 cursor-pointer">

@@ -43,13 +43,14 @@ class RandomSelectionStrategy(Strategy):
             return days_diff >= (self.rebalance_period * 30)
 
 class MomentumStrategy(Strategy):
-    def __init__(self, n_tickers: int, rebalance_period: int, rebalance_period_unit: str, data: pd.DataFrame, lookback_days: int = 30, filter_negative_momentum: bool = False):
+    def __init__(self, n_tickers: int, rebalance_period: int, rebalance_period_unit: str, data: pd.DataFrame, lookback_days: int = 30, filter_negative_momentum: bool = False, sma_period: int = -1):
         self.n_tickers = n_tickers
         self.rebalance_period = rebalance_period
         self.rebalance_period_unit = rebalance_period_unit
         self.data = data
         self.lookback_days = lookback_days
         self.filter_negative_momentum = filter_negative_momentum
+        self.sma_period = sma_period
         self.close_prices = self._get_close_prices(data)
 
     def _get_close_prices(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -97,6 +98,19 @@ class MomentumStrategy(Strategy):
                 # It's the last available valid price on or before current_date
                 end_price = ticker_prices.iloc[-1]
                 end_dt = ticker_prices.index[-1]
+                
+                # Check SMA Filter
+                # We need sma_period amount of history ending at current_date
+                # We already checked len >= lookback_days + 1. Now check sma_period.
+                # Only apply if sma_period > 0 (user set -1 to disable)
+                if self.sma_period > 0 and len(ticker_prices) >= self.sma_period:
+                    # Calculate SMA using the last N prices
+                    sma_window = ticker_prices.iloc[-self.sma_period:]
+                    sma = sma_window.mean()
+                    
+                    if pd.notna(sma) and end_price < sma:
+                        # Price is below SMA, reject ticker
+                        continue
                 
                 # Get Start Price (N trading days ago)
                 # If lookback is 120, we want the price 120 steps back from the end

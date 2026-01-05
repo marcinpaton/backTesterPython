@@ -38,8 +38,10 @@ def download_stock_data(request: DownloadRequest):
 class MomentumScanRequest(BaseModel):
     tickers: List[str]
     analysis_date: str
-    momentum_lookback_days: int
-    n_best_tickers: int
+    momentum_lookback_days: int = 120
+    n_best_tickers: int = 5
+    filter_negative_momentum: bool = False
+    sma_period: int = -1
 
 @app.post("/api/momentum_scan")
 def scan_momentum(request: MomentumScanRequest):
@@ -55,7 +57,8 @@ def scan_momentum(request: MomentumScanRequest):
         rebalance_period_unit='months', 
         data=df, 
         lookback_days=request.momentum_lookback_days,
-        filter_negative_momentum=False # Return raw momentum even if negative, user can see valid vs bad
+        filter_negative_momentum=request.filter_negative_momentum, # Return raw momentum even if negative, user can see valid vs bad
+        sma_period=request.sma_period
     )
     
     try:
@@ -105,6 +108,7 @@ class BacktestRequest(BaseModel):
     sizing_method: str = 'equal' # 'equal', 'var'
     momentum_lookback_days: int = 30 # Lookback period for momentum strategy
     filter_negative_momentum: bool = False # If True, skip tickers with negative momentum
+    sma_period: int = -1
 
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
@@ -115,7 +119,7 @@ def run_backtest_endpoint(request: BacktestRequest):
     if request.strategy == 'random':
         strategy = RandomSelectionStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit)
     elif request.strategy == 'momentum':
-        strategy = MomentumStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit, df, request.momentum_lookback_days, request.filter_negative_momentum)
+        strategy = MomentumStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit, df, request.momentum_lookback_days, request.filter_negative_momentum, request.sma_period)
     elif request.strategy == 'scoring':
         strategy = ScoringStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit, df)
     else:

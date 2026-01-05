@@ -16,8 +16,9 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Scanner params
-    const [momentumLookback, setMomentumLookback] = useState(120);
+    const [lookbackDays, setLookbackDays] = useState(120);
     const [nBestTickers, setNBestTickers] = useState(5);
+    const [smaPeriod, setSmaPeriod] = useState(-1);
 
     // Results state
     const [results, setResults] = useState(null);
@@ -45,8 +46,10 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
             const response = await axios.post('http://127.0.0.1:8000/api/momentum_scan', {
                 tickers: tickerList,
                 analysis_date: analysisDate,
-                momentum_lookback_days: parseInt(momentumLookback),
-                n_best_tickers: parseInt(nBestTickers)
+                momentum_lookback_days: parseInt(lookbackDays),
+                n_best_tickers: parseInt(nBestTickers),
+                filter_negative_momentum: false, // Default
+                sma_period: parseInt(smaPeriod)
             });
 
             setResults(response.data);
@@ -139,12 +142,22 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                     <label className="block text-xs font-medium text-blue-800">Momentum Lookback (days)</label>
                                     <input
                                         type="number"
-                                        value={momentumLookback}
-                                        onChange={(e) => setMomentumLookback(e.target.value)}
+                                        value={lookbackDays}
+                                        onChange={(e) => setLookbackDays(e.target.value)}
                                         min="1"
                                         className="mt-1 block w-full border border-blue-300 rounded-md shadow-sm p-2"
                                     />
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-blue-800">Momentum SMA Filter (days)</label>
+                                <input
+                                    type="number"
+                                    value={smaPeriod}
+                                    onChange={(e) => setSmaPeriod(e.target.value)}
+                                    className="mt-1 block w-full border border-blue-300 rounded-md shadow-sm p-2"
+                                    title="Set to -1 to disable filter"
+                                />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-blue-800">Number of Best Tickers</label>
