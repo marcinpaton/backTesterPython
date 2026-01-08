@@ -183,6 +183,7 @@ class OptimizationRequest(BaseModel):
     rebalance_period_range: OptimizationRangeRequest  # In months
     momentum_lookback_range: OptimizationRangeRequest  # In days
     filter_negative_momentum: List[bool] = [False] # Default to False if not provided
+    sma_period_range: Optional[OptimizationRangeRequest] = None # Optional, defaults to -1 if not provided
     margin_enabled: bool
     strategies: List[str]  # ['scoring', 'momentum']
     sizing_methods: List[str]  # ['equal', 'var']
@@ -227,7 +228,15 @@ def run_single_backtest(df, config, start_date, end_date, margin_enabled, initia
     
     # Create strategy
     if config['strategy'] == 'momentum':
-        strategy = MomentumStrategy(config['n_tickers'], config['rebalance_period'], 'months', df, config['momentum_lookback_days'], config['filter_negative_momentum'])
+        strategy = MomentumStrategy(
+            config['n_tickers'], 
+            config['rebalance_period'], 
+            'months', 
+            df, 
+            config['momentum_lookback_days'], 
+            config['filter_negative_momentum'],
+            config.get('sma_period', -1)
+        )
     elif config['strategy'] == 'scoring':
         strategy = ScoringStrategy(config['n_tickers'], config['rebalance_period'], 'months', df)
     else:
@@ -271,7 +280,10 @@ def run_single_backtest(df, config, start_date, end_date, margin_enabled, initia
     # Add momentum specific params
     if config['strategy'] == 'momentum':
         result['momentum_lookback_days'] = config['momentum_lookback_days']
+    if config['strategy'] == 'momentum':
+        result['momentum_lookback_days'] = config['momentum_lookback_days']
         result['filter_negative_momentum'] = config['filter_negative_momentum']
+        result['sma_period'] = config.get('sma_period', -1)
         
     return result
 
@@ -426,6 +438,7 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
             rebalance_period_range=request.rebalance_period_range,
             momentum_lookback_range=request.momentum_lookback_range,
             filter_negative_momentum=request.filter_negative_momentum,
+            sma_period_range=request.sma_period_range,
             margin_enabled=request.margin_enabled,
             strategies=request.strategies,
             sizing_methods=request.sizing_methods,
@@ -503,6 +516,7 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
                         'stop_loss_pct': best_result.get('stop_loss_pct', None),
                         'momentum_lookback_days': best_result.get('momentum_lookback_days', 30),
                         'filter_negative_momentum': best_result.get('filter_negative_momentum', False),
+                        'sma_period': best_result.get('sma_period', -1),
                         'strategy': best_result.get('strategy', 'momentum'),
                         'sizing_method': best_result.get('sizing_method', 'equal'),
                         'margin_enabled': best_result.get('margin_enabled', request.margin_enabled)
@@ -658,6 +672,7 @@ def run_optimization_endpoint(request: OptimizationRequest):
             rebalance_period_range=request.rebalance_period_range,
             momentum_lookback_range=request.momentum_lookback_range,
             filter_negative_momentum=request.filter_negative_momentum,
+            sma_period_range=request.sma_period_range,
             margin_enabled=request.margin_enabled,
             strategies=request.strategies,
             sizing_methods=request.sizing_methods,
@@ -679,7 +694,8 @@ def run_optimization_endpoint(request: OptimizationRequest):
                 'strategy': train_result['strategy'],
                 'sizing_method': train_result['sizing_method'],
                 'momentum_lookback_days': train_result.get('momentum_lookback_days', 30),
-                'filter_negative_momentum': train_result.get('filter_negative_momentum', False)
+                'filter_negative_momentum': train_result.get('filter_negative_momentum', False),
+                'sma_period': train_result.get('sma_period', -1)
             }
             
             # Run backtest on test period
@@ -786,6 +802,16 @@ def run_optimization_endpoint(request: OptimizationRequest):
         stop_loss_values = [round(v, 2) for v in stop_loss_values]
     else:
         stop_loss_values = [None]
+        
+    # SMA Period range (optional)
+    if request.sma_period_range:
+        sma_period_values = list(range(
+            int(request.sma_period_range.min),
+            int(request.sma_period_range.max) + 1,
+            int(request.sma_period_range.step)
+        ))
+    else:
+        sma_period_values = [-1]
     
     # Generate all combinations
     results = []
@@ -796,8 +822,10 @@ def run_optimization_endpoint(request: OptimizationRequest):
         len(stop_loss_values) * 
         len(request.strategies) * 
         len(request.sizing_methods) *
+        len(request.sizing_methods) *
         len(momentum_lookback_values) * # Only used when momentum is selected
-        len(request.filter_negative_momentum) # Only used when momentum is selected
+        len(request.filter_negative_momentum) * # Only used when momentum is selected
+        len(sma_period_values) # Only used when momentum is selected
     )
     
     # Initialize progress tracker - removed
@@ -818,77 +846,78 @@ def run_optimization_endpoint(request: OptimizationRequest):
                                 # For momentum, iterate over lookback values and filter options
                                 lookback_values = momentum_lookback_values if strategy_name == 'momentum' else [30]
                                 filter_values = request.filter_negative_momentum if strategy_name == 'momentum' else [False]
+                                sma_values = sma_period_values if strategy_name == 'momentum' else [-1]
                                 
                                 for lookback_days in lookback_values:
                                     for filter_neg_mom in filter_values:
-                                        current_test += 1
-                                        
-
-                                        
-                                        # Create strategy
-                                        if strategy_name == 'momentum':
-                                            strategy = MomentumStrategy(n_tickers, rebalance_period, 'months', df, lookback_days, filter_neg_mom)
-                                        elif strategy_name == 'scoring':
-                                            strategy = ScoringStrategy(n_tickers, rebalance_period, 'months', df)
-                                        else:
-                                            continue
-                                        
-                                        # Run backtest
-                                        try:
-                                            portfolio = run_backtest(
-                                                strategy,
-                                                df,
-                                                10000,  # Fixed initial capital
-                                                request.start_date,
-                                                request.end_date,
-                                                stop_loss_pct / 100 if stop_loss_pct else None,
-                                                False,  # smart_stop_loss
-                                                broker_config['transaction_fee_enabled'],
-                                                broker_config['transaction_fee_type'],
-                                                broker_config['transaction_fee_value'],
-                                                broker_config['capital_gains_tax_enabled'],
-                                                broker_config['capital_gains_tax_pct'],
-                                                request.margin_enabled,
-                                                sizing_method
-                                            )
+                                        for sma_period in sma_values:
+                                            current_test += 1
                                             
-                                            metrics = calculate_metrics(portfolio)
-                                            
-                                            # Store result with parameters
-                                            result = {
-                                                'test_number': current_test,
-                                                'broker': broker,
-                                                'n_tickers': n_tickers,
-                                                'rebalance_period': rebalance_period,
-                                                'stop_loss_pct': stop_loss_pct,
-                                                'strategy': strategy_name,
-                                                'sizing_method': sizing_method,
-                                                'margin_enabled': request.margin_enabled,
-                                                'cagr': metrics.get('cagr', 0),
-                                                'max_drawdown': metrics.get('max_drawdown', 0),
-                                                'final_value': metrics.get('final_value', 0),
-                                                'total_return': metrics.get('total_return', 0)
-                                            }
-                                            
-                                            # Add momentum specific params
+                                            # Create strategy
                                             if strategy_name == 'momentum':
-                                                result['momentum_lookback_days'] = lookback_days
-                                                result['filter_negative_momentum'] = filter_neg_mom
+                                                strategy = MomentumStrategy(n_tickers, rebalance_period, 'months', df, lookback_days, filter_neg_mom, sma_period)
+                                            elif strategy_name == 'scoring':
+                                                strategy = ScoringStrategy(n_tickers, rebalance_period, 'months', df)
+                                            else:
+                                                continue
                                             
-                                            # Calculate score for this result
-                                            result['score'] = calculate_single_score(
-                                                metrics.get('cagr', 0),
-                                                metrics.get('max_drawdown', 0),
-                                                request.scoring_config
-                                            )
-                                            
-                                            results.append(result)
-                                        except Exception as e:
-                                            import traceback
-                                            print(f"Error in test {current_test}: {e}")
-                                            traceback.print_exc()
-                                            # Continue with next combination
-                                            continue
+                                            # Run backtest
+                                            try:
+                                                portfolio = run_backtest(
+                                                    strategy,
+                                                    df,
+                                                    10000,  # Fixed initial capital
+                                                    request.start_date,
+                                                    request.end_date,
+                                                    stop_loss_pct / 100 if stop_loss_pct else None,
+                                                    False,  # smart_stop_loss
+                                                    broker_config['transaction_fee_enabled'],
+                                                    broker_config['transaction_fee_type'],
+                                                    broker_config['transaction_fee_value'],
+                                                    broker_config['capital_gains_tax_enabled'],
+                                                    broker_config['capital_gains_tax_pct'],
+                                                    request.margin_enabled,
+                                                    sizing_method
+                                                )
+                                                
+                                                metrics = calculate_metrics(portfolio)
+                                                
+                                                # Store result with parameters
+                                                result = {
+                                                    'test_number': current_test,
+                                                    'broker': broker,
+                                                    'n_tickers': n_tickers,
+                                                    'rebalance_period': rebalance_period,
+                                                    'stop_loss_pct': stop_loss_pct,
+                                                    'strategy': strategy_name,
+                                                    'sizing_method': sizing_method,
+                                                    'margin_enabled': request.margin_enabled,
+                                                    'cagr': metrics.get('cagr', 0),
+                                                    'max_drawdown': metrics.get('max_drawdown', 0),
+                                                    'final_value': metrics.get('final_value', 0),
+                                                    'total_return': metrics.get('total_return', 0)
+                                                }
+                                                
+                                                # Add momentum specific params
+                                                if strategy_name == 'momentum':
+                                                    result['momentum_lookback_days'] = lookback_days
+                                                    result['filter_negative_momentum'] = filter_neg_mom
+                                                    result['sma_period'] = sma_period
+                                                
+                                                # Calculate score for this result
+                                                result['score'] = calculate_single_score(
+                                                    metrics.get('cagr', 0),
+                                                    metrics.get('max_drawdown', 0),
+                                                    request.scoring_config
+                                                )
+                                                
+                                                results.append(result)
+                                            except Exception as e:
+                                                import traceback
+                                                print(f"Error in test {current_test}: {e}")
+                                                traceback.print_exc()
+                                                # Continue with next combination
+                                                continue
         
         # Sort results by score (descending), then by CAGR and Max Drawdown
         results.sort(key=lambda x: (-x.get('score', 0), -x['cagr'], -x['max_drawdown']))

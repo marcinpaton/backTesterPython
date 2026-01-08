@@ -38,6 +38,7 @@ const OptimizationHistograms = ({ results }) => {
                 n_tickers: result.n_tickers,
                 rebalance_period: result.rebalance_period,
                 momentum_lookback_days: result.momentum_lookback_days || 'N/A',
+                sma_period: (result.sma_period !== undefined && result.sma_period !== -1) ? result.sma_period : 'Disabled',
                 test_period_months: result.test_period_months || extraContext.test_period_months || 'N/A',
                 score: score
             };
@@ -89,6 +90,7 @@ const OptimizationHistograms = ({ results }) => {
                             n_tickers: portfolioState.best_params.n_tickers,
                             rebalance_period: portfolioState.best_params.rebalance_period,
                             momentum_lookback_days: portfolioState.best_params.momentum_lookback_days || 'N/A',
+                            sma_period: (portfolioState.best_params.sma_period !== undefined && portfolioState.best_params.sma_period !== -1) ? portfolioState.best_params.sma_period : 'Disabled',
                             test_period_months: portfolioState.best_params.rebalance_period || window.test_period_months || 'N/A',
                             score: 0
                         };
@@ -389,6 +391,7 @@ const OptimizationHistograms = ({ results }) => {
                         <option value="n_tickers">N Tickers</option>
                         <option value="rebalance_period">Rebalance Period</option>
                         <option value="momentum_lookback_days">Momentum Lookback</option>
+                        <option value="sma_period">SMA Period</option>
                     </select>
                 </div>
 
@@ -426,7 +429,7 @@ const OptimizationHistograms = ({ results }) => {
                             label={{ value: 'Frequency (Count)', angle: -90, position: 'insideLeft' }}
                         />
                         <Tooltip
-                            formatter={(value, name) => [value, groupingParam === 'none' ? 'Count' : `${groupingParam === 'momentum_lookback_days' ? 'Lookback:' : groupingParam === 'test_period_months' ? 'Period:' : groupingParam === 'rebalance_period' ? 'Rebal:' : 'N:'} ${name}`]}
+                            formatter={(value, name) => [value, groupingParam === 'none' ? 'Count' : `${groupingParam === 'momentum_lookback_days' ? 'Lookback:' : groupingParam === 'test_period_months' ? 'Period:' : groupingParam === 'rebalance_period' ? 'Rebal:' : groupingParam === 'sma_period' ? 'SMA:' : 'N:'} ${name}`]}
                             labelFormatter={(label) => `CAGR Range: ${label}% - ${label + binSize}%`}
                         />
                         <Legend />
@@ -465,7 +468,7 @@ const OptimizationHistograms = ({ results }) => {
                             domain={[0, 100]}
                         />
                         <Tooltip
-                            formatter={(value, name) => [`${value}%`, groupingParam === 'none' ? 'All Records' : `${groupingParam === 'momentum_lookback_days' ? 'Lookback:' : groupingParam === 'test_period_months' ? 'Period:' : groupingParam === 'rebalance_period' ? 'Rebal:' : 'N:'} ${name}`]}
+                            formatter={(value, name) => [`${value}%`, groupingParam === 'none' ? 'All Records' : `${groupingParam === 'momentum_lookback_days' ? 'Lookback:' : groupingParam === 'test_period_months' ? 'Period:' : groupingParam === 'rebalance_period' ? 'Rebal:' : groupingParam === 'sma_period' ? 'SMA:' : 'N:'} ${name}`]}
                             labelFormatter={(label) => `CAGR >= ${label}%`}
                         />
                         <Legend />

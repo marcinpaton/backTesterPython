@@ -255,6 +255,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                                         <th className="px-2 py-2 text-left">N</th>
                                                         <th className="px-2 py-2 text-left">Rebal</th>
                                                         <th className="px-2 py-2 text-left">Look</th>
+                                                        <th className="px-2 py-2 text-left">SMA</th>
                                                         <th className="px-2 py-2 text-left bg-green-50">Train CAGR</th>
                                                         <th className="px-2 py-2 text-left bg-red-50">Train DD</th>
                                                         <th className="px-2 py-2 text-left bg-green-100">Test CAGR</th>
@@ -319,6 +320,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                                                 <td className="px-2 py-2">{result.n_tickers}</td>
                                                                 <td className="px-2 py-2">{result.rebalance_period}</td>
                                                                 <td className="px-2 py-2">{result.momentum_lookback_days || '-'}</td>
+                                                                <td className="px-2 py-2">{result.sma_period && result.sma_period !== -1 ? result.sma_period : '-'}</td>
                                                                 <td className="px-2 py-2 bg-green-50">{(result.cagr * 100).toFixed(2)}%</td>
                                                                 <td className="px-2 py-2 bg-red-50">{(result.max_drawdown * 100).toFixed(2)}%</td>
                                                                 <td className="px-2 py-2 bg-green-100">{(testResult?.cagr * 100).toFixed(2)}%</td>
@@ -539,7 +541,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">N</th>
                                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rebal</th>
                                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Look</th>
-                                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">SL%</th>
+                                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">SMA</th>
                                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Strat</th>
                                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
                                     <th className="px-2 py-2 text-left text-xs font-medium text-green-700 uppercase bg-green-50">Train CAGR</th>
@@ -557,7 +559,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                         <td className="px-2 py-2 text-sm">{result.n_tickers}</td>
                                         <td className="px-2 py-2 text-sm">{result.rebalance_period}</td>
                                         <td className="px-2 py-2 text-sm">{result.momentum_lookback_days || '-'}</td>
-                                        <td className="px-2 py-2 text-sm">{result.stop_loss_pct || '-'}</td>
+                                        <td className="px-2 py-2 text-sm">{result.sma_period && result.sma_period !== -1 ? result.sma_period : '-'}</td>
                                         <td className="px-2 py-2 text-sm">{result.strategy}</td>
                                         <td className="px-2 py-2 text-sm">{result.sizing_method}</td>
                                         <td className="px-2 py-2 text-sm font-semibold text-green-700 bg-green-50">
@@ -621,7 +623,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rebalance (mo)</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lookback (d)</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filter Neg. Mom.</th>
-                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stop Loss %</th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SMA</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Strategy</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sizing</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">CAGR</th>
@@ -646,7 +648,7 @@ const OptimizationResults = ({ results, onSave }) => {
                                         {result.filter_negative_momentum !== undefined ? (result.filter_negative_momentum ? 'Yes' : 'No') : '-'}
                                     </td>
                                     <td className="px-3 py-3 text-sm text-gray-900">
-                                        {result.stop_loss_pct || '-'}
+                                        {result.sma_period && result.sma_period !== -1 ? result.sma_period : '-'}
                                     </td>
                                     <td className="px-3 py-3 text-sm text-gray-900">{result.strategy}</td>
                                     <td className="px-3 py-3 text-sm text-gray-900">{result.sizing_method}</td>

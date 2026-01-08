@@ -33,6 +33,9 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
     const [momentumLookbackStep, setMomentumLookbackStep] = useState(20);
     const [filterNegativeMomentumEnabled, setFilterNegativeMomentumEnabled] = useState(false); // Test with filter=True
     const [filterNegativeMomentumDisabled, setFilterNegativeMomentumDisabled] = useState(true); // Test with filter=False
+    const [smaPeriodMin, setSmaPeriodMin] = useState(-1);
+    const [smaPeriodMax, setSmaPeriodMax] = useState(-1);
+    const [smaPeriodStep, setSmaPeriodStep] = useState(100);
 
     // Margin trading
     const [marginEnabled, setMarginEnabled] = useState(false);
@@ -156,6 +159,11 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
                 min: parseInt(momentumLookbackMin),
                 max: parseInt(momentumLookbackMax),
                 step: parseInt(momentumLookbackStep)
+            },
+            sma_period_range: {
+                min: parseInt(smaPeriodMin),
+                max: parseInt(smaPeriodMax),
+                step: parseInt(smaPeriodStep)
             },
             filter_negative_momentum: filterNegativeMomentum,
             margin_enabled: marginEnabled,
@@ -282,6 +290,11 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
                 min: parseInt(momentumLookbackMin),
                 max: parseInt(momentumLookbackMax),
                 step: parseInt(momentumLookbackStep)
+            },
+            sma_period_range: {
+                min: parseInt(smaPeriodMin),
+                max: parseInt(smaPeriodMax),
+                step: parseInt(smaPeriodStep)
             },
             filter_negative_momentum: filterNegativeMomentum,
             margin_enabled: marginEnabled,
@@ -920,6 +933,45 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
                     </div>
                 </div>
 
+                {/* SMA Filter Period Range */}
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-3">SMA Filter Period (days) [Momentum]</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Min</label>
+                            <input
+                                type="number"
+                                value={smaPeriodMin}
+                                onChange={(e) => setSmaPeriodMin(e.target.value)}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                title="Set to -1 to disable filter"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Max</label>
+                            <input
+                                type="number"
+                                value={smaPeriodMax}
+                                onChange={(e) => setSmaPeriodMax(e.target.value)}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Step</label>
+                            <input
+                                type="number"
+                                value={smaPeriodStep}
+                                onChange={(e) => setSmaPeriodStep(e.target.value)}
+                                min="1"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            />
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                        Set Min=-1, Max=-1 to disable filter. Use positive values (e.g. Min=200, Max=200) to enable.
+                    </p>
+                </div>
+
                 {/* Stop Loss Range */}
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between mb-3">
@@ -1067,7 +1119,7 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
             </div>
 
             <OptimizationResults results={results} onSave={handleSaveResults} startDate={startDate} endDate={endDate} />
-        </div>
+        </div >
     );
 };
 
