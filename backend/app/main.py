@@ -109,6 +109,8 @@ class BacktestRequest(BaseModel):
     momentum_lookback_days: int = 30 # Lookback period for momentum strategy
     filter_negative_momentum: bool = False # If True, skip tickers with negative momentum
     sma_period: int = -1
+    sell_on_profit_enabled: bool = False
+    sell_on_profit_threshold_pct: Optional[float] = None
 
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
@@ -141,7 +143,9 @@ def run_backtest_endpoint(request: BacktestRequest):
             request.capital_gains_tax_enabled,
             request.capital_gains_tax_pct,
             request.margin_enabled,
-            request.sizing_method
+            request.sizing_method,
+            request.sell_on_profit_enabled,
+            request.sell_on_profit_threshold_pct
         )
         metrics = calculate_metrics(portfolio)
         return metrics
