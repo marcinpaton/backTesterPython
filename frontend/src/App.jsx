@@ -5,12 +5,13 @@ import ResultsDashboard from './components/ResultsDashboard';
 import OptimizationView from './components/OptimizationView';
 import OptimizationAnalysisPage from './components/OptimizationAnalysisPage';
 import MomentumScanner from './components/MomentumScanner';
+import PortfolioView from './components/PortfolioView';
 
 function App() {
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [currentView, setCurrentView] = useState('momentum_scanner'); // 'dashboard', 'optimization', 'analysis', 'momentum_scanner'
+  const [currentView, setCurrentView] = useState('portfolio'); // 'portfolio', 'dashboard', 'optimization', 'analysis', 'momentum_scanner'
 
   const handleDownload = async (params) => {
     setIsLoading(true);
@@ -164,54 +165,30 @@ function App() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Investment Strategy Backtester 🙂</h1>
           <div className="flex gap-2">
-            {currentView === 'momentum_scanner' && (
-              <>
-                <button
-                  onClick={() => setCurrentView('dashboard')}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold"
-                >
-                  Backtest Dashboard
-                </button>
-                <button
-                  onClick={() => setCurrentView('optimization')}
-                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition font-semibold"
-                >
-                  Optimization
-                </button>
-              </>
-            )}
-
-            {currentView === 'dashboard' && (
-              <>
-                <button
-                  onClick={() => setCurrentView('momentum_scanner')}
-                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-semibold"
-                >
-                  Momentum Scanner
-                </button>
-                <button
-                  onClick={() => setCurrentView('analysis')}
-                  className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition font-semibold"
-                >
-                  Analysis
-                </button>
-                <button
-                  onClick={() => setCurrentView('optimization')}
-                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition font-semibold"
-                >
-                  Optimization
-                </button>
-              </>
-            )}
-
-            {currentView === 'optimization' && (
-              <button
-                onClick={() => setCurrentView('momentum_scanner')}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-semibold"
-              >
-                Momentum Scanner
-              </button>
-            )}
+            <button
+              onClick={() => setCurrentView('portfolio')}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'portfolio' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            >
+              Portfolio
+            </button>
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+            >
+              Backtest
+            </button>
+            <button
+              onClick={() => setCurrentView('momentum_scanner')}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'momentum_scanner' ? 'bg-green-600 text-white' : 'bg-green-500 text-white hover:bg-green-600'}`}
+            >
+              Scanner
+            </button>
+            <button
+              onClick={() => setCurrentView('optimization')}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'optimization' ? 'bg-purple-600 text-white' : 'bg-purple-500 text-white hover:bg-purple-600'}`}
+            >
+              Optimization
+            </button>
           </div>
         </div>
 
@@ -222,7 +199,9 @@ function App() {
           </div>
         )}
 
-        {currentView === 'dashboard' ? (
+        {currentView === 'portfolio' ? (
+          <PortfolioView />
+        ) : currentView === 'dashboard' ? (
           <>
             <ConfigurationForm
               onDownloadData={handleDownload}
@@ -232,12 +211,6 @@ function App() {
             />
             <ResultsDashboard results={results} />
           </>
-        ) : currentView === 'analysis' ? (
-          <OptimizationAnalysisPage
-            results={results}
-            onLoadResults={setResults} // Allow loading results directly here
-            onBack={() => setCurrentView('dashboard')}
-          />
         ) : currentView === 'analysis' ? (
           <OptimizationAnalysisPage
             results={results}

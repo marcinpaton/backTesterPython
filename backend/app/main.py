@@ -4,15 +4,68 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, List, Any
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from app.data_loader import download_data, load_data
+from app.data_loader import download_data, load_data, DATA_DIR
 import uvicorn
 import os
 import json
 import asyncio
+import uuid
+import pandas as pd
 from queue import Queue
 from datetime import datetime
 
 app = FastAPI()
+
+TRANSACTIONS_FILE = os.path.join(DATA_DIR, "transactions.csv")
+
+class Transaction(BaseModel):
+    id: str
+    date: str # ISO format YYYY-MM-DD HH:MM
+    type: str # 'DEPOSIT', 'BUY', 'SELL'
+    
+    # Deposit specific
+    amount_pln: Optional[float] = None
+    
+    # Buy/Sell specific
+    ticker: Optional[str] = None
+    quantity: Optional[float] = None
+    price: Optional[float] = None # Price in PLN
+    fee_pln: Optional[float] = 0.0
+
+class TransactionList(BaseModel):
+    transactions: List[Transaction]
+
+@app.get("/api/portfolio/transactions")
+def get_transactions():
+    if not os.path.exists(TRANSACTIONS_FILE):
+        return []
+    
+    try:
+        df = pd.read_csv(TRANSACTIONS_FILE)
+        # Convert NaN to None/null for JSON compatibility
+        records = df.replace({pd.NA: None, float('nan'): None}).to_dict(orient='records')
+        return records
+    except Exception as e:
+        print(f"Error reading transactions: {e}")
+        return []
+
+@app.post("/api/portfolio/transactions")
+def save_transactions(request: TransactionList):
+    try:
+        data = [t.dict() for t in request.transactions]
+        df = pd.DataFrame(data)
+        
+        # Ensure directory exists (DATA_DIR is from data_loader)
+        if not os.path.exists(DATA_DIR):
+            os.makedirs(DATA_DIR)
+            
+        df.to_csv(TRANSACTIONS_FILE, index=False)
+        return {"message": "Transactions saved successfully", "count": len(data)}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 app.add_middleware(
     CORSMiddleware,
