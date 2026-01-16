@@ -38,6 +38,53 @@ def download_data(tickers: list[str], start_date: str, end_date: str):
     
     return {"message": "Data downloaded successfully", "path": DATA_FILE}
 
+CURRENCY_DATA_FILE = os.path.join(DATA_DIR, "currency_prices.csv")
+
+def download_currency_rates():
+    """
+    Downloads currency exchange rates for PLN/USD, PLN/EUR, PLN/GBP logic.
+    Downloads both directions to be safe: USDPLN=X, EURPLN=X, GBPPLN=X (Foreign to PLN)
+    and PLNUSD=X, PLNEUR=X, PLNGBP=X (PLN to Foreign).
+    Start Date: 2001-01-01
+    End Date: Today
+    """
+    tickers = ['USDPLN=X', 'EURPLN=X', 'GBPPLN=X', 'PLNUSD=X', 'PLNEUR=X', 'PLNGBP=X']
+    start_date = "2001-01-01"
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    
+    print(f"Downloading currency rates for {tickers} from {start_date} to today...")
+    
+    print(f"Downloading currency rates for {tickers} from {start_date} to today...")
+    
+    try:
+        # Download data (default group_by is 'column', so we have (Price, Ticker) structure usually)
+        # We want to extract just the 'Close' prices
+        data = yf.download(tickers, start=start_date, end=end_date, progress=False)
+        
+        # Check if 'Close' is in columns (standard yfinance structure for multiple tickers)
+        if 'Close' in data.columns:
+            data = data['Close']
+        elif isinstance(data.columns, pd.MultiIndex):
+            # If confusing structure, try to find Close level? 
+            # With default yf.download and multiple tickers, data['Close'] returns a DF with tickers as columns
+            pass
+            
+        # If single ticker (unlikely given list), it might be flat with 'Close' column
+        # But we list multiple, so it should be fine.
+        
+        # Sort columns
+        data = data.sort_index(axis=1)
+        
+        # Round
+        data = data.round(6)
+        
+        data.to_csv(CURRENCY_DATA_FILE)
+        print(f"Currency data (Close only) saved to {CURRENCY_DATA_FILE}")
+        return True
+    except Exception as e:
+        print(f"Error downloading currency rates: {e}")
+        return False
+
 def load_data():
     """
     Loads the locally saved data with caching.
