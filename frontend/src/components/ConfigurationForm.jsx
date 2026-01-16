@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialValues }) => {
   const [tickers, setTickers] = useState(
-    initialValues?.tickers?.join(', ') || 'CIEN, WDC, MU, FRES.L, ABX.TO, TER, CLS.TO, PAAS.TO, AU, ANTO.L, ANGPY, GOOG, FIX, EVN.AX, FSLR, NST.AX, DELTA.BK, FN, AEM.TO, AMD, CRDO, SHOP.TO, PRY.MI, UCBJY, UCB.BR, APH, WPM.L, WPM.TO, ASML, FNV.TO, KLAC, VRT, MNST, IDXX, AVGO, BWXT, STLD, PLTR, KEYS, WWD, MPWR, ANET, PSTG, RYCEY, RR.L, FLEX, ARZGY, 1177.HK, HWM, CRS, NVDA, DLTR, GD, ADI, ISRG, ULS, EME, SAAB-B.ST, FCX, FUTU, AV.L, AVVIY, SCHW, AIR.PA, EADSY, CBOE, CTRA, MA, AMZN, MET, RJF, V, PKG, ADBE, ADYEY, ARM, ASM.AS, ASMIY, AXON, BLK, BSX, CDNS, DXCM, FAST, FTNT, GWRE, IFNNY, IFX.DE, INTU, LNSTY, META, NOW, NSIS-B.CO, NVZMY, PGHN.SW, PINS, RHM.DE, RMD, RMD.AX, SAP, SAP.DE, SMCI, SPOT, SYK, TOST, TT, TW, VEEV, WDAY, GEV');
+    initialValues?.tickers?.join(', ') || '');
   const [startDate, setStartDate] = useState(initialValues?.start_date || '2020-01-01');
   const [endDate, setEndDate] = useState(initialValues?.end_date || '2025-11-15');
   const [nTickers, setNTickers] = useState(initialValues?.n_tickers || 7);
@@ -26,6 +26,20 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
   const [momentumLookbackDays, setMomentumLookbackDays] = useState(initialValues?.momentum_lookback_days || 30);
   const [filterNegativeMomentum, setFilterNegativeMomentum] = useState(initialValues?.filter_negative_momentum || false);
   const [smaPeriod, setSmaPeriod] = useState(initialValues?.sma_period !== undefined ? initialValues.sma_period : -1);
+
+  // Fetch default tickers if not provided in initialValues
+  useEffect(() => {
+    if (!initialValues?.tickers) {
+      fetch('http://127.0.0.1:8000/api/tickers')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            setTickers(data.join(', '));
+          }
+        })
+        .catch(err => console.error("Failed to fetch tickers:", err));
+    }
+  }, [initialValues]);
 
   // Effect to update state if initialValues changes (e.g., when navigation happens)
   useEffect(() => {

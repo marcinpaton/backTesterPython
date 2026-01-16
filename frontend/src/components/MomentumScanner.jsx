@@ -2,10 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 
 const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
-    // Default tickers as requested (same as ConfigurationForm defaults)
-    const [tickers, setTickers] = useState(
-        'CIEN WDC MU FRES.L ABX.TO TER CLS.TO PAAS.TO AU ANTO.L ANGPY GOOG FIX EVN.AX FSLR NST.AX DELTA.BK FN AEM.TO AMD CRDO SHOP.TO PRY.MI UCBJY UCB.BR APH WPM.L WPM.TO ASML FNV.TO KLAC VRT MNST IDXX AVGO BWXT STLD PLTR KEYS WWD MPWR ANET PSTG RYCEY RR.L FLEX ARZGY 1177.HK HWM CRS NVDA DLTR GD ADI ISRG ULS EME SAAB-B.ST FCX FUTU AV.L AVVIY SCHW AIR.PA EADSY CBOE CTRA MA AMZN MET RJF V PKG ADBE ADYEY ARM ASM.AS ASMIY AXON BLK BSX CDNS DXCM FAST FTNT GWRE IFNNY IFX.DE INTU LNSTY META NOW NSIS-B.CO NVZMY PGHN.SW PINS RHM.DE RMD RMD.AX SAP SAP.DE SMCI SPOT SYK TOST TT TW VEEV WDAY GEV'
-    );
+    // Default tickers will be fetched from server
+    const [tickers, setTickers] = useState('');
 
     // Date states
     // Default analysis date to today
@@ -19,6 +17,19 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     const [lookbackDays, setLookbackDays] = useState(120);
     const [nBestTickers, setNBestTickers] = useState(5);
     const [smaPeriod, setSmaPeriod] = useState(-1);
+
+    React.useEffect(() => {
+        fetch('http://127.0.0.1:8000/api/tickers')
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data) && data.length > 0) {
+                    setTickers(data.join(' ')); // Space separated for scanner typically? 
+                    // Actually scanner handles both comma and whitespace in logic. 
+                    // Let's use space to be consistent with previous default visual.
+                }
+            })
+            .catch(err => console.error("Failed to fetch tickers:", err));
+    }, []);
 
     // Results state
     const [results, setResults] = useState(null);

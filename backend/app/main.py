@@ -18,6 +18,7 @@ from datetime import datetime
 app = FastAPI()
 
 TRANSACTIONS_FILE = os.path.join(DATA_DIR, "transactions.csv")
+TICKERS_FILE = os.path.join(DATA_DIR, "tickers.csv")
 
 class Transaction(BaseModel):
     id: str
@@ -88,8 +89,24 @@ def get_transactions():
         records = df.replace({pd.NA: None, float('nan'): None}).to_dict(orient='records')
         return records
     except Exception as e:
+        return records
+    except Exception as e:
         print(f"Error reading transactions: {e}")
         return []
+
+@app.get("/api/tickers")
+def get_tickers():
+    if not os.path.exists(TICKERS_FILE):
+        return []
+    
+    try:
+        # Read lines, strip whitespace
+        with open(TICKERS_FILE, 'r') as f:
+            tickers = [line.strip() for line in f if line.strip()]
+        return tickers
+    except Exception as e:
+        print(f"Error reading tickers: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/portfolio/transactions")
 def save_transactions(request: TransactionList):
