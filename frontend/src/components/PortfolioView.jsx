@@ -50,10 +50,10 @@ const PortfolioView = ({ onBack }) => {
         }
     };
 
-    const handleSaveToServer = async () => {
+    const handleSaveToServer = async (currentTransactions = transactions) => {
         setIsLoading(true);
         try {
-            await axios.post('http://127.0.0.1:8000/api/portfolio/transactions', { transactions });
+            await axios.post('http://127.0.0.1:8000/api/portfolio/transactions', { transactions: currentTransactions });
             alert('Transactions saved successfully!');
             fetchPerformance(); // Refresh analysis
         } catch (err) {
@@ -97,7 +97,9 @@ const PortfolioView = ({ onBack }) => {
 
     const handleDeleteClick = (id) => {
         if (window.confirm('Are you sure you want to delete this transaction?')) {
-            setTransactions(transactions.filter(t => t.id !== id));
+            const updatedList = transactions.filter(t => t.id !== id);
+            setTransactions(updatedList);
+            handleSaveToServer(updatedList);
         }
     };
 
@@ -112,6 +114,7 @@ const PortfolioView = ({ onBack }) => {
 
         setTransactions(updatedList);
         setIsModalOpen(false);
+        handleSaveToServer(updatedList);
     };
 
     const handleDownloadAllPrices = async () => {
@@ -179,12 +182,7 @@ const PortfolioView = ({ onBack }) => {
                     >
                         Download Prices
                     </button>
-                    <button
-                        onClick={handleSaveToServer}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                    >
-                        Save Changes
-                    </button>
+
                 </div>
             </div>
 
