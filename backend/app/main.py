@@ -5,6 +5,7 @@ from typing import Optional, List, Any
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.data_loader import download_data, load_data, DATA_DIR
+from app.portfolio_replayer import PortfolioReplayer
 import uvicorn
 import os
 import json
@@ -34,6 +35,47 @@ class Transaction(BaseModel):
 
 class TransactionList(BaseModel):
     transactions: List[Transaction]
+
+@app.get("/api/portfolio/performance")
+def get_portfolio_performance():
+    if not os.path.exists(TRANSACTIONS_FILE):
+        print("Performance Debug: Transaction file not found.")
+        return {}
+        
+    try:
+        # Load transactions
+        tx_df = pd.read_csv(TRANSACTIONS_FILE)
+        transactions = tx_df.replace({pd.NA: None, float('nan'): None}).to_dict(orient='records')
+        print(f"Performance Debug: Loaded {len(transactions)} transactions.")
+        
+        if not transactions:
+            print("Performance Debug: No transactions.")
+            return {}
+            
+        # Load Price Data
+        price_df = load_data()
+        if price_df is None or price_df.empty:
+             print("Performance Debug: Price data is empty or None.")
+             return {"error": "No price data available. Please download data first."}
+        
+        print(f"Performance Debug: Price data shape: {price_df.shape}")
+        
+        # Calculate Logic using Replayer
+        replayer = PortfolioReplayer(transactions, price_df)
+        results = replayer.calculate_history()
+        
+        if results is None:
+            print("Performance Debug: Replayer returned None.")
+            return {}
+            
+        print("Performance Debug: Success.")
+        return results
+
+    except Exception as e:
+        print(f"Error calculating performance: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/portfolio/transactions")
 def get_transactions():

@@ -3,9 +3,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
+import PortfolioChart from './PortfolioChart';
+
 const PortfolioView = ({ onBack }) => {
     const [transactions, setTransactions] = useState([]);
+    const [performanceData, setPerformanceData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [performanceLoading, setPerformanceLoading] = useState(false);
     const [error, setError] = useState(null);
 
     // Modal state
@@ -14,7 +18,22 @@ const PortfolioView = ({ onBack }) => {
 
     useEffect(() => {
         fetchTransactions();
+        fetchPerformance();
     }, []);
+
+    const fetchPerformance = async () => {
+        setPerformanceLoading(true);
+        try {
+            const response = await axios.get('http://127.0.0.1:8000/api/portfolio/performance');
+            if (response.data && response.data.history) {
+                setPerformanceData(response.data);
+            }
+        } catch (err) {
+            console.error("Failed to load performance", err);
+        } finally {
+            setPerformanceLoading(false);
+        }
+    };
 
     const fetchTransactions = async () => {
         setIsLoading(true);
@@ -36,6 +55,7 @@ const PortfolioView = ({ onBack }) => {
         try {
             await axios.post('http://127.0.0.1:8000/api/portfolio/transactions', { transactions });
             alert('Transactions saved successfully!');
+            fetchPerformance(); // Refresh analysis
         } catch (err) {
             setError('Failed to save transactions');
             alert('Error saving transactions');
@@ -193,6 +213,16 @@ const PortfolioView = ({ onBack }) => {
                     onClose={() => setIsModalOpen(false)}
                 />
             )}
+
+            <div className="mt-8 border-t pt-8">
+                <h3 className="text-xl font-bold mb-4">Performance Analysis</h3>
+                {performanceLoading && <p>Loading performance...</p>}
+                {!performanceLoading && performanceData ? (
+                    <PortfolioChart data={performanceData.history} />
+                ) : (
+                    !performanceLoading && <p className="text-gray-500">Add transactions and ensure data is downloaded to see performance metrics.</p>
+                )}
+            </div>
         </div>
     );
 };
