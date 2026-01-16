@@ -27,6 +27,7 @@ class Transaction(BaseModel):
     
     # Deposit specific
     amount_pln: Optional[float] = None
+    currency: str = 'PLN' # 'USD', 'GBP', 'EUR', 'PLN'
     
     # Buy/Sell specific
     ticker: Optional[str] = None

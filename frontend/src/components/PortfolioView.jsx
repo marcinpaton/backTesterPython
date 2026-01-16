@@ -81,6 +81,7 @@ const PortfolioView = ({ onBack }) => {
             date: toLocalISOString(new Date()), // Use local time
             type: initialType,
             amount_pln: '',
+            currency: initialType === 'DEPOSIT' ? 'PLN' : 'USD',
             ticker: '',
             quantity: '',
             price: '',
@@ -218,20 +219,23 @@ const PortfolioView = ({ onBack }) => {
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-500">
                                     {t.type === 'DEPOSIT' && (
-                                        <span>Deposit: <b>{t.amount_pln} PLN</b></span>
+                                        <span>Deposit: <b>{t.amount_pln} {t.currency || 'PLN'}</b></span>
                                     )}
                                     {(t.type === 'BUY' || t.type === 'SELL') && (
                                         <div className="flex flex-col">
                                             <span className="font-medium text-gray-900">{t.ticker}</span>
                                             <span>{t.quantity} x {t.price} PLN</span>
                                             <span className="text-xs text-gray-400">Fee: {t.fee_pln} PLN</span>
+                                            {t.currency && t.currency !== 'PLN' && (
+                                                <span className="text-xs font-bold text-gray-500">Asset Currency: {t.currency}</span>
+                                            )}
                                         </div>
                                     )}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                                    {/* Estimate Value in PLN */}
-                                    {t.type === 'DEPOSIT' ? t.amount_pln :
-                                        (t.quantity * t.price).toFixed(2) + ' PLN'}
+                                    {/* Display Value in PLN */}
+                                    {t.type === 'DEPOSIT' ? `${t.amount_pln} PLN` :
+                                        `${(t.quantity * t.price).toFixed(2)} PLN`}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <button onClick={() => handleEditClick(t)} className="text-indigo-600 hover:text-indigo-900 mr-4">Edit</button>
@@ -274,8 +278,14 @@ const TransactionModal = ({ transaction, onSave, onClose }) => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        // Auto convert numbers if needed? For now string is fine as input
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData(prev => {
+            const newData = { ...prev, [name]: value };
+            // If switching to DEPOSIT, force currency to PLN
+            if (name === 'type' && value === 'DEPOSIT') {
+                newData.currency = 'PLN';
+            }
+            return newData;
+        });
     };
 
     const handleSubmit = (e) => {
@@ -283,6 +293,7 @@ const TransactionModal = ({ transaction, onSave, onClose }) => {
         // Basic validation/conversion
         const processed = {
             ...formData,
+            currency: formData.currency || 'PLN',
             amount_pln: formData.amount_pln ? parseFloat(formData.amount_pln) : null,
             quantity: formData.quantity ? parseFloat(formData.quantity) : null,
             price: formData.price ? parseFloat(formData.price) : null,
@@ -296,18 +307,36 @@ const TransactionModal = ({ transaction, onSave, onClose }) => {
             <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
                 <h3 className="text-xl font-bold mb-4">{transaction.id ? 'Edit' : 'Add'} Transaction</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Type</label>
-                        <select
-                            name="type"
-                            value={formData.type}
-                            onChange={handleChange}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                        >
-                            <option value="DEPOSIT">Deposit Account</option>
-                            <option value="BUY">Buy Shares</option>
-                            <option value="SELL">Sell Shares</option>
-                        </select>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className={formData.type === 'DEPOSIT' ? "col-span-2" : ""}>
+                            <label className="block text-sm font-medium text-gray-700">Type</label>
+                            <select
+                                name="type"
+                                value={formData.type}
+                                onChange={handleChange}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            >
+                                <option value="DEPOSIT">Deposit Account</option>
+                                <option value="BUY">Buy Shares</option>
+                                <option value="SELL">Sell Shares</option>
+                            </select>
+                        </div>
+                        {formData.type !== 'DEPOSIT' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Currency</label>
+                                <select
+                                    name="currency"
+                                    value={formData.currency}
+                                    onChange={handleChange}
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 font-bold"
+                                >
+                                    <option value="PLN">PLN</option>
+                                    <option value="USD">USD</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="GBP">GBP</option>
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -364,7 +393,7 @@ const TransactionModal = ({ transaction, onSave, onClose }) => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Price (per share)</label>
+                                    <label className="block text-sm font-medium text-gray-700">Price (PLN)</label>
                                     <input
                                         type="number"
                                         step="any"
