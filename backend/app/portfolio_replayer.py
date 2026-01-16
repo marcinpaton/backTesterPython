@@ -3,9 +3,10 @@ import numpy as np
 from datetime import datetime
 
 class PortfolioReplayer:
-    def __init__(self, transactions: list, price_data: pd.DataFrame):
+    def __init__(self, transactions: list, price_data: pd.DataFrame, currency_data: pd.DataFrame = None):
         self.transactions = transactions
         self.price_data = price_data
+        self.currency_data = currency_data
         self.history = []
         
     def calculate_history(self):
@@ -18,19 +19,17 @@ class PortfolioReplayer:
             return None
             
         start_date = pd.to_datetime(sorted_tx[0]['date']).normalize()
-        tx_end_date = pd.to_datetime(sorted_tx[-1]['date']).normalize()
+        # Limit simulation to available price data
         price_end_date = self.price_data.index.max()
-        
-        # Limit simulation strictly to available price data as requested
         end_date = price_end_date
         
         if start_date > end_date:
-            # All transactions are in the future relative to data
             return None
         
         # 2. Initialize state
         cash = 0.0
-        holdings = {} # {ticker: quantity}
+        # Holdings: {ticker: {'qty': float, 'currency': str}}
+        holdings = {} 
         
         tx_by_date = {}
         for t in sorted_tx:
@@ -43,156 +42,132 @@ class PortfolioReplayer:
         
         full_date_range = pd.date_range(start=start_date, end=end_date, freq='D')
         
-        # Initialize last known prices efficiently
-        # If start_date > price_end_date, we need the VERY LAST prices from data
-        # If start_date is within range, we just start empty and fill as we go?
-        # Better: Get the row at or before start_date.
-        last_known_prices = {} 
-        
-        # Find latest index <= start_date (or just last index if start > last)
-        init_price_idx = self.price_data.index.asof(start_date)
-        if pd.isna(init_price_idx):
-             # start_date is before ANY data.
-             # If start_date is after all data? asof returns last index.
-             # Wait, asof returns NaN if label is before first index.
-             # If label is after last index, it returns last index.
-             pass
-        else:
-            # Initialize with prices at that date
-            try:
-                # Handle MultiIndex vs Single
-                row = self.price_data.loc[init_price_idx]
-                # If MultiIndex with (Ticker, OHLCV) or (OHLCV, Ticker)
-                # We assume we can iterate.
-                # Simplest hack: iterate columns.
-                # But let's stick to the structure we observed or loop during day.
-                # Actually, strictly speaking, we can just rely on the loop updating prices 
-                # IF the loop covers the price_data.
-                # But if start_date > price_end_date, the loop (start..end) will NOT cover any price_data indices.
-                # So we must pre-fill.
-                pass
-            except Exception:
-                pass
-
-        # We need a function to extract prices from a row regardless of schema
+        # Helper to get price from row
         def get_prices_from_row(row):
             p = {}
-            # Check if MultiIndex
             if isinstance(self.price_data.columns, pd.MultiIndex):
-                # Try (Ticker, 'Close')
                 for col in self.price_data.columns:
-                    # col is (Ticker, Type) or (Type, Ticker)
-                    # We don't know order.
-                    # Usually yfinance is (Attrib, Ticker) or (Ticker, Attrib) depending on version/args.
-                    # data_loader uses group_by='ticker' -> (Ticker, Attrib).
-                    # check col[1] == 'Close'
                     if len(col) == 2:
                         if col[1] == 'Close':
                              p[col[0]] = row[col]
                         elif col[0] == 'Close':
                              p[col[1]] = row[col]
             else:
-                # Flat columns? maybe just Ticker names (if just Close prices)
-                # But data_loader suggests all OHLCV.
+                # If flat CSV (e.g. minimal download), assume columns are tickers
+                # But data_loader usually standardizes to MultiIndex if multiple, or we need to be careful.
+                # Assuming safe dictionary usage
                 pass
             return p
 
-        # Pre-fill if we are starting late
+        # Helper to get currency rate
+        def get_exchange_rate(target_currency, date_idx):
+            if target_currency == 'PLN':
+                return 1.0
+            
+            if self.currency_data is None:
+                # Fallback if no currency data: assume 1:1 or error? 
+                # User asked to use currency data. If missing, 1.0 is safest fallback to avoid crash
+                return 1.0
+                
+            # Try to start from 'current_date' or last available
+            # We want Rate(Foreign -> PLN). e.g. USDPLN=X
+            ticker = f"{target_currency}PLN=X"
+            
+            # Check availability
+            # We need to find the specific rate for this date
+            # Optimization: could cache "last known rates" globally in the loop
+            pass # logic moved to loop for efficiency
+            return 1.0
+
+        last_known_prices = {} 
+        last_known_rates = {} # {currency: rate_to_PLN}
+
+        # Pre-fill prices/rates if starting late (rare)
         if start_date > price_end_date:
-             last_row = self.price_data.iloc[-1]
-             last_known_prices = get_prices_from_row(last_row)
+             # Should not happen due to check above
+             pass
         
         for current_date in full_date_range:
-            # 1. Update prices if available (Trading Day)
+            # 1. Update Prices
             if current_date in self.price_data.index:
                 row = self.price_data.loc[current_date]
-                # Update last known prices with current day prices
                 current_prices = get_prices_from_row(row)
-                # Only update if valid (not NaN)
                 for t, p in current_prices.items():
                    if pd.notna(p):
                        last_known_prices[t] = p
             
-            # To get prices efficiently, let's look at the price_data row
-            # We need to withstand potential missing data
+            # 2. Update Rates
+            if self.currency_data is not None and current_date in self.currency_data.index:
+                curr_row = self.currency_data.loc[current_date]
+                # curr_row is Series with Tickers as index (USDPLN=X, etc.)
+                for ticker, rate in curr_row.items():
+                    if pd.notna(rate):
+                        # Extract currency code: USDPLN=X -> USD
+                        if 'PLN=X' in ticker:
+                            code = ticker.replace('PLN=X', '')
+                            last_known_rates[code] = rate
+                        # Handle potential inverses if ever needed (not requested but robust)
             
-            # 2. Apply Transactions
-            # We apply them at the START of the day (or end, doesn't matter much for daily resolution, usually start or mixed)
+            # 3. Apply Transactions
             if current_date in tx_by_date:
                 for tx in tx_by_date[current_date]:
                     t_type = tx.get('type')
                     t_amount = tx.get('amount_pln')
-                    
-                    # Convert None to 0
                     t_qty = tx.get('quantity') or 0.0
-                    t_price = tx.get('price') or 0.0 # Price in PLN (entered by user)
+                    t_price = tx.get('price') or 0.0 # Price in PLN (as per updated UI)
                     t_fee = tx.get('fee_pln') or 0.0
                     t_ticker = tx.get('ticker')
+                    t_currency = tx.get('currency') or 'PLN' # Asset currency
                     
                     if t_type == 'DEPOSIT':
                         cash += (t_amount or 0.0)
                     elif t_type == 'BUY':
+                        # cost is in PLN
                         cost = (t_qty * t_price) + t_fee
                         cash -= cost
                         
-                        # Calculate implicit ratio to handle currency/unit differences
-                        # ratio = price_paid_PLN / price_in_csv
-                        # If we have no CSV price, assume 1.0 (best effort)
-                        csv_price = last_known_prices.get(t_ticker)
-                        ratio = 1.0
-                        if csv_price and csv_price > 0:
-                            ratio = t_price / csv_price
-                        
                         if t_ticker not in holdings:
-                            holdings[t_ticker] = {'raw_qty': 0.0, 'normalized_qty': 0.0}
-                            
-                        holdings[t_ticker]['raw_qty'] += t_qty
-                        holdings[t_ticker]['normalized_qty'] += (t_qty * ratio)
+                            holdings[t_ticker] = {'qty': 0.0, 'currency': t_currency}
+                        
+                        holdings[t_ticker]['qty'] += t_qty
+                        # Update currency if changed? Usually consistent.
+                        holdings[t_ticker]['currency'] = t_currency
                         
                     elif t_type == 'SELL':
+                        # revenue in PLN
                         revenue = (t_qty * t_price)
                         cash += (revenue - t_fee)
                         
                         if t_ticker in holdings:
-                            # Reduce proportionally
-                            current_raw = holdings[t_ticker]['raw_qty']
-                            if current_raw > 0:
-                                fraction = t_qty / current_raw
-                                # Cap at 1.0 to avoid precision errors
-                                fraction = min(fraction, 1.0)
-                                
-                                holdings[t_ticker]['raw_qty'] -= t_qty
-                                holdings[t_ticker]['normalized_qty'] -= (holdings[t_ticker]['normalized_qty'] * fraction)
-                                
-                                if holdings[t_ticker]['raw_qty'] <= 1e-9:
-                                    del holdings[t_ticker]
-                            else:
-                                del holdings[t_ticker] # Should not happen
+                            holdings[t_ticker]['qty'] -= t_qty
+                            if holdings[t_ticker]['qty'] <= 1e-9:
+                                del holdings[t_ticker]
 
-            # 3. Calculate Valuation
-            # We need price for each holding.
-            # If current_date is in price_data, update last_known_prices
-            # 1. Update prices if available (Trading Day)
-            if current_date in self.price_data.index:
-                row = self.price_data.loc[current_date]
-                # Update last known prices with current day prices
-                current_prices = get_prices_from_row(row)
-                # Only update if valid (not NaN)
-                for t, p in current_prices.items():
-                   if pd.notna(p):
-                       last_known_prices[t] = p
-            
+            # 4. Calculate Valuation
             holdings_value = 0.0
+            
             for ticker, data in holdings.items():
-                price = last_known_prices.get(ticker, 0.0)
-                # Value = normalized_qty (which represents "units of CSV price") * CSV price
-                holdings_value += data['normalized_qty'] * price
+                qty = data['qty']
+                asset_currency = data['currency']
+                
+                # Get raw price from CSV (in likely Asset Currency)
+                raw_price = last_known_prices.get(ticker, 0.0)
+                
+                # Handle GBP/GBp difference
+                # LSE stocks (GBP) are quoted in pence by yfinance, but we need Pounds for the Rate
+                if asset_currency == 'GBP':
+                    raw_price = raw_price / 100.0
+                
+                # Get Exchange Rate
+                rate = 1.0
+                if asset_currency != 'PLN':
+                    rate = last_known_rates.get(asset_currency, 1.0)
+                    
+                # Value in PLN = Qty * Price(Asset) * Rate(Asset->PLN)
+                val = qty * raw_price * rate
+                holdings_value += val
                 
             total_value = cash + holdings_value
-            
-            # Only record history if we actually have data (usually trading days)
-            # Or record every day? Recharts handles gaps nicely or requires continuous data.
-            # Let's record daily to show flat lines on weekends.
             
             history_records.append({
                 "date": current_date,

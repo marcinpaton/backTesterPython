@@ -60,10 +60,22 @@ def get_portfolio_performance():
              print("Performance Debug: Price data is empty or None.")
              return {"error": "No price data available. Please download data first."}
         
+        # Load Currency Data
+        currency_df = None
+        from app.data_loader import CURRENCY_DATA_FILE
+        if os.path.exists(CURRENCY_DATA_FILE):
+            try:
+                currency_df = pd.read_csv(CURRENCY_DATA_FILE, parse_dates=True, index_col=0)
+                # Ensure index is datetime
+                if not isinstance(currency_df.index, pd.DatetimeIndex):
+                    currency_df.index = pd.to_datetime(currency_df.index)
+            except Exception as e:
+                print(f"Performance Debug: Failed to load currency data: {e}")
+        
         print(f"Performance Debug: Price data shape: {price_df.shape}")
         
         # Calculate Logic using Replayer
-        replayer = PortfolioReplayer(transactions, price_df)
+        replayer = PortfolioReplayer(transactions, price_df, currency_df)
         results = replayer.calculate_history()
         
         if results is None:
