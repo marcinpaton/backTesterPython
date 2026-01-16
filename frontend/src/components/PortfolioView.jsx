@@ -113,6 +113,41 @@ const PortfolioView = ({ onBack }) => {
         setIsModalOpen(false);
     };
 
+    const handleDownloadAllPrices = async () => {
+        setIsLoading(true);
+        try {
+            // 1. Fetch all tickers from backend
+            const response = await fetch('http://127.0.0.1:8000/api/tickers');
+            if (!response.ok) {
+                throw new Error('Failed to fetch ticker list');
+            }
+            const tickers = await response.json();
+
+            if (!Array.isArray(tickers) || tickers.length === 0) {
+                alert('No tickers found in tickers.csv');
+                setIsLoading(false);
+                return;
+            }
+
+            // 2. Trigger download
+            const today = new Date().toISOString().split('T')[0];
+            await axios.post('http://127.0.0.1:8000/api/download', {
+                tickers: tickers,
+                start_date: '2001-01-01',
+                end_date: today
+            });
+
+            alert(`Prices downloaded successfully for ${tickers.length} tickers.`);
+            fetchPerformance(); // Refresh analysis
+        } catch (err) {
+            setError('Failed to download prices');
+            console.error(err);
+            alert('Error downloading prices: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="bg-white shadow-md rounded-lg p-6">
             <div className="flex justify-between items-center mb-6">
@@ -135,6 +170,13 @@ const PortfolioView = ({ onBack }) => {
                         className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
                     >
                         + Sell
+                    </button>
+                    <button
+                        onClick={handleDownloadAllPrices}
+                        className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded"
+                        title="Download prices for ALL tickers in tickers.csv"
+                    >
+                        Download Prices
                     </button>
                     <button
                         onClick={handleSaveToServer}
