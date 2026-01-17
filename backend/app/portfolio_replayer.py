@@ -87,7 +87,12 @@ class PortfolioReplayer:
              # Should not happen due to check above
              pass
         
+        last_month = None
+        month_start_value = 0.0
+        prev_total_value = 0.0
+        
         for current_date in full_date_range:
+            # ... (Prices and Rates updates remain same) ...
             # 1. Update Prices
             if current_date in self.price_data.index:
                 row = self.price_data.loc[current_date]
@@ -99,45 +104,36 @@ class PortfolioReplayer:
             # 2. Update Rates
             if self.currency_data is not None and current_date in self.currency_data.index:
                 curr_row = self.currency_data.loc[current_date]
-                # curr_row is Series with Tickers as index (USDPLN=X, etc.)
                 for ticker, rate in curr_row.items():
                     if pd.notna(rate):
-                        # Extract currency code: USDPLN=X -> USD
                         if 'PLN=X' in ticker:
                             code = ticker.replace('PLN=X', '')
                             last_known_rates[code] = rate
-                        # Handle potential inverses if ever needed (not requested but robust)
-            
+
             # 3. Apply Transactions
             if current_date in tx_by_date:
+                # ... (Transaction logic remains same) ...
                 for tx in tx_by_date[current_date]:
                     t_type = tx.get('type')
                     t_amount = tx.get('amount_pln')
                     t_qty = tx.get('quantity') or 0.0
-                    t_price = tx.get('price') or 0.0 # Price in PLN (as per updated UI)
+                    t_price = tx.get('price') or 0.0 
                     t_fee = tx.get('fee_pln') or 0.0
                     t_ticker = tx.get('ticker')
-                    t_currency = tx.get('currency') or 'PLN' # Asset currency
+                    t_currency = tx.get('currency') or 'PLN' 
                     
                     if t_type == 'DEPOSIT':
                         cash += (t_amount or 0.0)
                     elif t_type == 'BUY':
-                        # cost is in PLN
                         cost = (t_qty * t_price) + t_fee
                         cash -= cost
-                        
                         if t_ticker not in holdings:
                             holdings[t_ticker] = {'qty': 0.0, 'currency': t_currency}
-                        
                         holdings[t_ticker]['qty'] += t_qty
-                        # Update currency if changed? Usually consistent.
                         holdings[t_ticker]['currency'] = t_currency
-                        
                     elif t_type == 'SELL':
-                        # revenue in PLN
                         revenue = (t_qty * t_price)
                         cash += (revenue - t_fee)
-                        
                         if t_ticker in holdings:
                             holdings[t_ticker]['qty'] -= t_qty
                             if holdings[t_ticker]['qty'] <= 1e-9:
@@ -150,24 +146,18 @@ class PortfolioReplayer:
             for ticker, data in holdings.items():
                 qty = data['qty']
                 asset_currency = data['currency']
-                
-                # Get raw price from CSV
                 raw_price = last_known_prices.get(ticker, 0.0)
                 
-                # Handle GBP/GBp difference
                 if asset_currency == 'GBP':
                     raw_price = raw_price / 100.0
                 
-                # Get Exchange Rate
                 rate = 1.0
                 if asset_currency != 'PLN':
                     rate = last_known_rates.get(asset_currency, 1.0)
                     
-                # Value in PLN = Qty * Price(Asset) * Rate(Asset->PLN)
                 val = qty * raw_price * rate
                 holdings_value += val
                 
-                # Store details for tooltip
                 daily_details.append({
                     "ticker": ticker,
                     "price_native": raw_price,
@@ -177,12 +167,30 @@ class PortfolioReplayer:
                 
             total_value = cash + holdings_value
             
+            # MTD Calculation
+            current_month = current_date.month
+            if last_month is None:
+                # First day of simulation
+                month_start_value = total_value
+            elif current_month != last_month:
+                # New month started, base is previous day (end of last month)
+                month_start_value = prev_total_value
+                
+            mtd_return = 0.0
+            if month_start_value > 0:
+                mtd_return = (total_value - month_start_value) / month_start_value
+            
+            # Update state for next day
+            last_month = current_month
+            prev_total_value = total_value
+
             history_records.append({
                 "date": current_date,
                 "total_value": total_value,
                 "cash": cash,
                 "holdings_value": holdings_value,
-                "details": daily_details
+                "details": daily_details,
+                "mtd_return": mtd_return
             })
             
         return self._generate_metrics(history_records)
@@ -223,7 +231,8 @@ class PortfolioReplayer:
                 "total_value": row['total_value'],
                 "cash": row['cash'],
                 "holdings_value": row['holdings_value'],
-                "details": row['details']
+                "details": row['details'],
+                "mtd_return": row['mtd_return']
             }
             for index, row in df.iterrows()
         ]

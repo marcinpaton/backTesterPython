@@ -7,9 +7,14 @@ const CustomTooltip = ({ active, payload, label }) => {
         return (
             <div className="bg-white p-3 border border-gray-200 shadow-lg rounded text-sm">
                 <p className="font-bold mb-2">{label}</p>
-                <p className="text-blue-600 font-semibold">
+                <p className="text-blue-600 font-semibold mb-1">
                     Total Value: {data.total_value.toFixed(2)} PLN
                 </p>
+                {data.mtd_return !== undefined && (
+                    <p className={`text-xs font-bold mb-2 ${data.mtd_return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        MTD Return: {(data.mtd_return * 100).toFixed(2)}%
+                    </p>
+                )}
                 {data.details && data.details.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-100">
                         <p className="text-xs text-gray-500 mb-1 font-semibold">Asset Prices:</p>
