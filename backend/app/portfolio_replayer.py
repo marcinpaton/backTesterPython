@@ -145,16 +145,16 @@ class PortfolioReplayer:
 
             # 4. Calculate Valuation
             holdings_value = 0.0
+            daily_details = []
             
             for ticker, data in holdings.items():
                 qty = data['qty']
                 asset_currency = data['currency']
                 
-                # Get raw price from CSV (in likely Asset Currency)
+                # Get raw price from CSV
                 raw_price = last_known_prices.get(ticker, 0.0)
                 
                 # Handle GBP/GBp difference
-                # LSE stocks (GBP) are quoted in pence by yfinance, but we need Pounds for the Rate
                 if asset_currency == 'GBP':
                     raw_price = raw_price / 100.0
                 
@@ -167,13 +167,22 @@ class PortfolioReplayer:
                 val = qty * raw_price * rate
                 holdings_value += val
                 
+                # Store details for tooltip
+                daily_details.append({
+                    "ticker": ticker,
+                    "price_native": raw_price,
+                    "currency": asset_currency,
+                    "price_pln": raw_price * rate
+                })
+                
             total_value = cash + holdings_value
             
             history_records.append({
                 "date": current_date,
                 "total_value": total_value,
                 "cash": cash,
-                "holdings_value": holdings_value
+                "holdings_value": holdings_value,
+                "details": daily_details
             })
             
         return self._generate_metrics(history_records)
@@ -205,11 +214,6 @@ class PortfolioReplayer:
         
         # Monthly Returns
         monthly_returns = df['total_value'].resample('M').last().pct_change().fillna(0.0)
-        # Fix first month return: (End - Start) / Start
-        # The resample pct_change compares end of this month vs end of last month.
-        # Only correct if we had full history.
-        # Let's ignore first partial month precision for now or fix it.
-        # Actually resample('M').last() gives values at end of months.
         monthly_returns_dict = {k.strftime('%Y-%m'): v for k, v in monthly_returns.items()}
         
         # Format history for frontend
@@ -218,7 +222,8 @@ class PortfolioReplayer:
                 "date": index.strftime('%Y-%m-%d'),
                 "total_value": row['total_value'],
                 "cash": row['cash'],
-                "holdings_value": row['holdings_value']
+                "holdings_value": row['holdings_value'],
+                "details": row['details']
             }
             for index, row in df.iterrows()
         ]

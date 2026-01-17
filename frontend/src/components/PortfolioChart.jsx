@@ -1,6 +1,39 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+            <div className="bg-white p-3 border border-gray-200 shadow-lg rounded text-sm">
+                <p className="font-bold mb-2">{label}</p>
+                <p className="text-blue-600 font-semibold">
+                    Total Value: {data.total_value.toFixed(2)} PLN
+                </p>
+                {data.details && data.details.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                        <p className="text-xs text-gray-500 mb-1 font-semibold">Asset Prices:</p>
+                        {data.details.map((item, index) => (
+                            <div key={index} className="flex justify-between gap-4 text-xs">
+                                <span>{item.ticker}:</span>
+                                <span className="text-gray-700">
+                                    {item.price_native.toFixed(2)} {item.currency}
+                                    {item.currency !== 'PLN' && (
+                                        <span className="text-gray-400 ml-1">
+                                            (~{item.price_pln.toFixed(2)} PLN)
+                                        </span>
+                                    )}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    }
+    return null;
+};
+
 const PortfolioChart = ({ data }) => {
     if (!data || data.length === 0) return <p className="text-gray-500">No performance data available.</p>;
 
@@ -28,10 +61,7 @@ const PortfolioChart = ({ data }) => {
                             domain={['auto', 'auto']}
                             tickFormatter={(val) => `${val.toFixed(0)} PLN`}
                         />
-                        <Tooltip
-                            formatter={(value) => [`${value.toFixed(2)} PLN`, "Total Value"]}
-                            labelFormatter={(label) => `Date: ${label}`}
-                        />
+                        <Tooltip content={<CustomTooltip />} />
                         <Area
                             type="monotone"
                             dataKey="total_value"
