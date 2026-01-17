@@ -162,7 +162,8 @@ class PortfolioReplayer:
                     "ticker": ticker,
                     "price_native": raw_price,
                     "currency": asset_currency,
-                    "price_pln": raw_price * rate
+                    "price_pln": raw_price * rate,
+                    "value_pln": val
                 })
                 
             total_value = cash + holdings_value
@@ -192,6 +193,10 @@ class PortfolioReplayer:
                 "details": daily_details,
                 "mtd_return": mtd_return
             })
+            
+            # Debug last day
+            if current_date == full_date_range[-1]:
+                print(f"DEBUG DETAILS LAST DAY: {daily_details}")
             
         return self._generate_metrics(history_records)
 

@@ -1,11 +1,51 @@
-import React from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useMemo, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
-const CustomTooltip = ({ active, payload, label }) => {
+const COLORS = [
+    '#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899',
+    '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#a855f7'
+];
+
+const BarTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+        const originalData = payload[0].payload;
+        const total = originalData.total_value;
+
+        return (
+            <div className="bg-white p-3 border border-gray-200 shadow-lg rounded text-sm z-50">
+                <p className="font-bold mb-2">{label}</p>
+                <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-100">
+                    <span className="text-gray-600 font-semibold mr-4">Total Value:</span>
+                    <span className="text-blue-600 font-bold">{total?.toFixed(2)} PLN</span>
+                </div>
+                {originalData.mtd_return !== undefined && (
+                    <p className={`text-xs font-bold mb-2 ${originalData.mtd_return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        MTD Return: {(originalData.mtd_return * 100).toFixed(2)}%
+                    </p>
+                )}
+                <div className="space-y-1">
+                    {[...payload].reverse().map((entry, index) => (
+                        <div key={index} className="flex justify-between gap-4 text-xs">
+                            <span style={{ color: entry.color }} className="font-semibold">
+                                {entry.name}:
+                            </span>
+                            <span className="text-gray-700">
+                                {entry.value?.toFixed(2)} PLN
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
+const AreaTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         return (
-            <div className="bg-white p-3 border border-gray-200 shadow-lg rounded text-sm">
+            <div className="bg-white p-3 border border-gray-200 shadow-lg rounded text-sm z-50">
                 <p className="font-bold mb-2">{label}</p>
                 <p className="text-blue-600 font-semibold mb-1">
                     Total Value: {data.total_value.toFixed(2)} PLN
@@ -40,41 +80,118 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const PortfolioChart = ({ data }) => {
+    const [chartType, setChartType] = useState('area'); // 'bar' or 'area'
+
     if (!data || data.length === 0) return <p className="text-gray-500">No performance data available.</p>;
+
+    // Prepare data for Bar Chart (Composition)
+    const { chartData, tickers } = useMemo(() => {
+        const uniqueTickers = new Set();
+
+        const transformed = data.map(day => {
+            const entry = {
+                date: day.date,
+                Cash: day.cash,
+                total_value: day.total_value, // For tooltip
+                mtd_return: day.mtd_return,
+                details: day.details // Also pass details for potential usage
+            };
+
+            if (day.details) {
+                day.details.forEach(d => {
+                    entry[d.ticker] = d.value_pln;
+                    uniqueTickers.add(d.ticker);
+                });
+            }
+            return entry;
+        });
+
+        return { chartData: transformed, tickers: Array.from(uniqueTickers) };
+    }, [data]);
 
     return (
         <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-bold mb-4 text-gray-700">Portfolio Value Over Time</h3>
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-700">
+                    {chartType === 'bar' ? 'Portfolio Composition (PLN)' : 'Portfolio Value Over Time'}
+                </h3>
+                <div className="flex bg-gray-100 p-1 rounded-lg">
+                    <button
+                        onClick={() => setChartType('bar')}
+                        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${chartType === 'bar'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        Composition
+                    </button>
+                    <button
+                        onClick={() => setChartType('area')}
+                        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${chartType === 'area'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        Total Value
+                    </button>
+                </div>
+            </div>
+
             <div className="h-96 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                        data={data}
-                        margin={{
-                            top: 10,
-                            right: 30,
-                            left: 0,
-                            bottom: 0,
-                        }}
-                    >
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis
-                            dataKey="date"
-                            tickFormatter={(str) => str.slice(0, 10)}
-                            minTickGap={30}
-                        />
-                        <YAxis
-                            domain={['auto', 'auto']}
-                            tickFormatter={(val) => `${val.toFixed(0)} PLN`}
-                        />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Area
-                            type="monotone"
-                            dataKey="total_value"
-                            stroke="#2563eb"
-                            fill="#3b82f6"
-                            fillOpacity={0.1}
-                        />
-                    </AreaChart>
+                    {chartType === 'bar' ? (
+                        <BarChart
+                            data={chartData}
+                            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis
+                                dataKey="date"
+                                tickFormatter={(str) => str.slice(0, 10)}
+                                minTickGap={30}
+                            />
+                            <YAxis
+                                tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
+                            />
+                            <Tooltip content={<BarTooltip />} />
+                            <Legend />
+                            {/* Cash Bar (Base) */}
+                            <Bar dataKey="Cash" stackId="a" fill="#22c55e" />
+                            {/* Ticker Bars */}
+                            {tickers.map((ticker, index) => (
+                                <Bar
+                                    key={ticker}
+                                    dataKey={ticker}
+                                    stackId="a"
+                                    fill={COLORS[index % COLORS.length]}
+                                />
+                            ))}
+                        </BarChart>
+                    ) : (
+                        <AreaChart
+                            data={data}
+                            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis
+                                dataKey="date"
+                                tickFormatter={(str) => str.slice(0, 10)}
+                                minTickGap={30}
+                            />
+                            <YAxis
+                                domain={['auto', 'auto']}
+                                tickFormatter={(val) => `${val.toFixed(0)} PLN`}
+                            />
+                            <Tooltip content={<AreaTooltip />} />
+                            <Area
+                                type="monotone"
+                                dataKey="total_value"
+                                stroke="#2563eb"
+                                fill="#3b82f6"
+                                fillOpacity={0.1}
+                            />
+                        </AreaChart>
+                    )}
                 </ResponsiveContainer>
             </div>
         </div>
