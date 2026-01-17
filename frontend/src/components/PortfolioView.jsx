@@ -262,7 +262,39 @@ const PortfolioView = ({ onBack }) => {
                 <h3 className="text-xl font-bold mb-4">Performance Analysis</h3>
                 {performanceLoading && <p>Loading performance...</p>}
                 {!performanceLoading && performanceData ? (
-                    <PortfolioChart data={performanceData.history} />
+                    <>
+                        <PortfolioChart data={performanceData.history} />
+
+                        {/* Monthly Returns List */}
+                        {performanceData.monthly_returns && (
+                            <div className="mt-8">
+                                <h4 className="text-lg font-bold mb-4 text-gray-700">Monthly Returns</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                    {Object.entries(performanceData.monthly_returns)
+                                        .sort((a, b) => a[0].localeCompare(b[0]))
+                                        .map(([month, ret], index, array) => {
+                                            const isLast = index === array.length - 1;
+                                            const label = isLast ? `${month} (MTD)` : month;
+                                            const isPositive = ret >= 0;
+
+                                            // Optional: Check if current month is actually current calendar month
+                                            // const now = new Date();
+                                            // const currentMonth = now.toISOString().slice(0, 7);
+                                            // const isActuallyCurrent = month === currentMonth;
+
+                                            return (
+                                                <div key={month} className={`p-3 rounded border ${isLast ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200'}`}>
+                                                    <div className="text-xs text-gray-500 font-semibold mb-1">{label}</div>
+                                                    <div className={`text-lg font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {isPositive ? '+' : ''}{(ret * 100).toFixed(2)}%
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     !performanceLoading && <p className="text-gray-500">Add transactions and ensure data is downloaded to see performance metrics.</p>
                 )}
