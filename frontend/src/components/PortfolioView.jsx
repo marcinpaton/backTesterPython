@@ -120,15 +120,11 @@ const PortfolioView = ({ onBack }) => {
     const handleDownloadAllPrices = async () => {
         setIsLoading(true);
         try {
-            // 1. Fetch all tickers from backend
-            const response = await fetch('http://127.0.0.1:8000/api/tickers');
-            if (!response.ok) {
-                throw new Error('Failed to fetch ticker list');
-            }
-            const tickers = await response.json();
+            // 1. Extract unique tickers from transactions
+            const uniqueTickers = [...new Set(transactions.map(t => t.ticker).filter(t => t))];
 
-            if (!Array.isArray(tickers) || tickers.length === 0) {
-                alert('No tickers found in tickers.csv');
+            if (uniqueTickers.length === 0) {
+                alert('No tickers found in transactions.');
                 setIsLoading(false);
                 return;
             }
@@ -136,12 +132,13 @@ const PortfolioView = ({ onBack }) => {
             // 2. Trigger download
             const today = new Date().toISOString().split('T')[0];
             await axios.post('http://127.0.0.1:8000/api/download', {
-                tickers: tickers,
-                start_date: '2001-01-01',
-                end_date: today
+                tickers: uniqueTickers,
+                start_date: '2025-12-01',
+                end_date: today,
+                use_transaction_file: true
             });
 
-            alert(`Prices downloaded successfully for ${tickers.length} tickers.`);
+            alert(`Prices downloaded successfully for ${uniqueTickers.length} tickers.`);
             fetchPerformance(); // Refresh analysis
         } catch (err) {
             setError('Failed to download prices');

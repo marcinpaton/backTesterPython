@@ -6,20 +6,21 @@ from datetime import datetime
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 DATA_FILE = os.path.join(DATA_DIR, "stock_prices.csv")
+TRANSACTIONS_DATA_FILE = os.path.join(DATA_DIR, "transactions_stock_prices.csv")
 
 # Global cache variable
-_cached_data = None
-_cached_data_mtime = 0
+# Cache is keyed by filename: {filename: (df, mtime)}
+_data_cache = {}
 
-def download_data(tickers: list[str], start_date: str, end_date: str):
+def download_data(tickers: list[str], start_date: str, end_date: str, filename: str = DATA_FILE):
     """
     Downloads historical data for the given tickers and saves it to a CSV file.
     """
-    global _cached_data
+    global _data_cache
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
 
-    print(f"Downloading data for {tickers} from {start_date} to {end_date}...")
+    print(f"Downloading data from {start_date} to {end_date} into {filename}...")
     
     # Download data
     data = yf.download(tickers, start=start_date, end=end_date, group_by='ticker', progress=False)
@@ -30,13 +31,14 @@ def download_data(tickers: list[str], start_date: str, end_date: str):
     # Round to 6 decimal places to ensure consistent file output
     data = data.round(6)
     
-    data.to_csv(DATA_FILE)
-    print(f"Data saved to {DATA_FILE}")
+    data.to_csv(filename)
+    print(f"Data saved to {filename}")
     
     # Invalidate cache
-    _cached_data = None
+    if filename in _data_cache:
+        del _data_cache[filename]
     
-    return {"message": "Data downloaded successfully", "path": DATA_FILE}
+    return {"message": "Data downloaded successfully", "path": filename}
 
 CURRENCY_DATA_FILE = os.path.join(DATA_DIR, "currency_prices.csv")
 
@@ -51,8 +53,6 @@ def download_currency_rates():
     tickers = ['USDPLN=X', 'EURPLN=X', 'GBPPLN=X', 'PLNUSD=X', 'PLNEUR=X', 'PLNGBP=X']
     start_date = "2001-01-01"
     end_date = datetime.now().strftime('%Y-%m-%d')
-    
-    print(f"Downloading currency rates for {tickers} from {start_date} to today...")
     
     print(f"Downloading currency rates for {tickers} from {start_date} to today...")
     
@@ -85,25 +85,30 @@ def download_currency_rates():
         print(f"Error downloading currency rates: {e}")
         return False
 
-def load_data():
+def load_data(filename: str = DATA_FILE):
     """
     Loads the locally saved data with caching.
     """
-    global _cached_data, _cached_data_mtime
+    global _data_cache
     
-    if not os.path.exists(DATA_FILE):
+    if not os.path.exists(filename):
         return None
     
     # Check file modification time
-    current_mtime = os.path.getmtime(DATA_FILE)
+    current_mtime = os.path.getmtime(filename)
     
-    if _cached_data is not None and current_mtime == _cached_data_mtime:
-        # print("Loading data from cache...")
-        return _cached_data
+    if filename in _data_cache:
+        cached_df, cached_mtime = _data_cache[filename]
+        if current_mtime == cached_mtime:
+            # print(f"Loading data from cache ({filename})...")
+            return cached_df
     
-    print("Loading data from disk...")
+    print(f"Loading data from disk ({filename})...")
     # Load with MultiIndex header if multiple tickers were saved
-    df = pd.read_csv(DATA_FILE, header=[0, 1], index_col=0, parse_dates=True)
+    try:
+         df = pd.read_csv(filename, header=[0, 1], index_col=0, parse_dates=True)
+    except:
+         df = pd.read_csv(filename, index_col=0, parse_dates=True)
     
     # Ensure we have a valid DatetimeIndex
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -123,7 +128,6 @@ def load_data():
         # Forward fill missing prices (use previous day's price)
         df.ffill(inplace=True)
     
-    _cached_data = df
-    _cached_data_mtime = current_mtime
+    _data_cache[filename] = (df, current_mtime)
     
     return df

@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, List, Any
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates
+from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates, TRANSACTIONS_DATA_FILE, DATA_FILE
 from app.portfolio_replayer import PortfolioReplayer
 import uvicorn
 import os
@@ -54,11 +54,11 @@ def get_portfolio_performance():
             print("Performance Debug: No transactions.")
             return {}
             
-        # Load Price Data
-        price_df = load_data()
+        # Load Price Data - SPECIFICALLY FOR PORTFOLIO
+        price_df = load_data(TRANSACTIONS_DATA_FILE)
         if price_df is None or price_df.empty:
-             print("Performance Debug: Price data is empty or None.")
-             return {"error": "No price data available. Please download data first."}
+             print("Performance Debug: Portfolio price data is empty or None.")
+             return {"error": "No portfolio price data available. Please 'Download Prices' in Transactions tab first."}
         
         # Load Currency Data
         currency_df = None
@@ -151,11 +151,13 @@ class DownloadRequest(BaseModel):
     tickers: List[str]
     start_date: str
     end_date: str
+    use_transaction_file: bool = False
 
 @app.post("/api/download")
 def download_stock_data(request: DownloadRequest):
     try:
-        result = download_data(request.tickers, request.start_date, request.end_date)
+        target_file = TRANSACTIONS_DATA_FILE if request.use_transaction_file else DATA_FILE
+        result = download_data(request.tickers, request.start_date, request.end_date, filename=target_file)
         
         # Also download currency rates
         download_currency_rates()
