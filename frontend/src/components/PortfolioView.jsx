@@ -11,6 +11,7 @@ const PortfolioView = ({ onBack }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [performanceLoading, setPerformanceLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [availableTickers, setAvailableTickers] = useState([]);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,7 +20,20 @@ const PortfolioView = ({ onBack }) => {
     useEffect(() => {
         fetchTransactions();
         fetchPerformance();
+        fetchTickers();
     }, []);
+
+    const fetchTickers = async () => {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/tickers');
+            if (response.ok) {
+                const data = await response.json();
+                setAvailableTickers(data || []);
+            }
+        } catch (err) {
+            console.error("Failed to load tickers for suggestions", err);
+        }
+    };
 
     const fetchPerformance = async () => {
         setPerformanceLoading(true);
@@ -105,10 +119,6 @@ const PortfolioView = ({ onBack }) => {
 
     const handleModalSave = (transaction) => {
         // Logic to add or update
-        // Check if ID exists in current list (actually we generated ID for new ones too)
-        // But we need to know if we replace or add?
-        // Since we pass ID, we can just filter out old and push new, then sort.
-
         const filtered = transactions.filter(t => t.id !== transaction.id);
         const updatedList = [transaction, ...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -252,6 +262,7 @@ const PortfolioView = ({ onBack }) => {
                     transaction={currentTransaction}
                     onSave={handleModalSave}
                     onClose={() => setIsModalOpen(false)}
+                    availableTickers={availableTickers}
                 />
             )}
 
@@ -274,11 +285,6 @@ const PortfolioView = ({ onBack }) => {
                                             const label = isLast ? `${month} (MTD)` : month;
                                             const isPositive = ret >= 0;
 
-                                            // Optional: Check if current month is actually current calendar month
-                                            // const now = new Date();
-                                            // const currentMonth = now.toISOString().slice(0, 7);
-                                            // const isActuallyCurrent = month === currentMonth;
-
                                             return (
                                                 <div key={month} className={`p-3 rounded border ${isLast ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200'}`}>
                                                     <div className="text-xs text-gray-500 font-semibold mb-1">{label}</div>
@@ -300,7 +306,7 @@ const PortfolioView = ({ onBack }) => {
     );
 };
 
-const TransactionModal = ({ transaction, onSave, onClose }) => {
+const TransactionModal = ({ transaction, onSave, onClose, availableTickers = [] }) => {
     const [formData, setFormData] = useState(transaction);
 
     const handleChange = (e) => {
@@ -403,8 +409,15 @@ const TransactionModal = ({ transaction, onSave, onClose }) => {
                                     value={formData.ticker}
                                     onChange={handleChange}
                                     required
+                                    list="ticker-suggestions"
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 uppercase"
+                                    autoComplete="off"
                                 />
+                                <datalist id="ticker-suggestions">
+                                    {availableTickers.map((ticker) => (
+                                        <option key={ticker} value={ticker} />
+                                    ))}
+                                </datalist>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
