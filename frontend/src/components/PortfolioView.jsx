@@ -19,6 +19,10 @@ const PortfolioView = ({ onBack }) => {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [currentTransaction, setCurrentTransaction] = useState(null); // null means new, object means edit
 
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+
     useEffect(() => {
         fetchTransactions();
         fetchPerformance();
@@ -168,6 +172,18 @@ const PortfolioView = ({ onBack }) => {
         }
     };
 
+    // Pagination logic
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentTransactions = transactions.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(transactions.length / itemsPerPage);
+
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= totalPages) {
+            setCurrentPage(newPage);
+        }
+    };
+
     return (
         <div className="bg-white shadow-md rounded-lg p-6">
 
@@ -260,7 +276,7 @@ const PortfolioView = ({ onBack }) => {
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {transactions.map((t) => (
+                        {currentTransactions.map((t) => (
                             <tr key={t.id} className="hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     {t.date.replace('T', ' ')}
@@ -306,27 +322,85 @@ const PortfolioView = ({ onBack }) => {
                         )}
                     </tbody>
                 </table>
+
             </div>
 
-            {isModalOpen && (
-                <TransactionModal
-                    transaction={currentTransaction}
-                    onSave={handleModalSave}
-                    onClose={() => setIsModalOpen(false)}
-                    availableTickers={availableTickers}
-                />
-            )}
+            {/* Pagination Controls */}
+            {
+                transactions.length > 0 && (
+                    <div className="flex justify-between items-center mt-4 border-t pt-4">
+                        <div className="flex items-center text-sm text-gray-700">
+                            <span className="mr-2">Rows per page:</span>
+                            <select
+                                value={itemsPerPage}
+                                onChange={(e) => {
+                                    setItemsPerPage(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                className="border border-gray-300 rounded p-1"
+                            >
+                                <option value={10}>10</option>
+                                <option value={20}>20</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                            <span className="ml-4">
+                                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, transactions.length)} of {transactions.length} entries
+                            </span>
+                        </div>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className={`px-3 py-1 rounded border ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-gray-50 border-gray-300'}`}
+                            >
+                                Previous
+                            </button>
+                            <div className="flex items-center space-x-1">
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    // Simple logic to show a window of pages or just first few. 
+                                    // Better: Show current, prev, next, first, last.
+                                    // For now: Simple prev/next with "Page X of Y" is robust enough.
+                                })}
+                                <span className="px-3 py-1 text-sm text-gray-700">
+                                    Page {currentPage} of {totalPages}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-gray-50 border-gray-300'}`}
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )
+            }
 
-            {isImportModalOpen && (
-                <TransactionImportModal
-                    onClose={() => setIsImportModalOpen(false)}
-                    onImport={handleImportSave}
-                    availableTickers={availableTickers}
-                />
-            )}
+            {
+                isModalOpen && (
+                    <TransactionModal
+                        transaction={currentTransaction}
+                        onSave={handleModalSave}
+                        onClose={() => setIsModalOpen(false)}
+                        availableTickers={availableTickers}
+                    />
+                )
+            }
+
+            {
+                isImportModalOpen && (
+                    <TransactionImportModal
+                        onClose={() => setIsImportModalOpen(false)}
+                        onImport={handleImportSave}
+                        availableTickers={availableTickers}
+                    />
+                )
+            }
 
 
-        </div>
+        </div >
     );
 };
 
