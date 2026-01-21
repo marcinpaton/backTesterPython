@@ -4,6 +4,7 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
 import PortfolioChart from './PortfolioChart';
+import TransactionImportModal from './TransactionImportModal';
 
 const PortfolioView = ({ onBack }) => {
     const [transactions, setTransactions] = useState([]);
@@ -15,6 +16,7 @@ const PortfolioView = ({ onBack }) => {
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [currentTransaction, setCurrentTransaction] = useState(null); // null means new, object means edit
 
     useEffect(() => {
@@ -127,6 +129,13 @@ const PortfolioView = ({ onBack }) => {
         handleSaveToServer(updatedList);
     };
 
+    const handleImportSave = (newTransactions) => {
+        const updatedList = [...newTransactions, ...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+        setTransactions(updatedList);
+        setIsImportModalOpen(false);
+        handleSaveToServer(updatedList);
+    };
+
     const handleDownloadAllPrices = async () => {
         setIsLoading(true);
         try {
@@ -181,6 +190,12 @@ const PortfolioView = ({ onBack }) => {
                         className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
                     >
                         + Sell
+                    </button>
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+                    >
+                        Import CSV
                     </button>
                     <button
                         onClick={handleDownloadAllPrices}
@@ -262,6 +277,14 @@ const PortfolioView = ({ onBack }) => {
                     transaction={currentTransaction}
                     onSave={handleModalSave}
                     onClose={() => setIsModalOpen(false)}
+                    availableTickers={availableTickers}
+                />
+            )}
+
+            {isImportModalOpen && (
+                <TransactionImportModal
+                    onClose={() => setIsImportModalOpen(false)}
+                    onImport={handleImportSave}
                     availableTickers={availableTickers}
                 />
             )}
