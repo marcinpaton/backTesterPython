@@ -79,7 +79,7 @@ const AreaTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-const PortfolioChart = ({ data }) => {
+const PortfolioChart = ({ data, onDownloadPrices }) => {
     const [chartType, setChartType] = useState('area'); // 'bar' or 'area'
 
     if (!data || data.length === 0) return <p className="text-gray-500">No performance data available.</p>;
@@ -115,25 +115,36 @@ const PortfolioChart = ({ data }) => {
                 <h3 className="text-lg font-bold text-gray-700">
                     {chartType === 'bar' ? 'Portfolio Composition (PLN)' : 'Portfolio Value Over Time'}
                 </h3>
-                <div className="flex bg-gray-100 p-1 rounded-lg">
-                    <button
-                        onClick={() => setChartType('bar')}
-                        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${chartType === 'bar'
-                            ? 'bg-white text-blue-600 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                    >
-                        Composition
-                    </button>
-                    <button
-                        onClick={() => setChartType('area')}
-                        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${chartType === 'area'
-                            ? 'bg-white text-blue-600 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                    >
-                        Total Value
-                    </button>
+                <div className="flex items-center space-x-4">
+                    {onDownloadPrices && (
+                        <button
+                            onClick={onDownloadPrices}
+                            className="bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold py-1 px-3 rounded text-sm transition-colors"
+                            title="Download prices for ALL tickers in tickers.csv"
+                        >
+                            Download Prices
+                        </button>
+                    )}
+                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => setChartType('bar')}
+                            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${chartType === 'bar'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            Composition
+                        </button>
+                        <button
+                            onClick={() => setChartType('area')}
+                            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${chartType === 'area'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            Total Value
+                        </button>
+                    </div>
                 </div>
             </div>
 

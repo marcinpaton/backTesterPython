@@ -170,6 +170,48 @@ const PortfolioView = ({ onBack }) => {
 
     return (
         <div className="bg-white shadow-md rounded-lg p-6">
+
+
+            <div className="mb-8 border-b pb-8">
+
+                {performanceLoading && <p>Loading performance...</p>}
+                {!performanceLoading && performanceData ? (
+                    <>
+                        <PortfolioChart
+                            data={performanceData.history}
+                            onDownloadPrices={handleDownloadAllPrices}
+                        />
+
+                        {/* Monthly Returns List */}
+                        {performanceData.monthly_returns && (
+                            <div className="mt-8">
+                                <h4 className="text-lg font-bold mb-4 text-gray-700">Monthly Returns</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                    {Object.entries(performanceData.monthly_returns)
+                                        .sort((a, b) => a[0].localeCompare(b[0]))
+                                        .map(([month, ret], index, array) => {
+                                            const isLast = index === array.length - 1;
+                                            const label = isLast ? `${month} (MTD)` : month;
+                                            const isPositive = ret >= 0;
+
+                                            return (
+                                                <div key={month} className={`p-3 rounded border ${isLast ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200'}`}>
+                                                    <div className="text-xs text-gray-500 font-semibold mb-1">{label}</div>
+                                                    <div className={`text-lg font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {isPositive ? '+' : ''}{(ret * 100).toFixed(2)}%
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    !performanceLoading && <p className="text-gray-500">Add transactions and ensure data is downloaded to see performance metrics.</p>
+                )}
+            </div>
+
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Portfolio Transactions</h2>
                 <div className="space-x-4">
@@ -195,15 +237,9 @@ const PortfolioView = ({ onBack }) => {
                         onClick={() => setIsImportModalOpen(true)}
                         className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
                     >
-                        Import CSV
+                        Import tansactions
                     </button>
-                    <button
-                        onClick={handleDownloadAllPrices}
-                        className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded"
-                        title="Download prices for ALL tickers in tickers.csv"
-                    >
-                        Download Prices
-                    </button>
+
 
                 </div>
             </div>
@@ -289,42 +325,7 @@ const PortfolioView = ({ onBack }) => {
                 />
             )}
 
-            <div className="mt-8 border-t pt-8">
-                <h3 className="text-xl font-bold mb-4">Performance Analysis</h3>
-                {performanceLoading && <p>Loading performance...</p>}
-                {!performanceLoading && performanceData ? (
-                    <>
-                        <PortfolioChart data={performanceData.history} />
 
-                        {/* Monthly Returns List */}
-                        {performanceData.monthly_returns && (
-                            <div className="mt-8">
-                                <h4 className="text-lg font-bold mb-4 text-gray-700">Monthly Returns</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                                    {Object.entries(performanceData.monthly_returns)
-                                        .sort((a, b) => a[0].localeCompare(b[0]))
-                                        .map(([month, ret], index, array) => {
-                                            const isLast = index === array.length - 1;
-                                            const label = isLast ? `${month} (MTD)` : month;
-                                            const isPositive = ret >= 0;
-
-                                            return (
-                                                <div key={month} className={`p-3 rounded border ${isLast ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200'}`}>
-                                                    <div className="text-xs text-gray-500 font-semibold mb-1">{label}</div>
-                                                    <div className={`text-lg font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {isPositive ? '+' : ''}{(ret * 100).toFixed(2)}%
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                </div>
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    !performanceLoading && <p className="text-gray-500">Add transactions and ensure data is downloaded to see performance metrics.</p>
-                )}
-            </div>
         </div>
     );
 };
