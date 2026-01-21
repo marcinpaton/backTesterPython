@@ -167,26 +167,26 @@ function App() {
           <div className="flex gap-2">
             <button
               onClick={() => setCurrentView('portfolio')}
-              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'portfolio' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'portfolio' ? 'bg-green-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
             >
               Portfolio
             </button>
             <button
               onClick={() => setCurrentView('momentum_scanner')}
-              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'momentum_scanner' ? 'bg-green-600 text-white' : 'bg-green-500 text-white hover:bg-green-600'}`}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'momentum_scanner' ? 'bg-green-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
             >
               Scanner
             </button>
             <button
               onClick={() => setCurrentView('dashboard')}
-              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'dashboard' ? 'bg-green-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
             >
               Backtest
             </button>
 
             <button
               onClick={() => setCurrentView('optimization')}
-              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'optimization' ? 'bg-purple-600 text-white' : 'bg-purple-500 text-white hover:bg-purple-600'}`}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'optimization' ? 'bg-green-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
             >
               Optimization
             </button>
