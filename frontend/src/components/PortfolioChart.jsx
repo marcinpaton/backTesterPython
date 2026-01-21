@@ -6,7 +6,7 @@ const COLORS = [
     '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#a855f7'
 ];
 
-const BarTooltip = ({ active, payload, label }) => {
+const BarTooltip = ({ active, payload, label, mode }) => {
     if (active && payload && payload.length) {
         const originalData = payload[0].payload;
         const total = originalData.total_value;
@@ -24,16 +24,29 @@ const BarTooltip = ({ active, payload, label }) => {
                     </p>
                 )}
                 <div className="space-y-1">
-                    {[...payload].reverse().map((entry, index) => (
-                        <div key={index} className="flex justify-between gap-4 text-xs">
-                            <span style={{ color: entry.color }} className="font-semibold">
-                                {entry.name}:
-                            </span>
-                            <span className="text-gray-700">
-                                {entry.value?.toFixed(2)} PLN
-                            </span>
-                        </div>
-                    ))}
+                    {[...payload].reverse().map((entry, index) => {
+                        // Find details for this ticker
+                        const detail = originalData.details?.find(d => d.ticker === entry.name);
+                        let displayValue = `${entry.value?.toFixed(2)} PLN`;
+                        let colorClass = "text-gray-700";
+
+                        if (mode === 'pnl' && detail && detail.return_pct !== undefined) {
+                            const pnl = detail.return_pct * 100;
+                            displayValue = `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`;
+                            colorClass = pnl >= 0 ? "text-green-600 font-bold" : "text-red-600 font-bold";
+                        }
+
+                        return (
+                            <div key={index} className="flex justify-between gap-4 text-xs">
+                                <span style={{ color: entry.color }} className="font-semibold">
+                                    {entry.name}:
+                                </span>
+                                <span className={colorClass}>
+                                    {displayValue}
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         );
@@ -41,7 +54,7 @@ const BarTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-const AreaTooltip = ({ active, payload, label }) => {
+const AreaTooltip = ({ active, payload, label, mode }) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         return (
@@ -57,20 +70,33 @@ const AreaTooltip = ({ active, payload, label }) => {
                 )}
                 {data.details && data.details.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-100">
-                        <p className="text-xs text-gray-500 mb-1 font-semibold">Asset Prices:</p>
-                        {data.details.map((item, index) => (
-                            <div key={index} className="flex justify-between gap-4 text-xs">
-                                <span>{item.ticker}:</span>
-                                <span className="text-gray-700">
-                                    {item.price_native.toFixed(2)} {item.currency}
-                                    {item.currency !== 'PLN' && (
-                                        <span className="text-gray-400 ml-1">
-                                            (~{item.price_pln.toFixed(2)} PLN)
+                        <p className="text-xs text-gray-500 mb-1 font-semibold">{mode === 'pnl' ? 'Asset P&L:' : 'Asset Prices:'}</p>
+                        {data.details.map((item, index) => {
+                            if (mode === 'pnl') {
+                                const pnl = (item.return_pct || 0) * 100;
+                                return (
+                                    <div key={index} className="flex justify-between gap-4 text-xs">
+                                        <span>{item.ticker}:</span>
+                                        <span className={pnl >= 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                                            {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}%
                                         </span>
-                                    )}
-                                </span>
-                            </div>
-                        ))}
+                                    </div>
+                                );
+                            }
+                            return (
+                                <div key={index} className="flex justify-between gap-4 text-xs">
+                                    <span>{item.ticker}:</span>
+                                    <span className="text-gray-700">
+                                        {item.price_native.toFixed(2)} {item.currency}
+                                        {item.currency !== 'PLN' && (
+                                            <span className="text-gray-400 ml-1">
+                                                (~{item.price_pln.toFixed(2)} PLN)
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -81,6 +107,7 @@ const AreaTooltip = ({ active, payload, label }) => {
 
 const PortfolioChart = ({ data, onDownloadPrices }) => {
     const [chartType, setChartType] = useState('area'); // 'bar' or 'area'
+    const [tooltipMode, setTooltipMode] = useState('price'); // 'price' or 'pnl'
 
     if (!data || data.length === 0) return <p className="text-gray-500">No performance data available.</p>;
 
@@ -164,7 +191,7 @@ const PortfolioChart = ({ data, onDownloadPrices }) => {
                             <YAxis
                                 tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
                             />
-                            <Tooltip content={<BarTooltip />} />
+                            <Tooltip content={<BarTooltip mode={tooltipMode} />} />
                             <Legend />
                             {/* Cash Bar (Base) */}
                             <Bar dataKey="Cash" stackId="a" fill="#22c55e" />
@@ -193,7 +220,7 @@ const PortfolioChart = ({ data, onDownloadPrices }) => {
                                 domain={['auto', 'auto']}
                                 tickFormatter={(val) => `${val.toFixed(0)} PLN`}
                             />
-                            <Tooltip content={<AreaTooltip />} />
+                            <Tooltip content={<AreaTooltip mode={tooltipMode} />} />
                             <Area
                                 type="monotone"
                                 dataKey="total_value"
@@ -204,6 +231,28 @@ const PortfolioChart = ({ data, onDownloadPrices }) => {
                         </AreaChart>
                     )}
                 </ResponsiveContainer>
+            </div>
+
+            <div className="flex justify-center mt-4 space-x-4">
+                <span className="text-sm font-medium text-gray-500 pt-1">Tooltip:</span>
+                <button
+                    onClick={() => setTooltipMode('price')}
+                    className={`px-3 py-1 text-sm font-medium rounded-full border ${tooltipMode === 'price'
+                            ? 'bg-blue-100 text-blue-700 border-blue-200'
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        }`}
+                >
+                    Show prices
+                </button>
+                <button
+                    onClick={() => setTooltipMode('pnl')}
+                    className={`px-3 py-1 text-sm font-medium rounded-full border ${tooltipMode === 'pnl'
+                            ? 'bg-blue-100 text-blue-700 border-blue-200'
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        }`}
+                >
+                    Show P&L
+                </button>
             </div>
         </div>
     );

@@ -28,7 +28,7 @@ class PortfolioReplayer:
         
         # 2. Initialize state
         cash = 0.0
-        # Holdings: {ticker: {'qty': float, 'currency': str}}
+        # Holdings: {ticker: {'qty': float, 'currency': str, 'total_cost': float}}
         holdings = {} 
         
         tx_by_date = {}
@@ -128,13 +128,20 @@ class PortfolioReplayer:
                         cost = (t_qty * t_price) + t_fee
                         cash -= cost
                         if t_ticker not in holdings:
-                            holdings[t_ticker] = {'qty': 0.0, 'currency': t_currency}
+                            holdings[t_ticker] = {'qty': 0.0, 'currency': t_currency, 'total_cost': 0.0}
                         holdings[t_ticker]['qty'] += t_qty
+                        holdings[t_ticker]['total_cost'] += cost # Add to cost basis
                         holdings[t_ticker]['currency'] = t_currency
                     elif t_type == 'SELL':
                         revenue = (t_qty * t_price)
                         cash += (revenue - t_fee)
                         if t_ticker in holdings:
+                            # Reduce cost basis proportionally
+                            current_qty = holdings[t_ticker]['qty']
+                            if current_qty > 0:
+                                cost_portion = (t_qty / current_qty) * holdings[t_ticker]['total_cost']
+                                holdings[t_ticker]['total_cost'] -= cost_portion
+                            
                             holdings[t_ticker]['qty'] -= t_qty
                             if holdings[t_ticker]['qty'] <= 1e-9:
                                 del holdings[t_ticker]
@@ -158,12 +165,19 @@ class PortfolioReplayer:
                 val = qty * raw_price * rate
                 holdings_value += val
                 
+                # Calculate P&L
+                total_cost = data.get('total_cost', 0.0)
+                avg_price_pln = total_cost / qty if qty > 0 else 0.0
+                return_pct = ((val - total_cost) / total_cost) if total_cost > 0 else 0.0
+
                 daily_details.append({
                     "ticker": ticker,
                     "price_native": raw_price,
                     "currency": asset_currency,
                     "price_pln": raw_price * rate,
-                    "value_pln": val
+                    "value_pln": val,
+                    "return_pct": return_pct,
+                    "avg_price_pln": avg_price_pln
                 })
                 
             total_value = cash + holdings_value
