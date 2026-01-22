@@ -3,27 +3,27 @@ import React, { useState, useEffect } from 'react';
 const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialValues }) => {
   const [tickers, setTickers] = useState(
     initialValues?.tickers?.join(', ') || '');
-  const [startDate, setStartDate] = useState(initialValues?.start_date || '2020-01-01');
-  const [endDate, setEndDate] = useState(initialValues?.end_date || '2025-11-15');
-  const [nTickers, setNTickers] = useState(initialValues?.n_tickers || 7);
+  const [startDate, setStartDate] = useState(initialValues?.start_date || '2024-01-01');
+  const [endDate, setEndDate] = useState(initialValues?.end_date || new Date().toISOString().split('T')[0]);
+  const [nTickers, setNTickers] = useState(initialValues?.n_tickers || 5);
   const [rebalancePeriod, setRebalancePeriod] = useState(initialValues?.rebalance_period || 1);
   const [rebalancePeriodUnit, setRebalancePeriodUnit] = useState(initialValues?.rebalance_period_unit || 'months');
   const [stopLoss, setStopLoss] = useState(initialValues?.stop_loss_pct ? initialValues.stop_loss_pct * 100 : '');
   const [smartStopLoss, setSmartStopLoss] = useState(initialValues?.smart_stop_loss || false);
-  const [transactionFeeEnabled, setTransactionFeeEnabled] = useState(initialValues?.transaction_fee_enabled || false);
+  const [transactionFeeEnabled, setTransactionFeeEnabled] = useState(initialValues?.transaction_fee_enabled !== undefined ? initialValues.transaction_fee_enabled : true);
   const [transactionFeeType, setTransactionFeeType] = useState(initialValues?.transaction_fee_type || 'percentage');
-  const [transactionFeeValue, setTransactionFeeValue] = useState(initialValues?.transaction_fee_value || 0.1);
+  const [transactionFeeValue, setTransactionFeeValue] = useState(initialValues?.transaction_fee_value || 0.29);
   const [capitalGainsTaxEnabled, setCapitalGainsTaxEnabled] = useState(initialValues?.capital_gains_tax_enabled || false);
   const [capitalGainsTaxPct, setCapitalGainsTaxPct] = useState(initialValues?.capital_gains_tax_pct || 19);
 
   const [sellOnProfitEnabled, setSellOnProfitEnabled] = useState(initialValues?.sell_on_profit_enabled || false);
   const [sellOnProfitThreshold, setSellOnProfitThreshold] = useState(initialValues?.sell_on_profit_threshold_pct ? initialValues.sell_on_profit_threshold_pct * 100 : '');
 
-  const [marginEnabled, setMarginEnabled] = useState(initialValues?.margin_enabled !== undefined ? initialValues.margin_enabled : true);
-  const [strategy, setStrategy] = useState(initialValues?.strategy || 'scoring');
+  const [marginEnabled, setMarginEnabled] = useState(initialValues?.margin_enabled !== undefined ? initialValues.margin_enabled : false);
+  const [strategy, setStrategy] = useState(initialValues?.strategy || 'momentum');
   const [sizingMethod, setSizingMethod] = useState(initialValues?.sizing_method || 'equal');
   const [initialCapital, setInitialCapital] = useState(initialValues?.initial_capital || 10000);
-  const [momentumLookbackDays, setMomentumLookbackDays] = useState(initialValues?.momentum_lookback_days || 30);
+  const [momentumLookbackDays, setMomentumLookbackDays] = useState(initialValues?.momentum_lookback_days || 120);
   const [filterNegativeMomentum, setFilterNegativeMomentum] = useState(initialValues?.filter_negative_momentum || false);
   const [smaPeriod, setSmaPeriod] = useState(initialValues?.sma_period !== undefined ? initialValues.sma_period : -1);
 
