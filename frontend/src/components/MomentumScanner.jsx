@@ -72,6 +72,123 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
         }
     };
 
+    // Allocation State
+    const [allocationData, setAllocationData] = useState(null);
+    const [showAllocation, setShowAllocation] = useState(false);
+    const [allocationLoading, setAllocationLoading] = useState(false);
+
+    const handleCalculateAllocation = async () => {
+        if (!results || results.length === 0) return;
+
+        setAllocationLoading(true);
+        try {
+            const topTickers = results.map(r => r.ticker);
+            const response = await axios.post('http://127.0.0.1:8000/api/scanner/allocation_data', {
+                tickers: topTickers
+            });
+
+            const data = response.data;
+            if (data.error) {
+                alert(data.error);
+                setAllocationLoading(false);
+                return;
+            }
+
+            // Prepare Table Data
+            const targetValuePerTicker = data.total_portfolio_value / topTickers.length;
+
+            const tableRows = data.candidates.map(c => {
+                const ownedQty = data.holdings[c.ticker] || 0;
+
+                // Initialize rate (Use backend provided rate if available, else defaults)
+                let rate = c.rate || 1.0;
+                if (!c.rate) {
+                    if (c.currency === 'USD') rate = 4.0;
+                    if (c.currency === 'EUR') rate = 4.3;
+                    if (c.currency === 'GBP') rate = 5.0;
+                    if (c.currency === 'PLN') rate = 1.0;
+                }
+
+                const currentValPLN = ownedQty * c.price * rate;
+
+                const diff = targetValuePerTicker - currentValPLN;
+
+                const buyValue = diff > 0 ? diff : 0;
+                const sellValue = diff < 0 ? Math.abs(diff) : 0;
+
+                const priceInPLN = c.price * rate;
+                const buyQty = (diff > 0 && priceInPLN > 0) ? buyValue / priceInPLN : 0;
+                const sellQty = (diff < 0 && priceInPLN > 0) ? sellValue / priceInPLN : 0;
+
+                return {
+                    ticker: c.ticker,
+                    currency: c.currency,
+                    price: c.price,
+                    rate: rate, // Editable Exchange Rate
+                    ownedQty: ownedQty,
+                    targetValue: targetValuePerTicker,
+                    buyValue: buyValue,
+                    buyQty: buyQty, // Editable
+                    sellValue: sellValue,
+                    sellQty: sellQty // Editable
+                };
+            });
+
+            setAllocationData({
+                ...data,
+                rows: tableRows
+            });
+            setShowAllocation(true);
+
+        } catch (err) {
+            console.error("Allocation error:", err);
+            alert("Failed to calculate allocation");
+        } finally {
+            setAllocationLoading(false);
+        }
+    };
+
+    const handleAllocationChange = (index, field, value) => {
+        const newRows = [...allocationData.rows];
+        const row = { ...newRows[index] };
+
+        row[field] = parseFloat(value) || 0;
+
+        // Recalculate dependents
+        if (field === 'price' || field === 'rate') {
+            // Recalculate logic when Price or Rate changes
+            const priceInPLN = row.price * row.rate;
+            const newOwnedValue = row.ownedQty * priceInPLN;
+
+            // Recalculate diff
+            const diff = row.targetValue - newOwnedValue;
+
+            row.buyValue = diff > 0 ? diff : 0;
+            row.sellValue = diff < 0 ? Math.abs(diff) : 0;
+
+            row.buyQty = (diff > 0 && priceInPLN > 0) ? row.buyValue / priceInPLN : 0;
+            row.sellQty = (diff < 0 && priceInPLN > 0) ? row.sellValue / priceInPLN : 0;
+
+        } else if (field === 'buyQty') {
+            // User manually overrides Buy Qty
+            const priceInPLN = row.price * row.rate;
+            row.buyValue = row.buyQty * priceInPLN;
+            // If buying, we are not selling
+            row.sellValue = 0;
+            row.sellQty = 0;
+        } else if (field === 'sellQty') {
+            // User manually overrides Sell Qty
+            const priceInPLN = row.price * row.rate;
+            row.sellValue = row.sellQty * priceInPLN;
+            // If selling, we are not buying
+            row.buyValue = 0;
+            row.buyQty = 0;
+        }
+
+        newRows[index] = row;
+        setAllocationData({ ...allocationData, rows: newRows });
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -202,74 +319,190 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
 
             {/* Results */}
             {results && (
-                <div className="bg-white p-6 rounded-lg shadow">
-                    <h2 className="text-xl font-bold mb-4 flex items-center">
-                        Scan Results <span className="ml-2 text-sm font-normal text-gray-500">({analysisDate})</span>
-                    </h2>
+                <div className="bg-white p-6 rounded-lg shadow space-y-6">
+                    <div>
+                        <h2 className="text-xl font-bold mb-4 flex items-center">
+                            Scan Results <span className="ml-2 text-sm font-normal text-gray-500">({analysisDate})</span>
+                        </h2>
 
-                    {results.length === 0 ? (
-                        <p className="text-gray-500 italic">No tickers found matching criteria (or data missing for date).</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticker</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Momentum</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {results.map((item, index) => (
-                                        <React.Fragment key={item.ticker}>
-                                            <tr
-                                                className={`hover:bg-gray-50 cursor-pointer ${expandedRow === item.ticker ? 'bg-blue-50' : ''}`}
-                                                onClick={() => setExpandedRow(expandedRow === item.ticker ? null : item.ticker)}
-                                            >
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    #{index + 1}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                                                    {item.ticker}
-                                                </td>
-                                                <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${item.momentum >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {(item.momentum * 100).toFixed(2)}%
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                                                    {item.score !== undefined ? item.score.toFixed(1) : '-'}
-                                                </td>
-                                            </tr>
-                                            {expandedRow === item.ticker && (
-                                                <tr>
-                                                    <td colSpan="4" className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                                                        <div className="text-sm text-gray-700">
-                                                            <div className="grid grid-cols-2 gap-4 max-w-lg">
-                                                                <div>
-                                                                    <span className="font-semibold block text-gray-500 text-xs uppercase">Start Date</span>
-                                                                    <span>{item.start_date}</span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-semibold block text-gray-500 text-xs uppercase">End Date</span>
-                                                                    <span>{item.end_date}</span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-semibold block text-gray-500 text-xs uppercase">Start Price</span>
-                                                                    <span>${item.start_price?.toFixed(2)}</span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-semibold block text-gray-500 text-xs uppercase">End Price</span>
-                                                                    <span>${item.end_price?.toFixed(2)}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                        {results.length === 0 ? (
+                            <p className="text-gray-500 italic">No tickers found matching criteria (or data missing for date).</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticker</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Momentum</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {results.map((item, index) => (
+                                            <React.Fragment key={item.ticker}>
+                                                <tr
+                                                    className={`hover:bg-gray-50 cursor-pointer ${expandedRow === item.ticker ? 'bg-blue-50' : ''}`}
+                                                    onClick={() => setExpandedRow(expandedRow === item.ticker ? null : item.ticker)}
+                                                >
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        #{index + 1}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                                                        {item.ticker}
+                                                    </td>
+                                                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${item.momentum >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {(item.momentum * 100).toFixed(2)}%
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                                                        {item.score !== undefined ? item.score.toFixed(1) : '-'}
                                                     </td>
                                                 </tr>
-                                            )}
-                                        </React.Fragment>
-                                    ))}
-                                </tbody>
-                            </table>
+                                                {expandedRow === item.ticker && (
+                                                    <tr>
+                                                        <td colSpan="4" className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                                                            <div className="text-sm text-gray-700">
+                                                                <div className="grid grid-cols-2 gap-4 max-w-lg">
+                                                                    <div>
+                                                                        <span className="font-semibold block text-gray-500 text-xs uppercase">Start Date</span>
+                                                                        <span>{item.start_date}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-semibold block text-gray-500 text-xs uppercase">End Date</span>
+                                                                        <span>{item.end_date}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-semibold block text-gray-500 text-xs uppercase">Start Price</span>
+                                                                        <span>${item.start_price?.toFixed(2)}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-semibold block text-gray-500 text-xs uppercase">End Price</span>
+                                                                        <span>${item.end_price?.toFixed(2)}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Allocation Calculator Button */}
+                    {results.length > 0 && (
+                        <div>
+                            <button
+                                onClick={handleCalculateAllocation}
+                                disabled={allocationLoading}
+                                className="w-full md:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded shadow-lg transition disabled:bg-gray-400"
+                            >
+                                {allocationLoading ? 'Calculating...' : 'Calculate Allocation'}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Allocation Results */}
+                    {showAllocation && allocationData && (
+                        <div className="mt-8 border-t pt-8">
+                            <h3 className="text-xl font-bold mb-4 text-purple-900">Allocation Plan</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
+                                <div className="bg-purple-50 p-3 rounded">
+                                    <span className="block text-gray-500">Total Portfolio Value</span>
+                                    <span className="text-lg font-bold">{allocationData.total_portfolio_value?.toFixed(2)} PLN</span>
+                                </div>
+                                <div className="bg-purple-50 p-3 rounded">
+                                    <span className="block text-gray-500">Target Value per Ticker</span>
+                                    <span className="text-lg font-bold">{(allocationData.total_portfolio_value / allocationData.rows.length).toFixed(2)} PLN</span>
+                                </div>
+                                <div className="bg-purple-50 p-3 rounded">
+                                    <span className="block text-gray-500">Current Cash</span>
+                                    <span className="text-lg font-bold">{allocationData.cash?.toFixed(2)} PLN</span>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200 border">
+                                    <thead className="bg-purple-100">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Ticker</th>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Currency</th>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase w-32">Price (Native)</th>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase w-24">Rate (to PLN)</th>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Price PLN</th>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Owned Qty</th>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Owned Value (PLN)</th>
+
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">To Buy (PLN)</th>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase w-32">Buy Qty</th>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-red-800 uppercase">To Sell (PLN)</th>
+                                            <th className="px-4 py-2 text-left text-xs font-bold text-red-800 uppercase w-32">Sell Qty</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {allocationData.rows.map((row, idx) => (
+                                            <tr key={row.ticker}>
+                                                <td className="px-4 py-2 font-bold">{row.ticker}</td>
+                                                <td className="px-4 py-2 text-gray-600">{row.currency}</td>
+                                                <td className="px-4 py-2">
+                                                    <input
+                                                        type="number"
+                                                        value={row.price}
+                                                        onChange={(e) => handleAllocationChange(idx, 'price', e.target.value)}
+                                                        className="w-24 border rounded p-1 text-right"
+                                                        step="any"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <input
+                                                        type="number"
+                                                        value={row.rate}
+                                                        onChange={(e) => handleAllocationChange(idx, 'rate', e.target.value)}
+                                                        className="w-20 border rounded p-1 text-right"
+                                                        step="any"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2 text-right font-medium">{(row.price * row.rate).toFixed(2)}</td>
+                                                <td className="px-4 py-2 text-right">{row.ownedQty?.toFixed(0)}</td>
+                                                <td className="px-4 py-2 text-right">{(row.ownedQty * row.price * row.rate).toFixed(2)}</td>
+
+                                                <td className="px-4 py-2 text-right font-semibold text-green-600">{row.buyValue > 0 ? row.buyValue.toFixed(2) : '-'}</td>
+                                                <td className="px-4 py-2">
+                                                    {row.buyValue > 0 ? (
+                                                        <input
+                                                            type="number"
+                                                            value={row.buyQty}
+                                                            onChange={(e) => handleAllocationChange(idx, 'buyQty', e.target.value)}
+                                                            className="w-24 border rounded p-1 text-right font-bold text-green-600"
+                                                            step="any"
+                                                        />
+                                                    ) : '-'}
+                                                </td>
+                                                <td className="px-4 py-2 text-right font-semibold text-red-600">{row.sellValue > 0 ? row.sellValue.toFixed(2) : '-'}</td>
+                                                <td className="px-4 py-2">
+                                                    {row.sellValue > 0 ? (
+                                                        <input
+                                                            type="number"
+                                                            value={row.sellQty}
+                                                            onChange={(e) => handleAllocationChange(idx, 'sellQty', e.target.value)}
+                                                            className="w-24 border rounded p-1 text-right font-bold text-red-600"
+                                                            step="any"
+                                                        />
+                                                    ) : '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">
+                                * <b>Price</b> matches data from Yahoo (Original Currency). <br />
+                                * <b>Rate</b> is estimated conversion to PLN. Adjust manually for precision. <br />
+                                * <b>Buy Qty</b> is calculated to reach Target Value (PLN) given the Price and Rate.
+                            </p>
                         </div>
                     )}
                 </div>

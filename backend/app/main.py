@@ -13,7 +13,9 @@ import asyncio
 import uuid
 import pandas as pd
 from queue import Queue
+from queue import Queue
 from datetime import datetime
+from app.currency_utils import infer_currency
 
 app = FastAPI()
 
@@ -208,7 +210,119 @@ def scan_momentum(request: MomentumScanRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/data")
+class ScannerAllocationRequest(BaseModel):
+    tickers: List[str]
+
+@app.post("/api/scanner/allocation_data")
+def get_allocation_data(request: ScannerAllocationRequest):
+    """
+    Returns data needed for allocation calculation:
+    1. Current Portfolio Value and Holdings (from transactions & portfolio prices)
+    2. Latest prices for candidate tickers (from general stock prices)
+    """
+    try:
+        # 1. Get Portfolio State
+        if not os.path.exists(TRANSACTIONS_FILE):
+             return {"error": "No transactions found. Cannot calculate allocation."}
+        
+        tx_df = pd.read_csv(TRANSACTIONS_FILE)
+        transactions = tx_df.replace({pd.NA: None, float('nan'): None}).to_dict(orient='records')
+        
+        # Load Portfolio Prices
+        from app.data_loader import TRANSACTIONS_DATA_FILE, CURRENCY_DATA_FILE
+        portfolio_prices = load_data(TRANSACTIONS_DATA_FILE)
+        
+        currency_df = None # Initialize currency_df
+        if os.path.exists(CURRENCY_DATA_FILE):
+            try:
+                currency_df = pd.read_csv(CURRENCY_DATA_FILE, parse_dates=True, index_col=0)
+                if not isinstance(currency_df.index, pd.DatetimeIndex):
+                    currency_df.index = pd.to_datetime(currency_df.index)
+            except Exception as e:
+                print(f"Warning: Failed to load currency data: {e}")
+
+        # Calculate Portfolio History to get current state
+        replayer = PortfolioReplayer(transactions, portfolio_prices, currency_df)
+        history = replayer.calculate_history()
+        
+        if not history or not history.get('history'):
+            return {"error": "Failed to calculate portfolio state. Ensure 'Download Prices' is run in Portfolio view."}
+
+        latest_record = history['history'][-1]
+        total_portfolio_value = latest_record['total_value']
+        current_cash = latest_record['cash']
+        
+        current_holdings = {}
+        for item in latest_record['details']:
+            t = item['ticker']
+            val = item['value_pln']
+            price = item['price_pln']
+            if price > 0:
+                qty = val / price
+                current_holdings[t] = qty
+        
+        # 2. Get Latest Prices for Candidates
+        # Load General Prices
+        general_prices = load_data(DATA_FILE) 
+        
+        # Prepare Rate Map from Currency DF
+        rate_map = {'PLN': 1.0}
+        if currency_df is not None and not currency_df.empty:
+            last_rates = currency_df.iloc[-1]
+            # Map standard codes to Yahoo pairs
+            # USD -> USDPLN=X
+            if 'USDPLN=X' in last_rates: rate_map['USD'] = float(last_rates['USDPLN=X'])
+            if 'EURPLN=X' in last_rates: rate_map['EUR'] = float(last_rates['EURPLN=X'])
+            if 'GBPPLN=X' in last_rates: rate_map['GBP'] = float(last_rates['GBPPLN=X'])
+            # Add others if available or needed (e.g. SEK, CAD usually not default in that file but logic is extensible)
+
+        candidates_data = []
+        if general_prices is not None and not general_prices.empty:
+            last_prices = general_prices.iloc[-1]
+            is_multi = isinstance(general_prices.columns, pd.MultiIndex)
+            
+            for t in request.tickers:
+                price = 0.0
+                if is_multi:
+                    if (t, 'Close') in last_prices.index:
+                         price = float(last_prices[(t, 'Close')])
+                    elif t in last_prices.index: 
+                         try:
+                             price = float(last_prices[t]['Close']) 
+                         except:
+                             pass
+                else:
+                    if t in last_prices.index:
+                        price = float(last_prices[t])
+                    elif 'Close' in last_prices.index: 
+                         price = float(last_prices['Close'])
+
+                curr = infer_currency(t)
+                rate = rate_map.get(curr, 1.0) # Default to 1.0 if not found (or user edit)
+                
+                # Special handling for GBP (LSE stocks usually in pence)
+                if curr == 'GBP':
+                    rate = rate / 100.0
+                
+                candidates_data.append({
+                    "ticker": t,
+                    "price": price,
+                    "currency": curr,
+                    "rate": rate
+                })
+
+        return {
+            "total_portfolio_value": total_portfolio_value,
+            "cash": current_cash,
+            "holdings": current_holdings,
+            "candidates": candidates_data,
+            "latest_date": latest_record['date']
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 def get_data():
     df = load_data()
     if df is None:
