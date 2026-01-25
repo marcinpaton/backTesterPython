@@ -111,14 +111,21 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
 
                 const currentValPLN = ownedQty * c.price * rate;
 
-                const diff = targetValuePerTicker - currentValPLN;
+                const isSelected = topTickers.includes(c.ticker);
+                const currentTargetValue = isSelected ? targetValuePerTicker : 0;
 
-                const buyValue = diff > 0 ? diff : 0;
-                const sellValue = diff < 0 ? Math.abs(diff) : 0;
+                const diff = currentTargetValue - currentValPLN;
+
+                const buyValueRaw = diff > 0 ? diff : 0;
+                const sellValueRaw = diff < 0 ? Math.abs(diff) : 0;
 
                 const priceInPLN = c.price * rate;
-                const buyQty = (diff > 0 && priceInPLN > 0) ? buyValue / priceInPLN : 0;
-                const sellQty = (diff < 0 && priceInPLN > 0) ? sellValue / priceInPLN : 0;
+                const buyQty = (diff > 0 && priceInPLN > 0) ? Math.floor(buyValueRaw / priceInPLN) : 0;
+                const sellQty = (diff < 0 && priceInPLN > 0) ? Math.floor(sellValueRaw / priceInPLN) : 0;
+
+                // Recalculate Value based on Integer Qty
+                const buyValue = buyQty * priceInPLN;
+                const sellValue = sellQty * priceInPLN;
 
                 return {
                     ticker: c.ticker,
@@ -126,7 +133,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                     price: c.price,
                     rate: rate, // Editable Exchange Rate
                     ownedQty: ownedQty,
-                    targetValue: targetValuePerTicker,
+                    targetValue: currentTargetValue,
                     buyValue: buyValue,
                     buyQty: buyQty, // Editable
                     sellValue: sellValue,
@@ -136,7 +143,8 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
 
             setAllocationData({
                 ...data,
-                rows: tableRows
+                rows: tableRows,
+                activeTickerCount: topTickers.length // Store active count for display
             });
             setShowAllocation(true);
 
@@ -163,11 +171,15 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
             // Recalculate diff
             const diff = row.targetValue - newOwnedValue;
 
-            row.buyValue = diff > 0 ? diff : 0;
-            row.sellValue = diff < 0 ? Math.abs(diff) : 0;
+            const buyValueRaw = diff > 0 ? diff : 0;
+            const sellValueRaw = diff < 0 ? Math.abs(diff) : 0;
 
-            row.buyQty = (diff > 0 && priceInPLN > 0) ? row.buyValue / priceInPLN : 0;
-            row.sellQty = (diff < 0 && priceInPLN > 0) ? row.sellValue / priceInPLN : 0;
+            row.buyQty = (diff > 0 && priceInPLN > 0) ? Math.floor(buyValueRaw / priceInPLN) : 0;
+            row.sellQty = (diff < 0 && priceInPLN > 0) ? Math.floor(sellValueRaw / priceInPLN) : 0;
+
+            // Recalculate Value based on Integer Qty
+            row.buyValue = row.buyQty * priceInPLN;
+            row.sellValue = row.sellQty * priceInPLN;
 
         } else if (field === 'buyQty') {
             // User manually overrides Buy Qty
@@ -416,7 +428,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                 </div>
                                 <div className="bg-purple-50 p-3 rounded">
                                     <span className="block text-gray-500">Target Value per Ticker</span>
-                                    <span className="text-lg font-bold">{(allocationData.total_portfolio_value / allocationData.rows.length).toFixed(2)} PLN</span>
+                                    <span className="text-lg font-bold">{(allocationData.total_portfolio_value / (allocationData.activeTickerCount || allocationData.rows.length)).toFixed(2)} PLN</span>
                                 </div>
                                 <div className="bg-purple-50 p-3 rounded">
                                     <span className="block text-gray-500">Current Cash</span>
@@ -444,7 +456,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {allocationData.rows.map((row, idx) => (
-                                            <tr key={row.ticker}>
+                                            <tr key={row.ticker} className={row.targetValue === 0 ? "bg-red-50" : "bg-green-50"}>
                                                 <td className="px-4 py-2 font-bold">{row.ticker}</td>
                                                 <td className="px-4 py-2 text-gray-600">{row.currency}</td>
                                                 <td className="px-4 py-2">
@@ -477,7 +489,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                                             value={row.buyQty}
                                                             onChange={(e) => handleAllocationChange(idx, 'buyQty', e.target.value)}
                                                             className="w-24 border rounded p-1 text-right font-bold text-green-600"
-                                                            step="any"
+                                                            step="1"
                                                         />
                                                     ) : '-'}
                                                 </td>
@@ -496,6 +508,28 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                             </tr>
                                         ))}
                                     </tbody>
+                                    <tfoot className="bg-gray-100 font-bold border-t-2 border-gray-300">
+                                        <tr>
+                                            <td colSpan="7" className="px-4 py-2 text-right uppercase text-gray-700">Total:</td>
+                                            <td className="px-4 py-2 text-right text-green-700">
+                                                {allocationData.rows.reduce((sum, row) => sum + (row.buyValue || 0), 0).toFixed(2)}
+                                            </td>
+                                            <td></td>
+                                            <td className="px-4 py-2 text-right text-red-700">
+                                                {allocationData.rows.reduce((sum, row) => sum + (row.sellValue || 0), 0).toFixed(2)}
+                                            </td>
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td colSpan="9" className="px-4 py-1 text-right text-xs uppercase text-gray-500">
+                                                + Current Cash ({allocationData.cash?.toFixed(2)}):
+                                            </td>
+                                            <td className="px-4 py-1 text-right font-medium text-gray-600 border-t border-gray-300 border-dashed">
+                                                {(allocationData.rows.reduce((sum, row) => sum + (row.sellValue || 0), 0) + (allocationData.cash || 0)).toFixed(2)}
+                                            </td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                             <p className="text-xs text-gray-500 mt-2">

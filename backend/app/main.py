@@ -281,7 +281,11 @@ def get_allocation_data(request: ScannerAllocationRequest):
             last_prices = general_prices.iloc[-1]
             is_multi = isinstance(general_prices.columns, pd.MultiIndex)
             
-            for t in request.tickers:
+            # Combine requested tickers with current holdings to ensuring we have data for selling
+            owned_tickers = list(current_holdings.keys())
+            all_tickers = list(set(request.tickers + owned_tickers))
+
+            for t in all_tickers:
                 price = 0.0
                 if is_multi:
                     if (t, 'Close') in last_prices.index:
