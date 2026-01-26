@@ -218,7 +218,7 @@ def get_allocation_data(request: ScannerAllocationRequest):
     """
     Returns data needed for allocation calculation:
     1. Current Portfolio Value and Holdings (from transactions & portfolio prices)
-    2. Latest prices for candidate tickers (from general stock prices)
+    2. Latest prices for candidate tickers (from intraday Yahoo Finance data)
     """
     try:
         # 1. Get Portfolio State
@@ -229,7 +229,7 @@ def get_allocation_data(request: ScannerAllocationRequest):
         transactions = tx_df.replace({pd.NA: None, float('nan'): None}).to_dict(orient='records')
         
         # Load Portfolio Prices
-        from app.data_loader import TRANSACTIONS_DATA_FILE, CURRENCY_DATA_FILE
+        from app.data_loader import TRANSACTIONS_DATA_FILE, CURRENCY_DATA_FILE, get_intraday_prices
         portfolio_prices = load_data(TRANSACTIONS_DATA_FILE)
         
         currency_df = None # Initialize currency_df
@@ -261,9 +261,13 @@ def get_allocation_data(request: ScannerAllocationRequest):
                 qty = val / price
                 current_holdings[t] = qty
         
-        # 2. Get Latest Prices for Candidates
-        # Load General Prices
-        general_prices = load_data(DATA_FILE) 
+        # 2. Get Latest Prices for Candidates using INTRADAY data
+        # Combine requested tickers with current holdings to ensure we have data for selling
+        owned_tickers = list(current_holdings.keys())
+        all_tickers = list(set(request.tickers + owned_tickers))
+        
+        # Fetch intraday prices from Yahoo Finance
+        intraday_prices = get_intraday_prices(all_tickers)
         
         # Prepare Rate Map from Currency DF
         rate_map = {'PLN': 1.0}
@@ -277,32 +281,59 @@ def get_allocation_data(request: ScannerAllocationRequest):
             # Add others if available or needed (e.g. SEK, CAD usually not default in that file but logic is extensible)
 
         candidates_data = []
-        if general_prices is not None and not general_prices.empty:
-            last_prices = general_prices.iloc[-1]
-            is_multi = isinstance(general_prices.columns, pd.MultiIndex)
+        price_timestamp = None  # Track timestamp of price data
+        
+        # If intraday fetch failed, fallback to daily prices
+        if not intraday_prices:
+            print("Warning: Intraday prices not available, falling back to daily prices")
+            general_prices = load_data(DATA_FILE)
             
-            # Combine requested tickers with current holdings to ensuring we have data for selling
-            owned_tickers = list(current_holdings.keys())
-            all_tickers = list(set(request.tickers + owned_tickers))
+            if general_prices is not None and not general_prices.empty:
+                last_prices = general_prices.iloc[-1]
+                price_timestamp = general_prices.index[-1].strftime('%Y-%m-%d')
+                is_multi = isinstance(general_prices.columns, pd.MultiIndex)
+                
+                for t in all_tickers:
+                    price = 0.0
+                    if is_multi:
+                        if (t, 'Close') in last_prices.index:
+                             price = float(last_prices[(t, 'Close')])
+                        elif t in last_prices.index: 
+                             try:
+                                 price = float(last_prices[t]['Close']) 
+                             except:
+                                 pass
+                    else:
+                        if t in last_prices.index:
+                            price = float(last_prices[t])
+                        elif 'Close' in last_prices.index: 
+                             price = float(last_prices['Close'])
 
+                    curr = infer_currency(t)
+                    rate = rate_map.get(curr, 1.0) # Default to 1.0 if not found (or user edit)
+                    
+                    # Special handling for GBP (LSE stocks usually in pence)
+                    if curr == 'GBP':
+                        rate = rate / 100.0
+                    
+                    candidates_data.append({
+                        "ticker": t,
+                        "price": price,
+                        "currency": curr,
+                        "rate": rate
+                    })
+        else:
+            # Use intraday prices
             for t in all_tickers:
-                price = 0.0
-                if is_multi:
-                    if (t, 'Close') in last_prices.index:
-                         price = float(last_prices[(t, 'Close')])
-                    elif t in last_prices.index: 
-                         try:
-                             price = float(last_prices[t]['Close']) 
-                         except:
-                             pass
+                if t in intraday_prices:
+                    price = intraday_prices[t]['price']
+                    if price_timestamp is None:
+                        price_timestamp = intraday_prices[t]['timestamp']
                 else:
-                    if t in last_prices.index:
-                        price = float(last_prices[t])
-                    elif 'Close' in last_prices.index: 
-                         price = float(last_prices['Close'])
-
+                    price = 0.0
+                
                 curr = infer_currency(t)
-                rate = rate_map.get(curr, 1.0) # Default to 1.0 if not found (or user edit)
+                rate = rate_map.get(curr, 1.0)
                 
                 # Special handling for GBP (LSE stocks usually in pence)
                 if curr == 'GBP':
@@ -320,7 +351,9 @@ def get_allocation_data(request: ScannerAllocationRequest):
             "cash": current_cash,
             "holdings": current_holdings,
             "candidates": candidates_data,
-            "latest_date": latest_record['date']
+            "latest_date": latest_record['date'],
+            "price_timestamp": price_timestamp,  # Add timestamp info
+            "is_intraday": bool(intraday_prices)  # Flag to indicate if intraday prices were used
         }
 
     except Exception as e:

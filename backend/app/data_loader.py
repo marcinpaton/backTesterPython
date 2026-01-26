@@ -85,6 +85,67 @@ def download_currency_rates():
         print(f"Error downloading currency rates: {e}")
         return False
 
+def get_intraday_prices(tickers: list[str]):
+    """
+    Fetches the most recent intraday prices for given tickers.
+    Uses 1-day period with 1-minute interval to get near real-time prices (~15 min delay).
+    
+    Returns:
+        dict: {ticker: {'price': float, 'timestamp': str}, ...}
+    """
+    print(f"Fetching intraday prices for {len(tickers)} tickers...")
+    
+    result = {}
+    
+    try:
+        # Download 1 day of data with 1-minute intervals
+        # This gives us the most recent available price with ~15 min delay
+        data = yf.download(
+            tickers, 
+            period='1d',  # Last 1 day
+            interval='1m',  # 1-minute intervals
+            progress=False
+        )
+        
+        if data.empty:
+            print("Warning: No intraday data returned")
+            return result
+        
+        # Handle single ticker vs multiple tickers
+        if len(tickers) == 1:
+            # Single ticker - data is a simple DataFrame
+            if 'Close' in data.columns and not data['Close'].empty:
+                last_price = data['Close'].iloc[-1]
+                last_timestamp = data.index[-1]
+                result[tickers[0]] = {
+                    'price': float(last_price),
+                    'timestamp': last_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                }
+        else:
+            # Multiple tickers - data has MultiIndex columns
+            if 'Close' in data.columns:
+                close_data = data['Close']
+                for ticker in tickers:
+                    if ticker in close_data.columns:
+                        ticker_data = close_data[ticker].dropna()
+                        if not ticker_data.empty:
+                            last_price = ticker_data.iloc[-1]
+                            last_timestamp = ticker_data.index[-1]
+                            result[ticker] = {
+                                'price': float(last_price),
+                                'timestamp': last_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                            }
+        
+        print(f"Successfully fetched intraday prices for {len(result)} tickers")
+        return result
+        
+    except Exception as e:
+        print(f"Error fetching intraday prices: {e}")
+        import traceback
+        traceback.print_exc()
+        return result
+
+
 def load_data(filename: str = DATA_FILE):
     """
     Loads the locally saved data with caching.

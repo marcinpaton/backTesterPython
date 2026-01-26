@@ -421,6 +421,26 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                     {showAllocation && allocationData && (
                         <div className="mt-8 border-t pt-8">
                             <h3 className="text-xl font-bold mb-4 text-purple-900">Allocation Plan</h3>
+
+                            {/* Price Info Banner */}
+                            {allocationData.price_timestamp && (
+                                <div className={`mb-4 p-3 rounded-lg border ${allocationData.is_intraday ? 'bg-green-50 border-green-300' : 'bg-yellow-50 border-yellow-300'}`}>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-sm font-semibold ${allocationData.is_intraday ? 'text-green-800' : 'text-yellow-800'}`}>
+                                            {allocationData.is_intraday ? '🟢 Live Prices' : '⚠️ Daily Prices'}
+                                        </span>
+                                        <span className="text-sm text-gray-600">
+                                            Last updated: {allocationData.price_timestamp}
+                                        </span>
+                                        {allocationData.is_intraday && (
+                                            <span className="text-xs text-gray-500 italic">
+                                                (~15 min delay)
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
                                 <div className="bg-purple-50 p-3 rounded">
                                     <span className="block text-gray-500">Total Portfolio Value</span>
