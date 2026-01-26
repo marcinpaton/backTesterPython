@@ -172,6 +172,7 @@ class PortfolioReplayer:
 
                 daily_details.append({
                     "ticker": ticker,
+                    "shares": qty,
                     "price_native": raw_price,
                     "currency": asset_currency,
                     "price_pln": raw_price * rate,
@@ -240,7 +241,7 @@ class PortfolioReplayer:
         max_drawdown = drawdown.min()
         
         # Monthly Returns
-        monthly_returns = df['total_value'].resample('M').last().pct_change().fillna(0.0)
+        monthly_returns = df['total_value'].resample('ME').last().pct_change().fillna(0.0)
         monthly_returns_dict = {k.strftime('%Y-%m'): v for k, v in monthly_returns.items()}
         
         # Format history for frontend

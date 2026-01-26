@@ -193,6 +193,25 @@ const PortfolioView = ({ onBack }) => {
                 {performanceLoading && <p>Loading performance...</p>}
                 {!performanceLoading && performanceData ? (
                     <>
+                        {/* Price Info Banner */}
+                        {performanceData.price_timestamp && (
+                            <div className={`mb-4 p-3 rounded-lg border ${performanceData.is_intraday ? 'bg-green-50 border-green-300' : 'bg-yellow-50 border-yellow-300'}`}>
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-sm font-semibold ${performanceData.is_intraday ? 'text-green-800' : 'text-yellow-800'}`}>
+                                        {performanceData.is_intraday ? '🟢 Live Prices' : '⚠️ Daily Prices'}
+                                    </span>
+                                    <span className="text-sm text-gray-600">
+                                        Last updated: {performanceData.price_timestamp}
+                                    </span>
+                                    {performanceData.is_intraday && (
+                                        <span className="text-xs text-gray-500 italic">
+                                            (~15 min delay)
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         <PortfolioChart
                             data={performanceData.history}
                             onDownloadPrices={handleDownloadAllPrices}
