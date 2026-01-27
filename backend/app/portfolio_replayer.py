@@ -178,7 +178,8 @@ class PortfolioReplayer:
                     "price_pln": raw_price * rate,
                     "value_pln": val,
                     "return_pct": return_pct,
-                    "avg_price_pln": avg_price_pln
+                    "avg_price_pln": avg_price_pln,
+                    "total_cost": total_cost  # Export for intraday recalculation
                 })
                 
             total_value = cash + holdings_value
@@ -209,9 +210,6 @@ class PortfolioReplayer:
                 "mtd_return": mtd_return
             })
             
-            # Debug last day
-            if current_date == full_date_range[-1]:
-                print(f"DEBUG DETAILS LAST DAY: {daily_details}")
             
         return self._generate_metrics(history_records)
 
@@ -241,7 +239,7 @@ class PortfolioReplayer:
         max_drawdown = drawdown.min()
         
         # Monthly Returns
-        monthly_returns = df['total_value'].resample('ME').last().pct_change().fillna(0.0)
+        monthly_returns = df['total_value'].resample('M').last().pct_change().fillna(0.0)
         monthly_returns_dict = {k.strftime('%Y-%m'): v for k, v in monthly_returns.items()}
         
         # Format history for frontend

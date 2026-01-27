@@ -154,14 +154,12 @@ def get_portfolio_performance():
                                 item['price_pln'] = live_price * rate
                                 item['value_pln'] = item['shares'] * item['price_pln']
                                 
-                                # Recalculate return_pct for this asset
-                                # details usually has: return_pct = (val - total_cost) / total_cost
-                                # But we don't have total_cost readily available in 'details' item unless we added it or infer it.
-                                # PortfolioReplayer doesn't export total_cost in details. 
-                                # We can approximate or just leave return_pct as is (it will be slightly stale)
-                                # OR better: Replayer export total_cost? 
-                                # For now, let's leave return_pct stale or set to 0 to avoid confusion if it's way off?
-                                # Actually, user mostly cares about Total Value.
+                                # Recalculate return_pct using total_cost from details
+                                total_cost = item.get('total_cost', 0.0)
+                                if total_cost > 0:
+                                    item['return_pct'] = (item['value_pln'] - total_cost) / total_cost
+                                else:
+                                    item['return_pct'] = 0.0
                                 
                                 is_updated = True
                                 
