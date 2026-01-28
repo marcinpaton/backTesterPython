@@ -4,6 +4,7 @@ Handles conversion between pandas DataFrame (wide format) and database (long for
 """
 from typing import List, Optional, Dict, Any
 import pandas as pd
+import time
 from datetime import datetime
 from app.supabase_client import supabase
 
@@ -106,6 +107,9 @@ def get_currency_rates(pairs: List[str], start_date: Optional[str] = None, end_d
         all_data = []
         page_size = 1000
         offset = 0
+        total_query_time = 0
+        
+        start_func_time = time.time()
         
         while True:
             query = supabase.table(CURRENCY_PRICES_TABLE).select("*").in_("pair", pairs)
@@ -116,12 +120,22 @@ def get_currency_rates(pairs: List[str], start_date: Optional[str] = None, end_d
                 query = query.lte("date", end_date)
             
             # Add deterministic ordering and range for pagination
-            response = query.order("pair").order("date").range(offset, offset + page_size - 1).execute()
+            query = query.order("pair").order("date").range(offset, offset + page_size - 1)
+            
+            # Execute query and measure time
+            q_start = time.time()
+            response = query.execute()
+            q_end = time.time()
+            
+            batch_time = q_end - q_start
+            total_query_time += batch_time
             
             if not response.data:
                 break
                 
             all_data.extend(response.data)
+            
+            print(f"DB Query: {CURRENCY_PRICES_TABLE} batch (offset {offset}) took {batch_time:.3f}s, rows: {len(response.data)}")
             
             if len(response.data) < page_size:
                 break
@@ -131,6 +145,8 @@ def get_currency_rates(pairs: List[str], start_date: Optional[str] = None, end_d
         if not all_data:
             print(f"No currency data found for pairs: {pairs}")
             return None
+            
+        print(f"DB Query: {CURRENCY_PRICES_TABLE} total query time: {total_query_time:.3f}s for {len(all_data)} rows")
         
         # Convert to DataFrame
         df_long = pd.DataFrame(all_data)
@@ -150,6 +166,7 @@ def get_currency_rates(pairs: List[str], start_date: Optional[str] = None, end_d
         # Sort index (dates)
         df_wide = df_wide.sort_index()
         
+        print(f"DB Query: {CURRENCY_PRICES_TABLE} total function time (incl. processing): {time.time() - start_func_time:.3f}s")
         return df_wide
         
     except Exception as e:

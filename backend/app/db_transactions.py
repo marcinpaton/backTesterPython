@@ -2,6 +2,7 @@
 Database operations for transactions table.
 """
 from typing import List, Optional, Dict, Any
+import time
 from datetime import datetime
 from app.supabase_client import supabase, TRANSACTIONS_TABLE
 
@@ -14,10 +15,13 @@ def get_all_transactions() -> List[Dict[str, Any]]:
         List of transaction dictionaries
     """
     try:
+        start_time = time.time()
         response = supabase.table(TRANSACTIONS_TABLE)\
             .select("*")\
             .order("date", desc=True)\
             .execute()
+        duration = time.time() - start_time
+        print(f"DB Query: {TRANSACTIONS_TABLE} took {duration:.3f}s, rows: {len(response.data) if response.data else 0}")
         
         return response.data if response.data else []
     except Exception as e:

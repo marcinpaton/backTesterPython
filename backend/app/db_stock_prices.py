@@ -4,6 +4,7 @@ Handles conversion between pandas DataFrame (wide format) and database (long for
 """
 from typing import List, Optional, Dict, Any
 import pandas as pd
+import time
 from datetime import datetime, date
 from app.supabase_client import supabase
 
@@ -104,7 +105,7 @@ def save_prices(df: pd.DataFrame, tickers: List[str]) -> bool:
         return False
 
 
-def get_prices(tickers: List[str], start_date: Optional[str] = None, end_date: Optional[str] = None) -> Optional[pd.DataFrame]:
+def get_prices(tickers: List[str], start_date: Optional[str] = None, end_date: Optional[str] = None, columns: Optional[List[str]] = None) -> Optional[pd.DataFrame]:
     """
     Retrieves stock price data from Supabase and converts to pandas DataFrame.
     
@@ -112,6 +113,7 @@ def get_prices(tickers: List[str], start_date: Optional[str] = None, end_date: O
         tickers: List of ticker symbols
         start_date: Optional start date (YYYY-MM-DD)
         end_date: Optional end date (YYYY-MM-DD)
+        columns: Optional list of columns to fetch (e.g. ['close', 'open'])
         
     Returns:
         pandas DataFrame with MultiIndex columns (ticker, price_type)
@@ -123,13 +125,24 @@ def get_prices(tickers: List[str], start_date: Optional[str] = None, end_date: O
         if not tickers:
             return None
         
+        # Determine columns to select
+        if columns:
+            # Always include ticker and date for processing
+            select_cols = list(set(['ticker', 'date'] + [c.lower() for c in columns]))
+            select_str = ",".join(select_cols)
+        else:
+            select_str = "*"
+            
         # Build query with pagination to fetch all rows
         all_data = []
         page_size = 1000
         offset = 0
+        total_query_time = 0
+        
+        start_func_time = time.time()
         
         while True:
-            query = supabase.table(STOCK_PRICES_TABLE).select("*").in_("ticker", tickers)
+            query = supabase.table(STOCK_PRICES_TABLE).select(select_str).in_("ticker", tickers)
             
             if start_date:
                 query = query.gte("date", start_date)
@@ -137,12 +150,22 @@ def get_prices(tickers: List[str], start_date: Optional[str] = None, end_date: O
                 query = query.lte("date", end_date)
             
             # Add deterministic ordering and range for pagination
-            response = query.order("ticker").order("date").range(offset, offset + page_size - 1).execute()
+            query = query.order("ticker").order("date").range(offset, offset + page_size - 1)
+            
+            # Execute query and measure time
+            q_start = time.time()
+            response = query.execute()
+            q_end = time.time()
+            
+            batch_time = q_end - q_start
+            total_query_time += batch_time
             
             if not response.data:
                 break
                 
             all_data.extend(response.data)
+            
+            print(f"DB Query: {STOCK_PRICES_TABLE} batch (offset {offset}) took {batch_time:.3f}s, rows: {len(response.data)}")
             
             if len(response.data) < page_size:
                 break
@@ -152,6 +175,8 @@ def get_prices(tickers: List[str], start_date: Optional[str] = None, end_date: O
         if not all_data:
             print(f"No price data found for tickers: {tickers}")
             return None
+            
+        print(f"DB Query: {STOCK_PRICES_TABLE} total query time: {total_query_time:.3f}s for {len(all_data)} rows")
         
         # Convert to DataFrame
         df_long = pd.DataFrame(all_data)
@@ -167,7 +192,8 @@ def get_prices(tickers: List[str], start_date: Optional[str] = None, end_date: O
         
         # Pivot to wide format
         # This creates a MultiIndex with (price_type, ticker)
-        df_pivot = df_long.pivot(index='date', columns='ticker', values=['open', 'high', 'low', 'close', 'volume'])
+        available_cols = [c for c in ['open', 'high', 'low', 'close', 'volume'] if c in df_long.columns]
+        df_pivot = df_long.pivot(index='date', columns='ticker', values=available_cols)
         
         # Swap levels to get (ticker, price_type) and sort
         df_pivot = df_pivot.swaplevel(0, 1, axis=1).sort_index(axis=1)
@@ -179,7 +205,9 @@ def get_prices(tickers: List[str], start_date: Optional[str] = None, end_date: O
             
         df_pivot.columns = pd.MultiIndex.from_tuples(new_columns)
         
-        return df_pivot.sort_index()
+        final_df = df_pivot.sort_index()
+        print(f"DB Query: {STOCK_PRICES_TABLE} total function time (incl. processing): {time.time() - start_func_time:.3f}s")
+        return final_df
         
     except Exception as e:
         print(f"Error loading prices: {e}")

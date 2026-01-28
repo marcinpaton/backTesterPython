@@ -356,7 +356,19 @@ class MomentumScanRequest(BaseModel):
 
 @app.post("/api/momentum_scan")
 def scan_momentum(request: MomentumScanRequest):
-    df = load_data()
+    from datetime import timedelta
+    from dateutil.relativedelta import relativedelta
+    
+    # Calculate start_date for optimization
+    # Formula: lookback_days / 22 + 2 months back
+    analysis_dt = datetime.strptime(request.analysis_date, '%Y-%m-%d')
+    months_back = int(request.momentum_lookback_days / 22) + 2
+    start_date_dt = analysis_dt - relativedelta(months=months_back)
+    start_date = start_date_dt.strftime('%Y-%m-%d')
+    
+    print(f"Scanner Debug: Loading data for {len(request.tickers)} tickers from {start_date}")
+    
+    df = load_data(from_database=True, tickers=request.tickers, start_date=start_date, columns=['close'])
     if df is None:
         raise HTTPException(status_code=404, detail="No data found. Please download data first.")
     

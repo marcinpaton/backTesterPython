@@ -230,7 +230,7 @@ def load_currency_data(from_database: bool = False, start_date: Optional[str] = 
         return load_data(CURRENCY_DATA_FILE)
 
 
-def load_data(filename: str = DATA_FILE, from_database: bool = False, tickers: list[str] = None, start_date: Optional[str] = None):
+def load_data(filename: str = DATA_FILE, from_database: bool = False, tickers: list[str] = None, start_date: Optional[str] = None, columns: Optional[list[str]] = None):
     """
     Loads stock price data with caching.
     
@@ -257,7 +257,8 @@ def load_data(filename: str = DATA_FILE, from_database: bool = False, tickers: l
                 return None
         
         # Create cache key
-        cache_key = f"db_general_{','.join(sorted(tickers))[:100]}_{len(tickers)}_{start_date}"
+        cols_key = ','.join(sorted(columns)) if columns else 'all'
+        cache_key = f"db_general_{','.join(sorted(tickers))[:100]}_{len(tickers)}_{start_date}_{cols_key}"
         
         # Check cache (valid for 60 seconds)
         if cache_key in _data_cache:
@@ -269,10 +270,12 @@ def load_data(filename: str = DATA_FILE, from_database: bool = False, tickers: l
         
         # Load in batches if there are many tickers to avoid large response issues
         all_dfs = []
-        batch_size = 20
+        # Increased batch size to 500 to fetch all tickers in one call for most cases
+        batch_size = 500 
         for i in range(0, len(tickers), batch_size):
             batch = tickers[i:i + batch_size]
-            batch_df = get_prices(batch, start_date=start_date)
+            # For scanner/backtest we often only need Close price, but for now keeping it flexible
+            batch_df = get_prices(batch, start_date=start_date, columns=columns)
             if batch_df is not None:
                 all_dfs.append(batch_df)
         
