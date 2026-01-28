@@ -366,9 +366,11 @@ def scan_momentum(request: MomentumScanRequest):
     start_date_dt = analysis_dt - relativedelta(months=months_back)
     start_date = start_date_dt.strftime('%Y-%m-%d')
     
-    print(f"Scanner Debug: Loading data for {len(request.tickers)} tickers from {start_date}")
+    print(f"Scanner Debug: Loading data from CSV...")
     
-    df = load_data(from_database=True, tickers=request.tickers, start_date=start_date, columns=['close'])
+    # Load ALL data from CSV (no ticker filtering at load time for CSV mode usually, or load_data handles it)
+    # Based on load_data implementation, if from_database=False, it loads the whole file.
+    df = load_data(from_database=False)
     if df is None:
         raise HTTPException(status_code=404, detail="No data found. Please download data first.")
     
@@ -597,7 +599,8 @@ class BacktestRequest(BaseModel):
 
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
-    df = load_data()
+    # Ensure we load from CSV for backtest as requested
+    df = load_data(from_database=False)
     if df is None:
         raise HTTPException(status_code=404, detail="No data found. Please download data first.")
     
