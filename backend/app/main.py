@@ -55,25 +55,37 @@ def get_portfolio_performance():
             print("Performance Debug: No transactions.")
             return {}
             
+        # Calculate oldest transaction date to optimize data loading
+        oldest_tx_date = min([t['date'] for t in transactions if t.get('date')])
+        if isinstance(oldest_tx_date, datetime):
+            oldest_tx_date = oldest_tx_date.strftime('%Y-%m-%d')
+        elif isinstance(oldest_tx_date, str):
+            # Ensure it's just YYYY-MM-DD
+            oldest_tx_date = oldest_tx_date.split('T')[0]
+            
+        print(f"Performance Debug: Oldest transaction date: {oldest_tx_date}")
+        
         # Load Price Data - SPECIFICALLY FOR PORTFOLIO from Database
         unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
-        price_df = load_data(from_database=True, tickers=unique_tickers)
+        price_df = load_data(from_database=True, tickers=unique_tickers, start_date=oldest_tx_date)
         
         if price_df is None or price_df.empty:
              print("Performance Debug: Portfolio price data is empty or None.")
              return {"error": "No portfolio price data available. Please 'Download Prices' in Transactions tab first."}
         
-        # Load Currency Data
-        currency_df = None
-        from app.data_loader import CURRENCY_DATA_FILE
-        if os.path.exists(CURRENCY_DATA_FILE):
-            try:
-                currency_df = pd.read_csv(CURRENCY_DATA_FILE, parse_dates=True, index_col=0)
-                # Ensure index is datetime
-                if not isinstance(currency_df.index, pd.DatetimeIndex):
-                    currency_df.index = pd.to_datetime(currency_df.index)
-            except Exception as e:
-                print(f"Performance Debug: Failed to load currency data: {e}")
+        # Load Currency Data from Database - Only for currencies present in transactions
+        from app.data_loader import load_currency_data
+        unique_currencies = list(set([t.get('currency', 'PLN') for t in transactions]))
+        currency_df = load_currency_data(from_database=True, start_date=oldest_tx_date, currencies=unique_currencies)
+        
+        # If currency_df is None (e.g. only PLN), create an empty DF with correct index to avoid errors
+        if currency_df is None or currency_df.empty:
+             if any(curr != 'PLN' for curr in unique_currencies):
+                 print("Performance Debug: Currency data is empty but foreign currencies exist.")
+                 return {"error": "No currency data available. Please 'Download Prices' in Transactions tab first."}
+             else:
+                 # Only PLN, create empty DF with dates from price_df
+                 currency_df = pd.DataFrame(index=price_df.index)
         
         print(f"Performance Debug: Price data shape: {price_df.shape}")
         
@@ -322,12 +334,13 @@ def download_stock_data(request: DownloadRequest):
         if request.use_transaction_file:
             # Save to database for portfolio
             result = download_data(request.tickers, request.start_date, request.end_date, use_database=True)
+            # Also download currency rates to database
+            download_currency_rates(use_database=True)
         else:
             # Save to CSV for general backtesting
             result = download_data(request.tickers, request.start_date, request.end_date, filename=DATA_FILE)
-        
-        # Also download currency rates
-        download_currency_rates()
+            # Also download currency rates to CSV
+            download_currency_rates(use_database=False)
         
         return result
     except Exception as e:
@@ -394,18 +407,28 @@ def get_allocation_data(request: ScannerAllocationRequest):
             return {"error": "No transactions found. Cannot calculate allocation."}
         
         # Load Portfolio Prices from Database
-        from app.data_loader import CURRENCY_DATA_FILE, get_intraday_prices
-        unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
-        portfolio_prices = load_data(from_database=True, tickers=unique_tickers)
+        from app.data_loader import load_currency_data, get_intraday_prices
         
-        currency_df = None # Initialize currency_df
-        if os.path.exists(CURRENCY_DATA_FILE):
-            try:
-                currency_df = pd.read_csv(CURRENCY_DATA_FILE, parse_dates=True, index_col=0)
-                if not isinstance(currency_df.index, pd.DatetimeIndex):
-                    currency_df.index = pd.to_datetime(currency_df.index)
-            except Exception as e:
-                print(f"Warning: Failed to load currency data: {e}")
+        # Calculate oldest transaction date
+        oldest_tx_date = min([t['date'] for t in transactions if t.get('date')])
+        if isinstance(oldest_tx_date, datetime):
+            oldest_tx_date = oldest_tx_date.strftime('%Y-%m-%d')
+        elif isinstance(oldest_tx_date, str):
+            oldest_tx_date = oldest_tx_date.split('T')[0]
+            
+        unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
+        portfolio_prices = load_data(from_database=True, tickers=unique_tickers, start_date=oldest_tx_date)
+        
+        # Load Currency Data from Database - Only for currencies present in transactions
+        unique_currencies = list(set([t.get('currency', 'PLN') for t in transactions]))
+        currency_df = load_currency_data(from_database=True, start_date=oldest_tx_date, currencies=unique_currencies)
+        
+        if currency_df is None or currency_df.empty:
+             if any(curr != 'PLN' for curr in unique_currencies):
+                 return {"error": "No currency data available. Please 'Download Prices' in Transactions tab first."}
+             else:
+                 # Only PLN, create empty DF with dates from portfolio_prices
+                 currency_df = pd.DataFrame(index=portfolio_prices.index)
 
         # Calculate Portfolio History to get current state
         replayer = PortfolioReplayer(transactions, portfolio_prices, currency_df)

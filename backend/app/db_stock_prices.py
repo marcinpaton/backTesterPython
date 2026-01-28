@@ -88,7 +88,8 @@ def save_prices(df: pd.DataFrame, tickers: List[str]) -> bool:
             batch = records[i:i + batch_size]
             try:
                 # Upsert (insert or update on conflict)
-                supabase.table(STOCK_PRICES_TABLE).upsert(batch).execute()
+                # Specify on_conflict to handle the unique constraint on (ticker, date)
+                supabase.table(STOCK_PRICES_TABLE).upsert(batch, on_conflict="ticker,date").execute()
             except Exception as e:
                 print(f"Error saving batch {i//batch_size + 1}: {e}")
                 return False
@@ -122,55 +123,63 @@ def get_prices(tickers: List[str], start_date: Optional[str] = None, end_date: O
         if not tickers:
             return None
         
-        # Build query
-        query = supabase.table(STOCK_PRICES_TABLE).select("*").in_("ticker", tickers)
+        # Build query with pagination to fetch all rows
+        all_data = []
+        page_size = 1000
+        offset = 0
         
-        if start_date:
-            query = query.gte("date", start_date)
-        if end_date:
-            query = query.lte("date", end_date)
+        while True:
+            query = supabase.table(STOCK_PRICES_TABLE).select("*").in_("ticker", tickers)
+            
+            if start_date:
+                query = query.gte("date", start_date)
+            if end_date:
+                query = query.lte("date", end_date)
+            
+            # Add deterministic ordering and range for pagination
+            response = query.order("ticker").order("date").range(offset, offset + page_size - 1).execute()
+            
+            if not response.data:
+                break
+                
+            all_data.extend(response.data)
+            
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
         
-        # Execute query
-        response = query.execute()
-        
-        if not response.data:
+        if not all_data:
             print(f"No price data found for tickers: {tickers}")
             return None
         
         # Convert to DataFrame
-        df_long = pd.DataFrame(response.data)
+        df_long = pd.DataFrame(all_data)
         
-        # Convert to wide format with MultiIndex
-        # Pivot: rows=date, columns=(ticker, price_type)
-        df_wide = pd.DataFrame()
+        # Convert date to datetime and normalize to date only
+        df_long['date'] = pd.to_datetime(df_long['date']).dt.normalize()
         
-        for ticker in tickers:
-            ticker_data = df_long[df_long['ticker'] == ticker].copy()
+        # Drop duplicates just in case (e.g. if pagination overlapped or data issue)
+        df_long = df_long.drop_duplicates(subset=['ticker', 'date'], keep='first')
+        
+        # Convert date to datetime
+        df_long['date'] = pd.to_datetime(df_long['date'])
+        
+        # Pivot to wide format
+        # This creates a MultiIndex with (price_type, ticker)
+        df_pivot = df_long.pivot(index='date', columns='ticker', values=['open', 'high', 'low', 'close', 'volume'])
+        
+        # Swap levels to get (ticker, price_type) and sort
+        df_pivot = df_pivot.swaplevel(0, 1, axis=1).sort_index(axis=1)
+        
+        # Capitalize price types to match yfinance format (Open, High, Low, Close, Volume)
+        new_columns = []
+        for ticker, col in df_pivot.columns:
+            new_columns.append((ticker, col.capitalize()))
             
-            if ticker_data.empty:
-                continue
-            
-            # Set date as index
-            ticker_data['date'] = pd.to_datetime(ticker_data['date'])
-            ticker_data = ticker_data.set_index('date')
-            
-            # Create columns for this ticker
-            for col in ['open', 'high', 'low', 'close', 'volume']:
-                if col in ticker_data.columns:
-                    # Capitalize first letter to match yfinance format
-                    col_name = col.capitalize()
-                    df_wide[(ticker, col_name)] = ticker_data[col]
+        df_pivot.columns = pd.MultiIndex.from_tuples(new_columns)
         
-        if df_wide.empty:
-            return None
-        
-        # Sort index (dates)
-        df_wide = df_wide.sort_index()
-        
-        # Create proper MultiIndex for columns
-        df_wide.columns = pd.MultiIndex.from_tuples(df_wide.columns)
-        
-        return df_wide
+        return df_pivot.sort_index()
         
     except Exception as e:
         print(f"Error loading prices: {e}")
@@ -201,19 +210,34 @@ def delete_prices(tickers: List[str]) -> bool:
 def get_available_tickers() -> List[str]:
     """
     Returns list of tickers that have price data in database.
+    Handles pagination to fetch all tickers if there are many rows.
     
     Returns:
         List of ticker symbols
     """
     try:
-        response = supabase.table(STOCK_PRICES_TABLE).select("ticker").execute()
+        all_tickers = set()
+        page_size = 1000
+        offset = 0
         
-        if not response.data:
-            return []
-        
-        # Get unique tickers
-        tickers = list(set([row['ticker'] for row in response.data]))
-        return sorted(tickers)
+        while True:
+            response = supabase.table(STOCK_PRICES_TABLE)\
+                .select("ticker")\
+                .range(offset, offset + page_size - 1)\
+                .execute()
+            
+            if not response.data:
+                break
+            
+            for row in response.data:
+                all_tickers.add(row['ticker'])
+            
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+            
+        return sorted(list(all_tickers))
         
     except Exception as e:
         print(f"Error getting available tickers: {e}")
