@@ -19,9 +19,12 @@ class PortfolioReplayer:
             return None
             
         start_date = pd.to_datetime(sorted_tx[0]['date']).normalize()
-        # Limit simulation to available price data
         price_end_date = self.price_data.index.max()
-        end_date = price_end_date
+        last_tx_date = pd.to_datetime(sorted_tx[-1]['date']).normalize()
+        today = pd.to_datetime(datetime.now().date())
+        
+        # Simulation should cover all transactions and go up to today if possible
+        end_date = max(price_end_date, last_tx_date, today)
         
         if start_date > end_date:
             return None
