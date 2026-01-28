@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, List, Any
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates, TRANSACTIONS_DATA_FILE, DATA_FILE
+from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates, DATA_FILE
 from app.portfolio_replayer import PortfolioReplayer
 import uvicorn
 import os
@@ -55,8 +55,10 @@ def get_portfolio_performance():
             print("Performance Debug: No transactions.")
             return {}
             
-        # Load Price Data - SPECIFICALLY FOR PORTFOLIO
-        price_df = load_data(TRANSACTIONS_DATA_FILE)
+        # Load Price Data - SPECIFICALLY FOR PORTFOLIO from Database
+        unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
+        price_df = load_data(from_database=True, tickers=unique_tickers)
+        
         if price_df is None or price_df.empty:
              print("Performance Debug: Portfolio price data is empty or None.")
              return {"error": "No portfolio price data available. Please 'Download Prices' in Transactions tab first."}
@@ -317,8 +319,12 @@ class DownloadRequest(BaseModel):
 @app.post("/api/download")
 def download_stock_data(request: DownloadRequest):
     try:
-        target_file = TRANSACTIONS_DATA_FILE if request.use_transaction_file else DATA_FILE
-        result = download_data(request.tickers, request.start_date, request.end_date, filename=target_file)
+        if request.use_transaction_file:
+            # Save to database for portfolio
+            result = download_data(request.tickers, request.start_date, request.end_date, use_database=True)
+        else:
+            # Save to CSV for general backtesting
+            result = download_data(request.tickers, request.start_date, request.end_date, filename=DATA_FILE)
         
         # Also download currency rates
         download_currency_rates()
@@ -387,9 +393,10 @@ def get_allocation_data(request: ScannerAllocationRequest):
         if not transactions:
             return {"error": "No transactions found. Cannot calculate allocation."}
         
-        # Load Portfolio Prices
-        from app.data_loader import TRANSACTIONS_DATA_FILE, CURRENCY_DATA_FILE, get_intraday_prices
-        portfolio_prices = load_data(TRANSACTIONS_DATA_FILE)
+        # Load Portfolio Prices from Database
+        from app.data_loader import CURRENCY_DATA_FILE, get_intraday_prices
+        unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
+        portfolio_prices = load_data(from_database=True, tickers=unique_tickers)
         
         currency_df = None # Initialize currency_df
         if os.path.exists(CURRENCY_DATA_FILE):
