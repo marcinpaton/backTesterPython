@@ -42,15 +42,11 @@ class TransactionList(BaseModel):
 
 @app.get("/api/portfolio/performance")
 def get_portfolio_performance():
-    if not os.path.exists(TRANSACTIONS_FILE):
-        print("Performance Debug: Transaction file not found.")
-        return {}
-        
     try:
-        # Load transactions
-        tx_df = pd.read_csv(TRANSACTIONS_FILE)
-        transactions = tx_df.replace({pd.NA: None, float('nan'): None}).to_dict(orient='records')
-        print(f"Performance Debug: Loaded {len(transactions)} transactions.")
+        # Load transactions from Supabase
+        from app.db_transactions import get_all_transactions
+        transactions = get_all_transactions()
+        print(f"Performance Debug: Loaded {len(transactions)} transactions from Supabase.")
         
         if not transactions:
             print("Performance Debug: No transactions.")
@@ -242,46 +238,40 @@ def get_portfolio_performance():
 
 @app.get("/api/portfolio/transactions")
 def get_transactions():
-    if not os.path.exists(TRANSACTIONS_FILE):
-        return []
-    
     try:
-        df = pd.read_csv(TRANSACTIONS_FILE)
-        # Convert NaN to None/null for JSON compatibility
-        records = df.replace({pd.NA: None, float('nan'): None}).to_dict(orient='records')
-        return records
-    except Exception as e:
-        return records
+        from app.db_transactions import get_all_transactions
+        transactions = get_all_transactions()
+        return transactions
     except Exception as e:
         print(f"Error reading transactions: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 @app.get("/api/tickers")
 def get_tickers():
-    if not os.path.exists(TICKERS_FILE):
-        return []
-    
     try:
-        # Read lines, strip whitespace
-        with open(TICKERS_FILE, 'r') as f:
-            tickers = [line.strip() for line in f if line.strip()]
+        from app.db_tickers import get_all_tickers
+        tickers = get_all_tickers()
         return tickers
     except Exception as e:
         print(f"Error reading tickers: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/portfolio/transactions")
 def save_transactions(request: TransactionList):
     try:
-        data = [t.dict() for t in request.transactions]
-        df = pd.DataFrame(data)
+        from app.db_transactions import save_all_transactions
         
-        # Ensure directory exists (DATA_DIR is from data_loader)
-        if not os.path.exists(DATA_DIR):
-            os.makedirs(DATA_DIR)
-            
-        df.to_csv(TRANSACTIONS_FILE, index=False)
-        return {"message": "Transactions saved successfully", "count": len(data)}
+        data = [t.dict() for t in request.transactions]
+        success = save_all_transactions(data)
+        
+        if success:
+            return {"message": "Transactions saved successfully", "count": len(data)}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save transactions")
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -368,12 +358,12 @@ def get_allocation_data(request: ScannerAllocationRequest):
     2. Latest prices for candidate tickers (from intraday Yahoo Finance data)
     """
     try:
-        # 1. Get Portfolio State
-        if not os.path.exists(TRANSACTIONS_FILE):
-             return {"error": "No transactions found. Cannot calculate allocation."}
+        # 1. Get Portfolio State from Supabase
+        from app.db_transactions import get_all_transactions
+        transactions = get_all_transactions()
         
-        tx_df = pd.read_csv(TRANSACTIONS_FILE)
-        transactions = tx_df.replace({pd.NA: None, float('nan'): None}).to_dict(orient='records')
+        if not transactions:
+            return {"error": "No transactions found. Cannot calculate allocation."}
         
         # Load Portfolio Prices
         from app.data_loader import TRANSACTIONS_DATA_FILE, CURRENCY_DATA_FILE, get_intraday_prices
