@@ -40,6 +40,9 @@ class Transaction(BaseModel):
 class TransactionList(BaseModel):
     transactions: List[Transaction]
 
+class TickerList(BaseModel):
+    tickers: List[str]
+
 @app.get("/api/portfolio/performance")
 def get_portfolio_performance():
     try:
@@ -256,6 +259,25 @@ def get_tickers():
         return tickers
     except Exception as e:
         print(f"Error reading tickers: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/tickers")
+def save_tickers(request: TickerList):
+    try:
+        from app.db_tickers import save_all_tickers
+        
+        # Remove empty strings and duplicates, convert to uppercase
+        tickers = list(set([t.strip().upper() for t in request.tickers if t.strip()]))
+        
+        success = save_all_tickers(tickers)
+        
+        if success:
+            return {"message": "Tickers saved successfully", "count": len(tickers)}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save tickers")
+    except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
