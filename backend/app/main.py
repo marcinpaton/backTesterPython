@@ -522,7 +522,7 @@ def get_allocation_data(request: ScannerAllocationRequest):
                     
                     # Special handling for GBP (LSE stocks usually in pence)
                     if curr == 'GBP':
-                        rate = rate / 100.0
+                        price = price / 100.0
                     
                     candidates_data.append({
                         "ticker": t,
@@ -545,7 +545,7 @@ def get_allocation_data(request: ScannerAllocationRequest):
                 
                 # Special handling for GBP (LSE stocks usually in pence)
                 if curr == 'GBP':
-                    rate = rate / 100.0
+                    price = price / 100.0
                 
                 candidates_data.append({
                     "ticker": t,
