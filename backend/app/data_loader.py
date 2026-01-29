@@ -12,16 +12,15 @@ DATA_FILE = os.path.join(DATA_DIR, "stock_prices.csv")
 # Cache is keyed by identifier: {key: (df, timestamp)}
 _data_cache = {}
 
-def download_data(tickers: list[str], start_date: str, end_date: str, filename: str = DATA_FILE, use_database: bool = False):
+def download_data(tickers: list[str], start_date: str, end_date: str, filename: str = DATA_FILE):
     """
-    Downloads historical data for the given tickers.
+    Downloads historical data for the given tickers and saves to CSV.
     
     Args:
         tickers: List of ticker symbols
         start_date: Start date (YYYY-MM-DD)
         end_date: End date (YYYY-MM-DD)
-        filename: CSV filename (used only if use_database=False)
-        use_database: If True, saves to Supabase database instead of CSV
+        filename: CSV filename
     """
     global _data_cache
     
@@ -36,40 +35,24 @@ def download_data(tickers: list[str], start_date: str, end_date: str, filename: 
     # Round to 6 decimal places
     data = data.round(6)
     
-    if use_database:
-        # Save to Supabase database
-        from app.db_stock_prices import save_prices
-        success = save_prices(data, tickers)
-        
-        # Invalidate cache
-        cache_key = f"db_portfolio_{','.join(sorted(tickers))}"
-        if cache_key in _data_cache:
-            del _data_cache[cache_key]
-        
-        if success:
-            print(f"Data saved to Supabase database")
-            return {"message": "Data downloaded and saved to database", "tickers": len(tickers)}
-        else:
-            return {"error": "Failed to save data to database"}
-    else:
-        # Save to CSV file (backward compatibility)
-        if not os.path.exists(DATA_DIR):
-            os.makedirs(DATA_DIR)
-        
-        data.to_csv(filename)
-        print(f"Data saved to {filename}")
-        
-        # Invalidate cache
-        if filename in _data_cache:
-            del _data_cache[filename]
-        
-        return {"message": "Data downloaded successfully", "path": filename}
+    # Save to CSV file
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+    
+    data.to_csv(filename)
+    print(f"Data saved to {filename}")
+    
+    # Invalidate cache
+    if filename in _data_cache:
+        del _data_cache[filename]
+    
+    return {"message": "Data downloaded successfully", "path": filename}
 
 CURRENCY_DATA_FILE = os.path.join(DATA_DIR, "currency_prices.csv")
 
-def download_currency_rates(use_database: bool = False):
+def download_currency_rates():
     """
-    Downloads currency exchange rates for PLN/USD, PLN/EUR, PLN/GBP logic.
+    Downloads currency exchange rates for PLN/USD, PLN/EUR, PLN/GBP logic and saves to CSV.
     """
     tickers = ['USDPLN=X', 'EURPLN=X', 'GBPPLN=X', 'PLNUSD=X', 'PLNEUR=X', 'PLNGBP=X']
     start_date = "2025-10-01"
@@ -86,28 +69,14 @@ def download_currency_rates(use_database: bool = False):
         data = data.sort_index(axis=1)
         data = data.round(6)
         
-        if use_database:
-            from app.db_currency_prices import save_currency_rates
-            success = save_currency_rates(data)
+        data.to_csv(CURRENCY_DATA_FILE)
+        print(f"Currency data (Close only) saved to {CURRENCY_DATA_FILE}")
+        
+        # Invalidate cache
+        if CURRENCY_DATA_FILE in _data_cache:
+            del _data_cache[CURRENCY_DATA_FILE]
             
-            # Invalidate cache
-            if 'currency_data' in _data_cache:
-                del _data_cache['currency_data']
-                
-            if success:
-                print(f"Currency data saved to Supabase database")
-                return True
-            else:
-                return False
-        else:
-            data.to_csv(CURRENCY_DATA_FILE)
-            print(f"Currency data (Close only) saved to {CURRENCY_DATA_FILE}")
-            
-            # Invalidate cache
-            if CURRENCY_DATA_FILE in _data_cache:
-                del _data_cache[CURRENCY_DATA_FILE]
-                
-            return True
+        return True
     except Exception as e:
         print(f"Error downloading currency rates: {e}")
         return False
@@ -173,170 +142,90 @@ def get_intraday_prices(tickers: list[str]):
         return result
 
 
-def load_currency_data(from_database: bool = False, start_date: Optional[str] = None, currencies: Optional[list[str]] = None):
+def load_currency_data(start_date: Optional[str] = None, currencies: Optional[list[str]] = None):
     """
-    Loads currency exchange rates with caching.
+    Loads currency exchange rates from CSV with caching.
     """
-    global _data_cache
-    
-    if from_database:
-        import time
-        # Create cache key based on start_date and currencies
-        curr_key = ','.join(sorted(currencies)) if currencies else 'all'
-        cache_key = f'currency_data_{start_date}_{curr_key}' if start_date else f'currency_data_{curr_key}'
-        
-        # Check cache (valid for 5 minutes)
-        if cache_key in _data_cache:
-            cached_df, cached_time = _data_cache[cache_key]
-            if time.time() - cached_time < 300:
-                return cached_df
-        
-        from app.db_currency_prices import get_currency_rates
-        
-        # Generate pairs based on requested currencies
-        if currencies:
-            pairs = []
-            for curr in currencies:
-                if curr != 'PLN':
-                    pairs.append(f"{curr}PLN=X")
-                    pairs.append(f"PLN{curr}=X")
-        else:
-            pairs = ['USDPLN=X', 'EURPLN=X', 'GBPPLN=X', 'PLNUSD=X', 'PLNEUR=X', 'PLNGBP=X']
-        
-        if not pairs:
-            # If only PLN or no currencies, return empty DF with date index if possible or just None
-            return None
-            
-        print(f"Loading currency rates from database (start_date={start_date}, pairs={pairs})...")
-        df = get_currency_rates(pairs, start_date=start_date)
-        
-        if df is not None and not df.empty:
-            # Process data
-            if not isinstance(df.index, pd.DatetimeIndex):
-                df.index = pd.to_datetime(df.index)
-            df.sort_index(inplace=True)
-            
-            # Reindex to business days and ffill
-            full_idx = pd.date_range(start=df.index.min(), end=df.index.max(), freq='B')
-            df = df.reindex(full_idx)
-            df.ffill(inplace=True)
-            
-            # Cache
-            _data_cache[cache_key] = (df, time.time())
-            
-        return df
-    else:
-        # Load from CSV
-        return load_data(CURRENCY_DATA_FILE)
+    return load_data(CURRENCY_DATA_FILE)
 
 
-def load_data(filename: str = DATA_FILE, from_database: bool = False, tickers: list[str] = None, start_date: Optional[str] = None, columns: Optional[list[str]] = None):
+def load_data(filename: str = DATA_FILE, tickers: list[str] = None, start_date: Optional[str] = None, columns: Optional[list[str]] = None):
     """
-    Loads stock price data with caching.
+    Loads stock price data from CSV with caching.
     
     Args:
-        filename: CSV filename (used only if from_database=False)
-        from_database: If True, loads from Supabase database instead of CSV
-        tickers: List of tickers to load (required if from_database=True)
+        filename: CSV filename
+        tickers: List of tickers to load (optional filtering)
     
     Returns:
         pandas DataFrame with price data
     """
     global _data_cache
     
-    if from_database or not os.path.exists(filename):
-        # Load from Supabase database
-        from app.db_stock_prices import get_prices, get_available_tickers
-        import time
-        
-        # If no tickers provided, get all available tickers from DB
-        if not tickers:
-            tickers = get_available_tickers()
-            if not tickers:
-                print("No tickers found in database")
-                return None
-        
-        # Create cache key
-        cols_key = ','.join(sorted(columns)) if columns else 'all'
-        cache_key = f"db_general_{','.join(sorted(tickers))[:100]}_{len(tickers)}_{start_date}_{cols_key}"
-        
-        # Check cache (valid for 60 seconds)
-        if cache_key in _data_cache:
-            cached_df, cached_time = _data_cache[cache_key]
-            if time.time() - cached_time < 60:
-                return cached_df
-        
-        print(f"Loading data from database for {len(tickers)} tickers (start_date={start_date})...")
-        
-        # Load in batches if there are many tickers to avoid large response issues
-        all_dfs = []
-        # Increased batch size to 500 to fetch all tickers in one call for most cases
-        batch_size = 500 
-        for i in range(0, len(tickers), batch_size):
-            batch = tickers[i:i + batch_size]
-            # For scanner/backtest we often only need Close price, but for now keeping it flexible
-            batch_df = get_prices(batch, start_date=start_date, columns=columns)
-            if batch_df is not None:
-                all_dfs.append(batch_df)
-        
-        if not all_dfs:
-            return None
-            
-        # Combine all batches
-        df = pd.concat(all_dfs, axis=1)
-        
-        if df is not None and not df.empty:
-            # Process data same as CSV
-            if not isinstance(df.index, pd.DatetimeIndex):
-                df.index = pd.to_datetime(df.index)
-            
-            df.sort_index(inplace=True)
-            
-            # Create complete range of business days
-            full_idx = pd.date_range(start=df.index.min(), end=df.index.max(), freq='B')
-            df = df.reindex(full_idx)
-            df.ffill(inplace=True)
-            
-            # Cache with timestamp
-            _data_cache[cache_key] = (df, time.time())
-        
-        return df
-    else:
-        # Load from CSV file (backward compatibility)
-        # Check file modification time
-        current_mtime = os.path.getmtime(filename)
-        
-        if filename in _data_cache:
-            cached_df, cached_mtime = _data_cache[filename]
-            if current_mtime == cached_mtime:
-                # print(f"Loading data from cache ({filename})...")
-                return cached_df
-        
-        print(f"Loading data from disk ({filename})...")
-        # Load with MultiIndex header if multiple tickers were saved
-        try:
-             df = pd.read_csv(filename, header=[0, 1], index_col=0, parse_dates=True)
-        except:
-             df = pd.read_csv(filename, index_col=0, parse_dates=True)
-        
-        # Ensure we have a valid DatetimeIndex
-        if not isinstance(df.index, pd.DatetimeIndex):
-            df.index = pd.to_datetime(df.index)
+    if not os.path.exists(filename):
+        print(f"File not found: {filename}")
+        return None
 
-        # Sort index just in case
-        df.sort_index(inplace=True)
+    # Load from CSV file
+    # Check file modification time
+    current_mtime = os.path.getmtime(filename)
+    
+    if filename in _data_cache:
+        cached_df, cached_mtime = _data_cache[filename]
+        if current_mtime == cached_mtime:
+            # print(f"Loading data from cache ({filename})...")
+            return cached_df
+    
+    print(f"Loading data from disk ({filename})...")
+    
+    # Detect if MultiIndex header is present
+    # We read the first two lines to check
+    try:
+        with open(filename, 'r') as f:
+            line1 = f.readline().strip().split(',')
+            line2 = f.readline().strip().split(',')
+        
+        # If the second line has many empty values or looks like header (no numbers in date column)
+        # yfinance MultiIndex CSV usually has ticker names in row 0 and attributes in row 1
+        # The first column is 'Date' (or empty)
+        is_multi = False
+        if len(line2) > 1:
+            # Check if the first element of line2 is a date
+            try:
+                pd.to_datetime(line2[0])
+                is_multi = False # Second line is data
+            except:
+                is_multi = True # Second line is likely a header
+    except:
+        is_multi = False
 
-        if not df.empty:
-            # Create a complete range of business days (Mon-Fri) from start to end
-            full_idx = pd.date_range(start=df.index.min(), end=df.index.max(), freq='B')
-            
-            # Reindex the DataFrame to include all business days
-            # This will introduce NaNs for missing days (e.g. holidays)
-            df = df.reindex(full_idx)
-            
-            # Forward fill missing prices (use previous day's price)
-            df.ffill(inplace=True)
+    try:
+        if is_multi:
+            df = pd.read_csv(filename, header=[0, 1], index_col=0, parse_dates=True)
+        else:
+            df = pd.read_csv(filename, index_col=0, parse_dates=True)
+    except Exception as e:
+        print(f"Error reading {filename}: {e}")
+        df = pd.read_csv(filename, index_col=0, parse_dates=True)
+    
+    # Ensure we have a valid DatetimeIndex
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+
+    # Sort index just in case
+    df.sort_index(inplace=True)
+
+    if not df.empty:
+        # Create a complete range of business days (Mon-Fri) from start to end
+        full_idx = pd.date_range(start=df.index.min(), end=df.index.max(), freq='B')
         
-        _data_cache[filename] = (df, current_mtime)
+        # Reindex the DataFrame to include all business days
+        # This will introduce NaNs for missing days (e.g. holidays)
+        df = df.reindex(full_idx)
         
-        return df
+        # Forward fill missing prices (use previous day's price)
+        df.ffill(inplace=True)
+    
+    _data_cache[filename] = (df, current_mtime)
+    
+    return df

@@ -107,10 +107,12 @@ class PortfolioReplayer:
             # 2. Update Rates
             if self.currency_data is not None and current_date in self.currency_data.index:
                 curr_row = self.currency_data.loc[current_date]
-                for ticker, rate in curr_row.items():
+                for ticker_item, rate in curr_row.items():
                     if pd.notna(rate):
-                        if 'PLN=X' in ticker:
-                            code = ticker.replace('PLN=X', '')
+                        # Handle both string and tuple (MultiIndex) tickers
+                        ticker_str = ticker_item[0] if isinstance(ticker_item, tuple) else ticker_item
+                        if 'PLN=X' in ticker_str:
+                            code = ticker_str.replace('PLN=X', '')
                             last_known_rates[code] = rate
 
             # 3. Apply Transactions
