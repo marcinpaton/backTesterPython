@@ -72,7 +72,7 @@ def download_currency_rates(use_database: bool = False):
     Downloads currency exchange rates for PLN/USD, PLN/EUR, PLN/GBP logic.
     """
     tickers = ['USDPLN=X', 'EURPLN=X', 'GBPPLN=X', 'PLNUSD=X', 'PLNEUR=X', 'PLNGBP=X']
-    start_date = "2001-01-01"
+    start_date = "2025-10-01"
     end_date = datetime.now().strftime('%Y-%m-%d')
     
     print(f"Downloading currency rates for {tickers} from {start_date} to today...")

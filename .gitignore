@@ -14,3 +14,4 @@ dist/
 .vscode/
 .idea/
 backend/data/stock_prices.csv
+backend/data/currency_prices.csv
