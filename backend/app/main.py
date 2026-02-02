@@ -65,18 +65,18 @@ def get_portfolio_performance():
             
         print(f"Performance Debug: Oldest transaction date: {oldest_tx_date}")
         
-        # Load Price Data - SPECIFICALLY FOR PORTFOLIO from Database
+        # Load Price Data - SPECIFICALLY FOR PORTFOLIO from CSV
         unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
-        price_df = load_data(from_database=True, tickers=unique_tickers, start_date=oldest_tx_date)
+        price_df = load_data(tickers=unique_tickers, start_date=oldest_tx_date)
         
         if price_df is None or price_df.empty:
              print("Performance Debug: Portfolio price data is empty or None.")
              return {"error": "No portfolio price data available. Please 'Download Prices' in Transactions tab first."}
         
-        # Load Currency Data from Database - Only for currencies present in transactions
+        # Load Currency Data from CSV - Only for currencies present in transactions
         from app.data_loader import load_currency_data
         unique_currencies = list(set([t.get('currency', 'PLN') for t in transactions]))
-        currency_df = load_currency_data(from_database=True, start_date=oldest_tx_date, currencies=unique_currencies)
+        currency_df = load_currency_data(start_date=oldest_tx_date, currencies=unique_currencies)
         
         # If currency_df is None (e.g. only PLN), create an empty DF with correct index to avoid errors
         if currency_df is None or currency_df.empty:
@@ -141,9 +141,23 @@ def get_portfolio_performance():
                         rate_map_perf = {}
                         if currency_df is not None and not currency_df.empty:
                             last_rates = currency_df.iloc[-1]
-                            if 'USDPLN=X' in last_rates: rate_map_perf['USD'] = float(last_rates['USDPLN=X'])
-                            if 'EURPLN=X' in last_rates: rate_map_perf['EUR'] = float(last_rates['EURPLN=X'])
-                            if 'GBPPLN=X' in last_rates: rate_map_perf['GBP'] = float(last_rates['GBPPLN=X'])
+                            
+                            def get_rate(ticker):
+                                if ticker in last_rates:
+                                    val = last_rates[ticker]
+                                    if isinstance(val, pd.Series):
+                                        return float(val.iloc[0])
+                                    return float(val)
+                                return None
+
+                            usd_rate = get_rate('USDPLN=X')
+                            if usd_rate: rate_map_perf['USD'] = usd_rate
+                            
+                            eur_rate = get_rate('EURPLN=X')
+                            if eur_rate: rate_map_perf['EUR'] = eur_rate
+                            
+                            gbp_rate = get_rate('GBPPLN=X')
+                            if gbp_rate: rate_map_perf['GBP'] = gbp_rate
                         
                         for item in record_to_update['details']:
                             t = item['ticker']
@@ -331,16 +345,10 @@ class DownloadRequest(BaseModel):
 @app.post("/api/download")
 def download_stock_data(request: DownloadRequest):
     try:
-        if request.use_transaction_file:
-            # Save to database for portfolio
-            result = download_data(request.tickers, request.start_date, request.end_date, use_database=True)
-            # Also download currency rates to database
-            download_currency_rates(use_database=True)
-        else:
-            # Save to CSV for general backtesting
-            result = download_data(request.tickers, request.start_date, request.end_date, filename=DATA_FILE)
-            # Also download currency rates to CSV
-            download_currency_rates(use_database=False)
+        # Save to CSV for all cases
+        result = download_data(request.tickers, request.start_date, request.end_date, filename=DATA_FILE)
+        # Also download currency rates to CSV
+        download_currency_rates()
         
         return result
     except Exception as e:
@@ -366,11 +374,8 @@ def scan_momentum(request: MomentumScanRequest):
     start_date_dt = analysis_dt - relativedelta(months=months_back)
     start_date = start_date_dt.strftime('%Y-%m-%d')
     
-    print(f"Scanner Debug: Loading data from CSV...")
-    
-    # Load ALL data from CSV (no ticker filtering at load time for CSV mode usually, or load_data handles it)
-    # Based on load_data implementation, if from_database=False, it loads the whole file.
-    df = load_data(from_database=False)
+    # Load ALL data from CSV
+    df = load_data()
     if df is None:
         raise HTTPException(status_code=404, detail="No data found. Please download data first.")
     
@@ -431,11 +436,11 @@ def get_allocation_data(request: ScannerAllocationRequest):
             oldest_tx_date = oldest_tx_date.split('T')[0]
             
         unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
-        portfolio_prices = load_data(from_database=True, tickers=unique_tickers, start_date=oldest_tx_date)
+        portfolio_prices = load_data(tickers=unique_tickers, start_date=oldest_tx_date)
         
-        # Load Currency Data from Database - Only for currencies present in transactions
+        # Load Currency Data from CSV - Only for currencies present in transactions
         unique_currencies = list(set([t.get('currency', 'PLN') for t in transactions]))
-        currency_df = load_currency_data(from_database=True, start_date=oldest_tx_date, currencies=unique_currencies)
+        currency_df = load_currency_data(start_date=oldest_tx_date, currencies=unique_currencies)
         
         if currency_df is None or currency_df.empty:
              if any(curr != 'PLN' for curr in unique_currencies):
@@ -517,7 +522,7 @@ def get_allocation_data(request: ScannerAllocationRequest):
                     
                     # Special handling for GBP (LSE stocks usually in pence)
                     if curr == 'GBP':
-                        rate = rate / 100.0
+                        price = price / 100.0
                     
                     candidates_data.append({
                         "ticker": t,
@@ -540,7 +545,7 @@ def get_allocation_data(request: ScannerAllocationRequest):
                 
                 # Special handling for GBP (LSE stocks usually in pence)
                 if curr == 'GBP':
-                    rate = rate / 100.0
+                    price = price / 100.0
                 
                 candidates_data.append({
                     "ticker": t,
@@ -600,7 +605,7 @@ class BacktestRequest(BaseModel):
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
     # Ensure we load from CSV for backtest as requested
-    df = load_data(from_database=False)
+    df = load_data()
     if df is None:
         raise HTTPException(status_code=404, detail="No data found. Please download data first.")
     
