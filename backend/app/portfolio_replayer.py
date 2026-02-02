@@ -266,5 +266,53 @@ class PortfolioReplayer:
             "monthly_returns": monthly_returns_dict,
             "history": formatted_history,
              # Frontend expects rebalance_history, provide empty list or derive if needed
-            "rebalance_history": [] 
+            "rebalance_history": self._generate_annual_summaries(df) 
         }
+
+    def _generate_annual_summaries(self, df):
+        if df.empty:
+            return []
+            
+        summaries = []
+        # Group by year
+        df['year'] = df.index.year
+        years = df['year'].unique()
+        
+        # Calculate for each year
+        for year in years:
+            year_data = df[df['year'] == year]
+            if year_data.empty:
+                continue
+                
+            start_val = year_data['total_value'].iloc[0]
+            end_val = year_data['total_value'].iloc[-1]
+            try:
+                # If it's not the very first year of the whole history, we should probably 
+                # check the end value of the *previous* year for accurate 'year_start' base
+                # but using first available data point of the year is a reasonable approx 
+                # if exact EOY previous year is missing. 
+                # Actually closer logic: look for day before first day of year? 
+                # Simpler: The first record of the year IS the start position for our PnL calculation roughly
+                # OR: Logic: Return = (End - Start) / Start.
+                
+                # Let's try to find end of previous year if possible for better precision
+                prev_year_mask = df['year'] == (year - 1)
+                if prev_year_mask.any():
+                    start_val = df.loc[prev_year_mask, 'total_value'].iloc[-1]
+                
+                pnl = end_val - start_val
+                pnl_pct = (pnl / start_val) if start_val != 0 else 0.0
+                
+                summaries.append({
+                    "date": f"{year}-12-31", # Nominal date
+                    "type": "annual_summary",
+                    "year": int(year),
+                    "year_start_value": float(start_val),
+                    "year_end_value": float(end_val),
+                    "annual_pnl_dollars": float(pnl),
+                    "annual_pnl_percent": float(pnl_pct)
+                })
+            except Exception as e:
+                print(f"Error calculating annual summary for {year}: {e}")
+                
+        return summaries

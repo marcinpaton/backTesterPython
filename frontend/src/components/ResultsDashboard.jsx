@@ -6,6 +6,7 @@ const ResultsDashboard = ({ results }) => {
     const [showSoldBought, setShowSoldBought] = useState(false);
     const [showTax, setShowTax] = useState(false);
     const [showMonthlyReturn, setShowMonthlyReturn] = useState(false);
+    const [showAnnualReturns, setShowAnnualReturns] = useState(true);
 
     if (!results) return null;
 
@@ -65,6 +66,15 @@ const ResultsDashboard = ({ results }) => {
                         <label className="flex items-center space-x-1">
                             <input
                                 type="checkbox"
+                                checked={showAnnualReturns}
+                                onChange={(e) => setShowAnnualReturns(e.target.checked)}
+                                className="rounded text-blue-600"
+                            />
+                            <span>Annual Returns</span>
+                        </label>
+                        <label className="flex items-center space-x-1">
+                            <input
+                                type="checkbox"
                                 checked={showRebalancing}
                                 onChange={(e) => setShowRebalancing(e.target.checked)}
                                 className="rounded text-blue-600"
@@ -113,11 +123,12 @@ const ResultsDashboard = ({ results }) => {
                         }
 
                         // Add rebalancing events ONLY if enabled (or tax enabled for tax events)
-                        if (results.rebalance_history && (showRebalancing || showTax)) {
+                        if (results.rebalance_history && (showRebalancing || showTax || showAnnualReturns)) {
                             results.rebalance_history.forEach(event => {
                                 // Optimization: Only add events we care about
-                                const isTax = event.type === 'tax_settlement' || event.type === 'annual_summary';
-                                const isRebalance = event.type === 'rebalance' || event.type === 'stop_loss' || event.type === 'stop_loss_smart';
+                                const isTax = event.type === 'tax_settlement';
+                                const isAnnual = event.type === 'annual_summary';
+                                const isRebalance = event.type === 'rebalance' || event.type === 'stop_loss' || event.type === 'stop_loss_smart' || event.type === 'sell_on_profit';
 
                                 if (isTax && showTax) {
                                     events.push({
@@ -125,6 +136,14 @@ const ResultsDashboard = ({ results }) => {
                                         date: event.date,
                                         sortDate: event.date,
                                         sortPriority: 0,
+                                        data: event
+                                    });
+                                } else if (isAnnual && showAnnualReturns) {
+                                    events.push({
+                                        type: 'rebalance',
+                                        date: event.date,
+                                        sortDate: event.date,
+                                        sortPriority: 2, // Annual summary at end of year
                                         data: event
                                     });
                                 } else if (isRebalance && showRebalancing) {
@@ -215,9 +234,12 @@ const ResultsDashboard = ({ results }) => {
                                     );
                                 }
 
+
+
                                 // Annual Summary
                                 const isAnnualSummary = type === 'annual_summary';
                                 if (isAnnualSummary) {
+                                    if (!showAnnualReturns) return null;
                                     const { year, year_start_value, year_end_value, annual_pnl_dollars, annual_pnl_percent } = event.data;
                                     return (
                                         <div key={`annual-${index}`} className="border rounded p-3 bg-white border-purple-200">

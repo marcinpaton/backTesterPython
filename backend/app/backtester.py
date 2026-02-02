@@ -516,6 +516,51 @@ def calculate_metrics(portfolio: Portfolio):
             elif hasattr(v, 'item'): # Handle numpy types
                 record[k] = v.item()
 
+
+
+    # Generate annual summaries for backtest as well
+    annual_summaries = []
+    try:
+        if not history_df.empty:
+            history_df['year'] = history_df.index.year
+            years = history_df['year'].unique()
+            
+            for year in years:
+                year_data = history_df[history_df['year'] == year]
+                if year_data.empty: continue
+                
+                start_val = year_data['total_value'].iloc[0]
+                end_val = year_data['total_value'].iloc[-1]
+                
+                # Try to get previous year end for accurate start
+                prev_year_mask = history_df['year'] == (year - 1)
+                if prev_year_mask.any():
+                    start_val = history_df.loc[prev_year_mask, 'total_value'].iloc[-1]
+                
+                pnl = end_val - start_val
+                pnl_pct = (pnl / start_val) if start_val != 0 else 0.0
+                
+                annual_summaries.append({
+                    "date": f"{year}-12-31",
+                    "type": "annual_summary",
+                    "year": int(year),
+                    "year_start_value": float(start_val),
+                    "year_end_value": float(end_val),
+                    "annual_pnl_dollars": float(pnl),
+                    "annual_pnl_percent": float(pnl_pct)
+                })
+    except Exception as e:
+        print(f"Error calculating backtest annual summaries: {e}")
+
+    # Combine rebalance history with annual summaries
+    combined_history = [
+        {
+            **r,
+            "date": r["date"].strftime('%Y-%m-%d'),
+            "type": r.get("type", "rebalance"),
+        } for r in portfolio.rebalance_history
+    ] + annual_summaries
+
     return {
         "total_return": float(total_return),
         "cagr": float(cagr),
@@ -523,11 +568,5 @@ def calculate_metrics(portfolio: Portfolio):
         "final_value": float(end_value),
         "monthly_returns": monthly_returns_dict,
         "history": history_records,
-        "rebalance_history": [
-            {
-                **r,
-                "date": r["date"].strftime('%Y-%m-%d'),
-                "type": r.get("type", "rebalance"),
-            } for r in portfolio.rebalance_history
-        ]
+        "rebalance_history": combined_history
     }
