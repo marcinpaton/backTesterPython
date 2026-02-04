@@ -6,6 +6,7 @@ from datetime import datetime
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 DATA_FILE = os.path.join(DATA_DIR, "stock_prices.csv")
+PORTFOLIO_DATA_FILE = os.path.join(DATA_DIR, "portfolio_stock_prices.csv")
 # TRANSACTIONS_DATA_FILE removed - now using database
 
 # Global cache variable

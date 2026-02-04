@@ -158,6 +158,7 @@ const PortfolioView = ({ onBack }) => {
                 tickers: uniqueTickers,
                 start_date: '2025-12-01',
                 end_date: today,
+                filename: 'portfolio_stock_prices.csv',
                 use_transaction_file: true
             });
 

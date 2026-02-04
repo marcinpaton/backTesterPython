@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, List, Any
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates, DATA_FILE
+from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates, DATA_FILE, PORTFOLIO_DATA_FILE
 from app.portfolio_replayer import PortfolioReplayer
 import uvicorn
 import os
@@ -67,7 +67,7 @@ def get_portfolio_performance():
         
         # Load Price Data - SPECIFICALLY FOR PORTFOLIO from CSV
         unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
-        price_df = load_data(tickers=unique_tickers, start_date=oldest_tx_date)
+        price_df = load_data(filename=PORTFOLIO_DATA_FILE, tickers=unique_tickers, start_date=oldest_tx_date)
         
         if price_df is None or price_df.empty:
              print("Performance Debug: Portfolio price data is empty or None.")
@@ -340,13 +340,20 @@ class DownloadRequest(BaseModel):
     tickers: List[str]
     start_date: str
     end_date: str
+    filename: Optional[str] = None
     use_transaction_file: bool = False
 
 @app.post("/api/download")
 def download_stock_data(request: DownloadRequest):
     try:
+        # Determine target filename
+        target_file = request.filename if request.filename else DATA_FILE
+        # If it's a relative path name like "portfolio_stock_prices.csv", prepend DATA_DIR
+        if target_file and not os.path.isabs(target_file):
+            target_file = os.path.join(DATA_DIR, target_file)
+            
         # Save to CSV for all cases
-        result = download_data(request.tickers, request.start_date, request.end_date, filename=DATA_FILE)
+        result = download_data(request.tickers, request.start_date, request.end_date, filename=target_file)
         # Also download currency rates to CSV
         download_currency_rates()
         
@@ -436,7 +443,7 @@ def get_allocation_data(request: ScannerAllocationRequest):
             oldest_tx_date = oldest_tx_date.split('T')[0]
             
         unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
-        portfolio_prices = load_data(tickers=unique_tickers, start_date=oldest_tx_date)
+        portfolio_prices = load_data(filename=PORTFOLIO_DATA_FILE, tickers=unique_tickers, start_date=oldest_tx_date)
         
         # Load Currency Data from CSV - Only for currencies present in transactions
         unique_currencies = list(set([t.get('currency', 'PLN') for t in transactions]))
