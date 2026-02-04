@@ -50,13 +50,14 @@ def download_data(tickers: list[str], start_date: str, end_date: str, filename: 
     return {"message": "Data downloaded successfully", "path": filename}
 
 CURRENCY_DATA_FILE = os.path.join(DATA_DIR, "currency_prices.csv")
+PORTFOLIO_CURRENCY_DATA_FILE = os.path.join(DATA_DIR, "portfolio_currency_prices.csv")
 
-def download_currency_rates():
+def download_currency_rates(filename: str = CURRENCY_DATA_FILE, start_date: str = "2025-10-01"):
     """
     Downloads currency exchange rates for PLN/USD, PLN/EUR, PLN/GBP logic and saves to CSV.
     """
     tickers = ['USDPLN=X', 'EURPLN=X', 'GBPPLN=X', 'PLNUSD=X', 'PLNEUR=X', 'PLNGBP=X']
-    start_date = "2025-10-01"
+    # start_date is now an argument
     end_date = datetime.now().strftime('%Y-%m-%d')
     
     print(f"Downloading currency rates for {tickers} from {start_date} to today...")
@@ -70,12 +71,12 @@ def download_currency_rates():
         data = data.sort_index(axis=1)
         data = data.round(6)
         
-        data.to_csv(CURRENCY_DATA_FILE)
-        print(f"Currency data (Close only) saved to {CURRENCY_DATA_FILE}")
+        data.to_csv(filename)
+        print(f"Currency data (Close only) saved to {filename}")
         
         # Invalidate cache
-        if CURRENCY_DATA_FILE in _data_cache:
-            del _data_cache[CURRENCY_DATA_FILE]
+        if filename in _data_cache:
+            del _data_cache[filename]
             
         return True
     except Exception as e:
@@ -143,11 +144,11 @@ def get_intraday_prices(tickers: list[str]):
         return result
 
 
-def load_currency_data(start_date: Optional[str] = None, currencies: Optional[list[str]] = None):
+def load_currency_data(start_date: Optional[str] = None, currencies: Optional[list[str]] = None, filename: str = CURRENCY_DATA_FILE):
     """
     Loads currency exchange rates from CSV with caching.
     """
-    return load_data(CURRENCY_DATA_FILE)
+    return load_data(filename)
 
 
 def load_data(filename: str = DATA_FILE, tickers: list[str] = None, start_date: Optional[str] = None, columns: Optional[list[str]] = None):

@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, List, Any
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates, DATA_FILE, PORTFOLIO_DATA_FILE
+from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates, DATA_FILE, PORTFOLIO_DATA_FILE, PORTFOLIO_CURRENCY_DATA_FILE, CURRENCY_DATA_FILE
 from app.portfolio_replayer import PortfolioReplayer
 import uvicorn
 import os
@@ -76,7 +76,7 @@ def get_portfolio_performance():
         # Load Currency Data from CSV - Only for currencies present in transactions
         from app.data_loader import load_currency_data
         unique_currencies = list(set([t.get('currency', 'PLN') for t in transactions]))
-        currency_df = load_currency_data(start_date=oldest_tx_date, currencies=unique_currencies)
+        currency_df = load_currency_data(start_date=oldest_tx_date, currencies=unique_currencies, filename=PORTFOLIO_CURRENCY_DATA_FILE)
         
         # If currency_df is None (e.g. only PLN), create an empty DF with correct index to avoid errors
         if currency_df is None or currency_df.empty:
@@ -341,6 +341,7 @@ class DownloadRequest(BaseModel):
     start_date: str
     end_date: str
     filename: Optional[str] = None
+    currency_filename: Optional[str] = None
     use_transaction_file: bool = False
 
 @app.post("/api/download")
@@ -354,8 +355,14 @@ def download_stock_data(request: DownloadRequest):
             
         # Save to CSV for all cases
         result = download_data(request.tickers, request.start_date, request.end_date, filename=target_file)
+        
         # Also download currency rates to CSV
-        download_currency_rates()
+        currency_target = request.currency_filename if request.currency_filename else CURRENCY_DATA_FILE
+        # If relative, prepend DATA_DIR
+        if currency_target and not os.path.isabs(currency_target):
+            currency_target = os.path.join(DATA_DIR, currency_target)
+            
+        download_currency_rates(filename=currency_target, start_date=request.start_date)
         
         return result
     except Exception as e:
@@ -447,7 +454,7 @@ def get_allocation_data(request: ScannerAllocationRequest):
         
         # Load Currency Data from CSV - Only for currencies present in transactions
         unique_currencies = list(set([t.get('currency', 'PLN') for t in transactions]))
-        currency_df = load_currency_data(start_date=oldest_tx_date, currencies=unique_currencies)
+        currency_df = load_currency_data(start_date=oldest_tx_date, currencies=unique_currencies, filename=PORTFOLIO_CURRENCY_DATA_FILE)
         
         if currency_df is None or currency_df.empty:
              if any(curr != 'PLN' for curr in unique_currencies):

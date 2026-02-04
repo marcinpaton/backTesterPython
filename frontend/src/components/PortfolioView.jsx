@@ -154,11 +154,22 @@ const PortfolioView = ({ onBack }) => {
 
             // 2. Trigger download
             const today = new Date().toISOString().split('T')[0];
+
+            // Calculate start date: oldest transaction - 7 days
+            let startDate = '2025-12-01'; // Default fallback
+            if (transactions.length > 0) {
+                const dates = transactions.map(t => new Date(t.date));
+                const oldestDate = new Date(Math.min(...dates));
+                oldestDate.setDate(oldestDate.getDate() - 7);
+                startDate = oldestDate.toISOString().split('T')[0];
+            }
+
             await axios.post('http://127.0.0.1:8000/api/download', {
                 tickers: uniqueTickers,
-                start_date: '2025-12-01',
+                start_date: startDate,
                 end_date: today,
                 filename: 'portfolio_stock_prices.csv',
+                currency_filename: 'portfolio_currency_prices.csv',
                 use_transaction_file: true
             });
 
