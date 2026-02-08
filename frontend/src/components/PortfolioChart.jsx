@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, ReferenceLine } from 'recharts';
 
 const COLORS = [
     '#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899',
@@ -111,6 +111,32 @@ const PortfolioChart = ({ data, onDownloadPrices }) => {
 
     if (!data || data.length === 0) return <p className="text-gray-500">No performance data available.</p>;
 
+    // Identify start of each month for vertical lines
+    const startOfMonthDates = useMemo(() => {
+        const dates = [];
+        let lastMonth = null;
+
+        // Sort data by date just in case
+        const sortedData = [...data].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        sortedData.forEach(day => {
+            const dateObj = new Date(day.date);
+            const currentMonth = dateObj.getMonth();
+            const currentYear = dateObj.getFullYear();
+            const monthKey = `${currentYear}-${currentMonth}`;
+
+            if (lastMonth !== monthKey) {
+                // It's a new month!
+                // Skip the very first data point if it's the start of the chart's history to avoid line on Y-axis
+                if (lastMonth !== null) {
+                    dates.push(day.date);
+                }
+                lastMonth = monthKey;
+            }
+        });
+        return dates;
+    }, [data]);
+
     // Prepare data for Bar Chart (Composition)
     const { chartData, tickers } = useMemo(() => {
         const uniqueTickers = new Set();
@@ -183,6 +209,9 @@ const PortfolioChart = ({ data, onDownloadPrices }) => {
                             margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                         >
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            {startOfMonthDates.map(date => (
+                                <ReferenceLine key={date} x={date} stroke="red" strokeWidth={2} />
+                            ))}
                             <XAxis
                                 dataKey="date"
                                 tickFormatter={(str) => str.slice(0, 10)}
@@ -211,6 +240,9 @@ const PortfolioChart = ({ data, onDownloadPrices }) => {
                             margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                         >
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            {startOfMonthDates.map(date => (
+                                <ReferenceLine key={date} x={date} stroke="#fcd34d" strokeWidth={2} strokeDasharray="3 3" />
+                            ))}
                             <XAxis
                                 dataKey="date"
                                 tickFormatter={(str) => str.slice(0, 10)}
@@ -238,8 +270,8 @@ const PortfolioChart = ({ data, onDownloadPrices }) => {
                 <button
                     onClick={() => setTooltipMode('price')}
                     className={`px-3 py-1 text-sm font-medium rounded-full border ${tooltipMode === 'price'
-                            ? 'bg-blue-100 text-blue-700 border-blue-200'
-                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                         }`}
                 >
                     Show prices
@@ -247,8 +279,8 @@ const PortfolioChart = ({ data, onDownloadPrices }) => {
                 <button
                     onClick={() => setTooltipMode('pnl')}
                     className={`px-3 py-1 text-sm font-medium rounded-full border ${tooltipMode === 'pnl'
-                            ? 'bg-blue-100 text-blue-700 border-blue-200'
-                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                         }`}
                 >
                     Show P&L
