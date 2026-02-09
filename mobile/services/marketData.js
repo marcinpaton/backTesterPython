@@ -96,5 +96,6 @@ export const getCurrencyRates = async (base = 'PLN') => {
         }
     }));
 
+    console.log("Fetched Currency Rates (Mobile):", JSON.stringify(rates, null, 2));
     return rates;
 };
