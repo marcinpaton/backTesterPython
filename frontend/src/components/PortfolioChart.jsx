@@ -85,7 +85,7 @@ const AreaTooltip = ({ active, payload, label, mode }) => {
                             }
                             return (
                                 <div key={index} className="flex justify-between gap-4 text-xs">
-                                    <span>{item.ticker}:</span>
+                                    <span>{item.ticker} ({item.shares}):</span>
                                     <span className="text-gray-700">
                                         {item.price_native.toFixed(2)} {item.currency}
                                         {item.currency !== 'PLN' && (
