@@ -43,10 +43,15 @@ const HomeScreen = () => {
             // Mobile Replayer is complex. For now, let's just show Current Value
             // and a simulated chart of "Value if held" or just transaction accumulation.
 
+            // 4. Calculate Current Value & History
             let cash = 0;
             let holdings = {};
-            let historyPoints = [];
 
+            // We need to calculate state for BOTH current value AND history.
+            // But History requires "time travel".
+
+            // A. Calculate CURRENT STATE first (for Total Value display)
+            // Replay all transactions
             txData.forEach(tx => {
                 const t_type = tx.type;
                 const t_qty = parseFloat(tx.quantity) || 0;
@@ -54,39 +59,20 @@ const HomeScreen = () => {
                 const t_fee = parseFloat(tx.fee_pln) || 0;
                 const t_amount = parseFloat(tx.amount_pln) || 0;
 
-                if (t_type === 'DEPOSIT') {
-                    cash += Math.abs(t_amount);
-                }
-                else if (t_type === 'WITHDRAWAL') {
-                    cash -= Math.abs(t_amount);
-                }
+                if (t_type === 'DEPOSIT') cash += Math.abs(t_amount);
+                else if (t_type === 'WITHDRAWAL') cash -= Math.abs(t_amount);
                 else if (t_type === 'BUY') {
-                    // Replicate backend logic: cost = (qty * price) + fee
-                    // Fallback to t_amount if price/qty missing (but prefer calculated)
                     let cost = (t_qty * t_price) + t_fee;
                     if (cost === 0 && t_amount !== 0) cost = Math.abs(t_amount);
-
                     cash -= cost;
                     holdings[tx.ticker] = (holdings[tx.ticker] || 0) + t_qty;
-                    console.log(`BUY ${tx.ticker}: Cost ${cost.toFixed(2)} (Qty: ${t_qty}, Price: ${t_price}, Fee: ${t_fee}) -> New Cash: ${cash.toFixed(2)}`);
                 }
                 else if (t_type === 'SELL') {
-                    // Replicate backend logic: revenue = (qty * price) - fee
                     let revenue = (t_qty * t_price) - t_fee;
                     if (revenue === 0 && t_amount !== 0) revenue = Math.abs(t_amount);
-
                     cash += revenue;
                     holdings[tx.ticker] = (holdings[tx.ticker] || 0) - t_qty;
-                    console.log(`SELL ${tx.ticker}: Revenue ${revenue.toFixed(2)} -> New Cash: ${cash.toFixed(2)}`);
                 }
-
-                // Snapshot state at each transaction (Simplified history)
-                historyPoints.push({
-                    date: tx.date,
-                    total_value: cash // This is CASH only + Book Value of stocks?
-                    // Without historical prices, we can't calculate accurate history.
-                    // We will display "Net Invested Capital" history for now.
-                });
             });
 
             // Calculate CURRENT total value with LIVE prices
@@ -97,27 +83,124 @@ const HomeScreen = () => {
                     const priceInfo = prices[ticker];
                     if (priceInfo) {
                         const currency = priceInfo.currency || 'USD';
-                        const rate = currencyRates[currency] || 1.0;
+                        // Fix: currencyRates now returns object { current, history }
+                        const rateObj = currencyRates[currency];
+                        const rate = rateObj?.current || (currency === 'PLN' ? 1.0 : 0);
+
                         const val = shares * priceInfo.price * rate;
-                        console.log(`Valuation: ${ticker} | Shares: ${shares} | Price: ${priceInfo.price} ${currency} | Rate: ${rate} | Value: ${val.toFixed(2)} PLN`);
                         stocksValue += val;
                     }
                 }
             });
 
             const totalValue = cash + stocksValue;
-            console.log(`--- CALCULATION SUMMARY ---`);
-            console.log(`Final Cash: ${cash.toFixed(2)} PLN`);
-            console.log(`Stocks Value: ${stocksValue.toFixed(2)} PLN`);
-            console.log(`Total Value: ${totalValue.toFixed(2)} PLN`);
-            console.log(`---------------------------`);
             setPortfolioValue(totalValue);
 
-            // Add "Today" to history
-            historyPoints.push({
-                date: new Date().toISOString(),
-                total_value: totalValue
+            // B. Calculate 5-Day History
+            // Get dates from first ticker's history, or generate last 5 days
+            let chartDates = [];
+            const firstTicker = Object.keys(prices)[0];
+            if (firstTicker && prices[firstTicker]?.history?.length > 0) {
+                chartDates = prices[firstTicker].history.map(h => h.date);
+            } else {
+                // Fallback if no stocks or no history found
+                for (let i = 4; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    // Skip weekends in fallback? Simple check:
+                    if (d.getDay() !== 0 && d.getDay() !== 6) {
+                        chartDates.push(d.toISOString().split('T')[0]);
+                    }
+                }
+            }
+
+            // Replay for History Points
+            let historyPoints = [];
+            let h_cash = 0;
+            let h_holdings = {};
+            let txIndex = 0;
+
+            chartDates.forEach(date => {
+                // Advance state to this date
+                // Txs are sorted by date
+                // Fix: Compare YYYY-MM-DD parts to include transactions from the same day
+                while (txIndex < txData.length && txData[txIndex].date && txData[txIndex].date.substring(0, 10) <= date) {
+                    const tx = txData[txIndex];
+                    const t_type = tx.type;
+                    const t_qty = parseFloat(tx.quantity) || 0;
+                    const t_price = parseFloat(tx.price) || 0;
+                    const t_fee = parseFloat(tx.fee_pln) || 0;
+                    const t_amount = parseFloat(tx.amount_pln) || 0;
+
+                    if (t_type === 'DEPOSIT') h_cash += Math.abs(t_amount);
+                    else if (t_type === 'WITHDRAWAL') h_cash -= Math.abs(t_amount);
+                    else if (t_type === 'BUY') {
+                        let cost = (t_qty * t_price) + t_fee;
+                        if (cost === 0 && t_amount !== 0) cost = Math.abs(t_amount);
+                        h_cash -= cost;
+                        h_holdings[tx.ticker] = (h_holdings[tx.ticker] || 0) + t_qty;
+                    }
+                    else if (t_type === 'SELL') {
+                        let revenue = (t_qty * t_price) - t_fee;
+                        if (revenue === 0 && t_amount !== 0) revenue = Math.abs(t_amount);
+                        h_cash += revenue;
+                        h_holdings[tx.ticker] = (h_holdings[tx.ticker] || 0) - t_qty;
+                    }
+                    txIndex++;
+                }
+
+                // Calculate Value at this date
+                let dailyVal = h_cash;
+                Object.keys(h_holdings).forEach(ticker => {
+                    const shares = h_holdings[ticker];
+                    if (shares > 0) {
+                        const histPriceObj = prices[ticker]?.history?.find(h => h.date === date);
+                        // Fallback to current price if history missing for day?
+                        const price = histPriceObj ? histPriceObj.price : (prices[ticker]?.price || 0);
+
+                        const currency = prices[ticker]?.currency || 'PLN';
+                        const rateObj = currencyRates[currency];
+                        // Get historical rate or current
+                        let rate = 1.0;
+                        if (currency !== 'PLN') {
+                            rate = rateObj?.history?.[date] || rateObj?.current || 1.0;
+                        }
+
+                        dailyVal += (shares * price * rate);
+                    }
+                });
+
+                historyPoints.push({
+                    date: date,
+                    total_value: dailyVal
+                });
             });
+
+            // Ensure the last point reflects the LIVE totalValue
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (historyPoints.length > 0) {
+                const lastPoint = historyPoints[historyPoints.length - 1];
+                if (lastPoint.date === todayStr) {
+                    // Overwrite with live value (more accurate than "close")
+                    lastPoint.total_value = totalValue;
+                } else {
+                    // Append today if missing (e.g. market open but no close candle yet)
+                    historyPoints.push({
+                        date: todayStr,
+                        total_value: totalValue
+                    });
+                }
+            } else {
+                // Fallback if chartDates was empty
+                historyPoints.push({
+                    date: todayStr,
+                    total_value: totalValue
+                });
+            }
+
+            // Ensure we have at least "Today" if list is empty?
+            // If chartDates was empty, we might have issue. 
+            // But we handled fallbacks.
 
             setHistory(historyPoints);
 
@@ -166,17 +249,32 @@ const HomeScreen = () => {
                         {/* Holdings List (Optional) */}
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Recent Transactions</Text>
-                            {transactions.slice(-5).reverse().map((tx, index) => (
-                                <View key={index} style={styles.txRow}>
-                                    <View>
-                                        <Text style={styles.txType}>{tx.type}</Text>
-                                        <Text style={styles.txDate}>{tx.date}</Text>
+                            {transactions.slice(-5).reverse().map((tx, index) => {
+                                let amount = parseFloat(tx.amount_pln) || 0;
+
+                                // Logic for display: User requested NO FEES, just Qty * Price
+                                if (tx.type === 'BUY' || tx.type === 'SELL') {
+                                    const qty = parseFloat(tx.quantity) || 0;
+                                    const price = parseFloat(tx.price) || 0;
+                                    // Fee is ignored for display as per user request
+                                    amount = (qty * price);
+                                }
+
+                                const displayAmount = Math.abs(amount).toFixed(2);
+                                return (
+                                    <View key={index} style={styles.txRow}>
+                                        <View>
+                                            <Text style={styles.txType}>{tx.type} {tx.ticker ? `(${tx.ticker})` : ''}</Text>
+                                            <Text style={styles.txDate}>{new Date(tx.date).toLocaleDateString()}</Text>
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={[styles.txAmount, { color: tx.type === 'DEPOSIT' || tx.type === 'SELL' ? '#16a34a' : '#1f2937' }]}>
+                                                {displayAmount} PLN
+                                            </Text>
+                                        </View>
                                     </View>
-                                    <Text style={styles.txAmount}>
-                                        {parseFloat(tx.amount_pln).toFixed(2)} PLN
-                                    </Text>
-                                </View>
-                            ))}
+                                );
+                            })}
                         </View>
                     </>
                 )}
