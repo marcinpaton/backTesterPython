@@ -12,6 +12,7 @@ const HomeScreen = () => {
     const [portfolioValue, setPortfolioValue] = useState(0);
     const [transactions, setTransactions] = useState([]);
     const [history, setHistory] = useState([]); // Simplified history for chart
+    const [selectedPoint, setSelectedPoint] = useState(null); // For interactive chart
 
     const fetchData = async () => {
         try {
@@ -76,7 +77,10 @@ const HomeScreen = () => {
             });
 
             // Calculate CURRENT total value with LIVE prices
+            // Calculate CURRENT total value with LIVE prices
             let stocksValue = 0;
+            let liveAssets = [];
+
             Object.keys(holdings).forEach(ticker => {
                 const shares = holdings[ticker];
                 if (shares > 0) {
@@ -89,9 +93,30 @@ const HomeScreen = () => {
 
                         const val = shares * priceInfo.price * rate;
                         stocksValue += val;
+
+                        liveAssets.push({
+                            ticker,
+                            shares,
+                            price: priceInfo.price,
+                            currency,
+                            rate,
+                            valuePLN: val
+                        });
                     }
                 }
             });
+
+            if (Math.abs(cash) > 0.01) {
+                liveAssets.push({
+                    ticker: 'CASH',
+                    shares: cash,
+                    price: 1.0,
+                    currency: 'PLN',
+                    rate: 1.0,
+                    valuePLN: cash
+                });
+            }
+            liveAssets.sort((a, b) => b.valuePLN - a.valuePLN);
 
             const totalValue = cash + stocksValue;
             setPortfolioValue(totalValue);
@@ -151,6 +176,8 @@ const HomeScreen = () => {
 
                 // Calculate Value at this date
                 let dailyVal = h_cash;
+                let dailyAssets = [];
+
                 Object.keys(h_holdings).forEach(ticker => {
                     const shares = h_holdings[ticker];
                     if (shares > 0) {
@@ -166,43 +193,68 @@ const HomeScreen = () => {
                             rate = rateObj?.history?.[date] || rateObj?.current || 1.0;
                         }
 
-                        dailyVal += (shares * price * rate);
+                        const val = shares * price * rate;
+                        dailyVal += val;
+
+                        dailyAssets.push({
+                            ticker,
+                            shares,
+                            price,
+                            currency,
+                            rate,
+                            valuePLN: val
+                        });
                     }
                 });
 
+                if (Math.abs(h_cash) > 0.01) {
+                    dailyAssets.push({
+                        ticker: 'CASH',
+                        price: 1.0,
+                        currency: 'PLN',
+                        rate: 1.0,
+                        valuePLN: h_cash,
+                        shares: h_cash
+                    });
+                }
+                dailyAssets.sort((a, b) => b.valuePLN - a.valuePLN);
+
                 historyPoints.push({
                     date: date,
-                    total_value: dailyVal
+                    total_value: dailyVal,
+                    assets: dailyAssets
                 });
             });
 
-            // Ensure the last point reflects the LIVE totalValue
+            // Ensure the last point reflects the LIVE totalValue and liveAssets
             const todayStr = new Date().toISOString().split('T')[0];
             if (historyPoints.length > 0) {
                 const lastPoint = historyPoints[historyPoints.length - 1];
                 if (lastPoint.date === todayStr) {
                     // Overwrite with live value (more accurate than "close")
                     lastPoint.total_value = totalValue;
+                    lastPoint.assets = liveAssets;
                 } else {
                     // Append today if missing (e.g. market open but no close candle yet)
                     historyPoints.push({
                         date: todayStr,
-                        total_value: totalValue
+                        total_value: totalValue,
+                        assets: liveAssets
                     });
                 }
             } else {
                 // Fallback if chartDates was empty
                 historyPoints.push({
                     date: todayStr,
-                    total_value: totalValue
+                    total_value: totalValue,
+                    assets: liveAssets
                 });
             }
 
-            // Ensure we have at least "Today" if list is empty?
-            // If chartDates was empty, we might have issue. 
-            // But we handled fallbacks.
-
             setHistory(historyPoints);
+            if (historyPoints.length > 0) {
+                setSelectedPoint(historyPoints[historyPoints.length - 1]);
+            }
 
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -219,6 +271,12 @@ const HomeScreen = () => {
     const onRefresh = () => {
         setRefreshing(true);
         fetchData();
+    };
+
+    const handleChartPointClick = (index) => {
+        if (history[index]) {
+            setSelectedPoint(history[index]);
+        }
     };
 
     return (
@@ -244,7 +302,41 @@ const HomeScreen = () => {
                         </View>
 
                         {/* Chart Section */}
-                        <PortfolioChart data={history} />
+                        <PortfolioChart
+                            data={history}
+                            onPointClick={handleChartPointClick}
+                        />
+
+                        {/* Selected Point Details */}
+                        {selectedPoint && (
+                            <View style={styles.section}>
+                                <Text style={styles.sectionTitle}>
+                                    Details: {new Date(selectedPoint.date).toLocaleDateString()}
+                                </Text>
+                                <View style={styles.statRow}>
+                                    <Text style={styles.statLabel}>Valuation:</Text>
+                                    <Text style={styles.statValueSmall}>
+                                        {selectedPoint.total_value.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}
+                                    </Text>
+                                </View>
+                                <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 8 }} />
+                                {selectedPoint.assets && selectedPoint.assets.map((asset, idx) => (
+                                    <View key={idx} style={styles.assetRow}>
+                                        <View>
+                                            <Text style={styles.assetTicker}>{asset.ticker}</Text>
+                                            {asset.ticker !== 'CASH' && (
+                                                <Text style={styles.assetSub}>
+                                                    {asset.shares.toFixed(0)} x {asset.price.toFixed(2)} {asset.currency}
+                                                </Text>
+                                            )}
+                                        </View>
+                                        <Text style={styles.assetValue}>
+                                            {asset.valuePLN.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
 
                         {/* Holdings List (Optional) */}
                         <View style={styles.section}>
@@ -351,6 +443,41 @@ const styles = StyleSheet.create({
         color: '#9ca3af'
     },
     txAmount: {
+        fontWeight: 'bold',
+        color: '#1f2937'
+    },
+    statRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8
+    },
+    statLabel: {
+        fontSize: 14,
+        color: '#6b7280',
+    },
+    statValueSmall: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#1f2937'
+    },
+    assetRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 4,
+    },
+    assetTicker: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151'
+    },
+    assetSub: {
+        fontSize: 12,
+        color: '#9ca3af'
+    },
+    assetValue: {
+        fontSize: 14,
         fontWeight: 'bold',
         color: '#1f2937'
     }

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Dimensions, StyleSheet } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 
-const PortfolioChart = ({ data }) => {
+const PortfolioChart = ({ data, onPointClick }) => {
     if (!data || data.length === 0) {
         return (
             <View style={styles.container}>
@@ -40,6 +40,9 @@ const PortfolioChart = ({ data }) => {
                 yAxisLabel=""
                 yAxisSuffix=" zł"
                 yAxisInterval={1} // optional, defaults to 1
+                onDataPointClick={({ index }) => {
+                    if (onPointClick) onPointClick(index);
+                }}
                 chartConfig={{
                     backgroundColor: "#ffffff",
                     backgroundGradientFrom: "#ffffff",
@@ -51,7 +54,7 @@ const PortfolioChart = ({ data }) => {
                         borderRadius: 16
                     },
                     propsForDots: {
-                        r: "4",
+                        r: "6",
                         strokeWidth: "2",
                         stroke: "#2563eb"
                     }
