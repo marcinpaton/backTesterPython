@@ -36,6 +36,12 @@ const HomeScreen = () => {
             const prices = await getMarketPrices(uniqueTickers);
             const currencyRates = await getCurrencyRates(); // e.g. USDPLN
 
+            // Define dates early for use in liveAssets loop
+            const todayObj = new Date();
+            const todayStr = todayObj.toISOString().split('T')[0];
+            const startOfMonth = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toISOString().split('T')[0];
+            const startOfYear = new Date(todayObj.getFullYear(), 0, 1).toISOString().split('T')[0];
+
             // 4. Calculate Current Value (Simplified Replayer)
             let cash = 0;
             let holdings = {};
@@ -82,25 +88,34 @@ const HomeScreen = () => {
                         // Calculate daily change from history
                         const tickerHistory = priceInfo.history || [];
                         let changePct = priceInfo.change_pct; // Fallback
+                        let changeMtd = 0;
+
                         if (tickerHistory.length > 1) {
-                            // If market is open, history might contain today's partial candle at the end.
-                            // If range=1y, history contains many points.
-                            // We compare the current price (regularMarketPrice) with the PREVIOUS trading day's close.
-                            // If today's date is at the end of history, previous close is history[len-2]
+                            // Daily Change
                             const todayStrStrict = new Date().toISOString().split('T')[0];
                             const lastHistPoint = tickerHistory[tickerHistory.length - 1];
 
                             let prevClose;
                             if (lastHistPoint.date === todayStrStrict) {
-                                // Last point is today, previous close is one before
                                 prevClose = tickerHistory[tickerHistory.length - 2]?.price;
                             } else {
-                                // Last point is yesterday, it IS the previous close
                                 prevClose = lastHistPoint.price;
                             }
 
                             if (prevClose) {
                                 changePct = (priceInfo.price - prevClose) / prevClose;
+                            }
+
+                            // MTD Change
+                            // Find price at prevMonthDate
+                            // For live calculation, we want the price at the close of the PREVIOUS month.
+                            // However, we can't assume every ticker has a history point at exactly `prevMonthDate` (which is based on the first ticker).
+                            // So we find the last price strictly before startOfMonth.
+
+                            const priceAtMtdStartObj = tickerHistory.filter(h => h.date < startOfMonth).pop();
+
+                            if (priceAtMtdStartObj && priceAtMtdStartObj.price) {
+                                changeMtd = (priceInfo.price - priceAtMtdStartObj.price) / priceAtMtdStartObj.price;
                             }
                         }
 
@@ -111,7 +126,8 @@ const HomeScreen = () => {
                             currency,
                             rate,
                             valuePLN: val,
-                            change_pct: changePct
+                            change_pct: changePct,
+                            change_mtd: changeMtd
                         });
                     }
                 }
@@ -133,10 +149,6 @@ const HomeScreen = () => {
             setPortfolioValue(totalValue);
 
             // 5. Calculate Returns (Today, MTD, YTD)
-            const todayObj = new Date();
-            const todayStr = todayObj.toISOString().split('T')[0];
-            const startOfMonth = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toISOString().split('T')[0];
-            const startOfYear = new Date(todayObj.getFullYear(), 0, 1).toISOString().split('T')[0];
 
             // Helper to get value at specific date
             const calculateValueAtDate = (targetDate) => {
@@ -305,9 +317,31 @@ const HomeScreen = () => {
                         const tickerHistory = prices[ticker]?.history || [];
                         const histPriceIdx = tickerHistory.findIndex(h => h.date === date);
                         let histChange = 0;
+                        let histChangeMtd = 0;
+
                         if (histPriceIdx > 0) {
                             const prevPrice = tickerHistory[histPriceIdx - 1].price;
                             histChange = (price - prevPrice) / prevPrice;
+                        }
+
+                        // Calculate MTD change for historical date
+                        // 1. Get start of month for 'date'
+                        const currentRefDate = new Date(date);
+                        const startOfMonthForDate = new Date(currentRefDate.getFullYear(), currentRefDate.getMonth(), 1).toISOString().split('T')[0];
+
+                        // 2. Find latest available date BEFORE startOfMonthForDate (End of Prev Month)
+                        // We can verify if 'startOfMonthForDate' is actually the date we need to look back from.
+                        // Actually, MTD return is (Price_Current - Price_End_Of_Prev_Month) / Price_End_Of_Prev_Month
+                        let prevMonthEndPrice = 0;
+
+                        // Find the last history point strictly before startOfMonthForDate
+                        // We can't use 'getLatestAvailableDateBefore' easily here as it might not be in scope or correct context, 
+                        // but we have 'tickerHistory'.
+                        const prevMonthEndPoint = tickerHistory.filter(h => h.date < startOfMonthForDate).pop();
+
+                        if (prevMonthEndPoint) {
+                            prevMonthEndPrice = prevMonthEndPoint.price;
+                            histChangeMtd = (price - prevMonthEndPrice) / prevMonthEndPrice;
                         }
 
                         dailyAssets.push({
@@ -317,7 +351,8 @@ const HomeScreen = () => {
                             currency,
                             rate,
                             valuePLN: val,
-                            change_pct: histChange
+                            change_pct: histChange,
+                            change_mtd: histChangeMtd
                         });
                     }
                 });
@@ -492,6 +527,11 @@ const HomeScreen = () => {
                                                 {asset.change_pct != null && asset.ticker !== 'CASH' && (
                                                     <Text style={[styles.assetChange, { color: asset.change_pct >= 0 ? '#16a34a' : '#dc2626' }]}>
                                                         {asset.change_pct >= 0 ? '+' : ''}{(asset.change_pct * 100).toFixed(2)}%
+                                                    </Text>
+                                                )}
+                                                {asset.change_mtd != null && asset.ticker !== 'CASH' && (
+                                                    <Text style={[styles.assetChange, { marginLeft: 4, color: asset.change_mtd >= 0 ? '#16a34a' : '#dc2626' }]}>
+                                                        ({asset.change_mtd >= 0 ? '+' : ''}{(asset.change_mtd * 100).toFixed(2)}% MTD)
                                                     </Text>
                                                 )}
                                             </View>
