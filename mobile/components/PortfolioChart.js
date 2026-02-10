@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Dimensions, StyleSheet } from 'react-native';
+import { Circle, G, Rect } from 'react-native-svg';
 import { LineChart } from 'react-native-chart-kit';
 
 const PortfolioChart = ({ data, onPointClick }) => {
@@ -59,6 +60,26 @@ const PortfolioChart = ({ data, onPointClick }) => {
                         stroke: "#2563eb"
                     }
                 }}
+                renderDotContent={({ x, y, index, indexData }) => (
+                    <G key={index}>
+                        <Circle
+                            cx={x}
+                            cy={y}
+                            r={6}
+                            stroke="#2563eb"
+                            strokeWidth={2}
+                            fill="#2563eb"
+                        />
+                        <Rect
+                            x={x - 24}
+                            y={y - 24}
+                            width={48}
+                            height={48}
+                            fill="transparent"
+                            onPress={() => onPointClick && onPointClick(index)}
+                        />
+                    </G>
+                )}
                 bezier
                 style={{
                     marginVertical: 8,
