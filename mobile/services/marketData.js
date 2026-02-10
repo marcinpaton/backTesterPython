@@ -118,6 +118,24 @@ export const getMarketPrices = async (tickers) => {
         }
     }
 
+    const summary = {};
+    Object.keys(prices).forEach(t => {
+        summary[t] = { price: prices[t].price, currency: prices[t].currency };
+    });
+    console.log("Fetched Market Prices (Mobile):", JSON.stringify(summary));
+
+    // Log a summary of history ONLY when we did a fresh 1y fetch
+    if (!isHistoryFresh) {
+        const histSummary = {};
+        Object.keys(prices).forEach(t => {
+            histSummary[t] = {
+                price: prices[t].price,
+                historyPoints: prices[t].history?.length || 0
+            };
+        });
+        console.log("Full Market History Fetched (Summary):", JSON.stringify(histSummary));
+    }
+
     return prices;
 };
 
@@ -198,7 +216,11 @@ export const getCurrencyRates = async (base = 'PLN') => {
         }
     }
 
-    console.log("Fetched Currency Rates (Mobile):", JSON.stringify(rates, null, 2));
+    const summary = {};
+    Object.keys(rates).forEach(c => {
+        summary[c] = { current: rates[c].current };
+    });
+    console.log("Fetched Currency Rates (Mobile):", JSON.stringify(summary));
     return rates;
 };
 
