@@ -633,17 +633,22 @@ const styles = StyleSheet.create({
     },
     returnItem: {
         alignItems: 'center',
-        flex: 1
+        flex: 1,
+        backgroundColor: '#ffffff',
+        marginHorizontal: 4,
+        paddingVertical: 8,
+        borderRadius: 10,
     },
     returnLabelText: {
-        color: '#bfdbfe', // Blue-200
-        fontSize: 12,
-        fontWeight: '600',
-        marginBottom: 2
+        color: '#000000',
+        fontSize: 11,
+        fontWeight: 'bold',
+        marginBottom: 2,
+        textTransform: 'uppercase'
     },
     returnValueText: {
-        fontSize: 16,
-        fontWeight: 'bold'
+        fontSize: 18,
+        fontWeight: '900'
     },
     clearCacheButton: {
         backgroundColor: '#fee2e2', // Red-100
