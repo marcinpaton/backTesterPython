@@ -226,16 +226,25 @@ const HomeScreen = () => {
                 ytd: v_ytd > 0 ? (totalValue - v_ytd) / v_ytd : 0
             });
 
-            // B. Calculate Chart History (Last 5 available days)
+            // B. Calculate Chart History (Exactly 5 available days including Today)
             let chartDates = [];
             const firstTicker = Object.keys(prices)[0];
-            if (firstTicker && prices[firstTicker]?.history?.length > 0) {
-                // Take last 5 points
-                chartDates = prices[firstTicker].history.slice(-5).map(h => h.date);
+            const tickerHistory = prices[firstTicker]?.history || [];
+
+            if (tickerHistory.length > 0) {
+                // Determine if today is already the last point in history
+                const lastHistDate = tickerHistory[tickerHistory.length - 1].date;
+                const isTodayInHistory = lastHistDate === todayStr;
+
+                // If today is in history, take last 5. 
+                // If not, take last 4 (as we will append today later)
+                const takeCount = isTodayInHistory ? 5 : 4;
+                chartDates = tickerHistory.slice(-takeCount).map(h => h.date);
             } else {
-                for (let i = 4; i >= 0; i--) {
+                // Fallback if no history
+                for (let i = 3; i >= 0; i--) {
                     const d = new Date();
-                    d.setDate(d.getDate() - i);
+                    d.setDate(d.getDate() - (i + 1));
                     if (d.getDay() !== 0 && d.getDay() !== 6) {
                         chartDates.push(d.toISOString().split('T')[0]);
                     }
