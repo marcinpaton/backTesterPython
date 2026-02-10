@@ -13,6 +13,7 @@ const HomeScreen = () => {
     const [transactions, setTransactions] = useState([]);
     const [history, setHistory] = useState([]); // Simplified history for chart
     const [selectedPoint, setSelectedPoint] = useState(null); // For interactive chart
+    const [returns, setReturns] = useState({ today: 0, mtd: 0, ytd: 0 });
 
     const fetchData = async () => {
         try {
@@ -35,24 +36,9 @@ const HomeScreen = () => {
             const currencyRates = await getCurrencyRates(); // e.g. USDPLN
 
             // 4. Calculate Current Value (Simplified Replayer)
-            // For chart history, we'd need historical prices.
-            // For this prototype, we'll just show Current Value and maybe
-            // a "fake" history based on transaction dates + current price (flat line projection)
-            // or fetch historical data if possible.
-            // 
-            // REAL IMPLEMENTATION for Chart:
-            // Mobile Replayer is complex. For now, let's just show Current Value
-            // and a simulated chart of "Value if held" or just transaction accumulation.
-
-            // 4. Calculate Current Value & History
             let cash = 0;
             let holdings = {};
 
-            // We need to calculate state for BOTH current value AND history.
-            // But History requires "time travel".
-
-            // A. Calculate CURRENT STATE first (for Total Value display)
-            // Replay all transactions
             txData.forEach(tx => {
                 const t_type = tx.type;
                 const t_qty = parseFloat(tx.quantity) || 0;
@@ -77,7 +63,6 @@ const HomeScreen = () => {
             });
 
             // Calculate CURRENT total value with LIVE prices
-            // Calculate CURRENT total value with LIVE prices
             let stocksValue = 0;
             let liveAssets = [];
 
@@ -87,7 +72,6 @@ const HomeScreen = () => {
                     const priceInfo = prices[ticker];
                     if (priceInfo) {
                         const currency = priceInfo.currency || 'USD';
-                        // Fix: currencyRates now returns object { current, history }
                         const rateObj = currencyRates[currency];
                         const rate = rateObj?.current || (currency === 'PLN' ? 1.0 : 0);
 
@@ -121,51 +105,139 @@ const HomeScreen = () => {
             const totalValue = cash + stocksValue;
             setPortfolioValue(totalValue);
 
-            // B. Calculate 5-Day History
-            // Get dates from first ticker's history, or generate last 5 days
+            // 5. Calculate Returns (Today, MTD, YTD)
+            const todayObj = new Date();
+            const todayStr = todayObj.toISOString().split('T')[0];
+            const startOfMonth = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toISOString().split('T')[0];
+            const startOfYear = new Date(todayObj.getFullYear(), 0, 1).toISOString().split('T')[0];
+
+            // Helper to get value at specific date
+            const calculateValueAtDate = (targetDate) => {
+                let h_cash = 0;
+                let h_holdings = {};
+                let h_txIndex = 0;
+
+                // 1. Replay Transactions up to targetDate
+                while (h_txIndex < txData.length && txData[h_txIndex].date && txData[h_txIndex].date.substring(0, 10) < targetDate) {
+                    const tx = txData[h_txIndex];
+                    const t_qty = parseFloat(tx.quantity) || 0;
+                    const t_price = parseFloat(tx.price) || 0;
+                    const t_fee = parseFloat(tx.fee_pln) || 0;
+                    const t_amount = parseFloat(tx.amount_pln) || 0;
+
+                    if (tx.type === 'DEPOSIT') h_cash += Math.abs(t_amount);
+                    else if (tx.type === 'WITHDRAWAL') h_cash -= Math.abs(t_amount);
+                    else if (tx.type === 'BUY') {
+                        let cost = (t_qty * t_price) + t_fee;
+                        if (cost === 0 && t_amount !== 0) cost = Math.abs(t_amount);
+                        h_cash -= cost;
+                        h_holdings[tx.ticker] = (h_holdings[tx.ticker] || 0) + t_qty;
+                    }
+                    else if (tx.type === 'SELL') {
+                        let revenue = (t_qty * t_price) - t_fee;
+                        if (revenue === 0 && t_amount !== 0) revenue = Math.abs(t_amount);
+                        h_cash += revenue;
+                        h_holdings[tx.ticker] = (h_holdings[tx.ticker] || 0) - t_qty;
+                    }
+                    h_txIndex++;
+                }
+
+                // 2. Value assets at targetDate
+                let h_stocksValue = 0;
+                Object.keys(h_holdings).forEach(ticker => {
+                    const shares = h_holdings[ticker];
+                    if (shares > 0) {
+                        const tickerHistory = prices[ticker]?.history || [];
+                        // Find the closest price BEFORE or ON targetDate
+                        const pricePoint = tickerHistory.reduce((prev, curr) => {
+                            if (curr.date <= targetDate) return curr;
+                            return prev;
+                        }, tickerHistory[0]);
+
+                        const price = pricePoint ? pricePoint.price : (prices[ticker]?.price || 0);
+                        const currency = prices[ticker]?.currency || 'USD';
+                        const rateObj = currencyRates[currency];
+
+                        // Get historical rate
+                        let rate = 1.0;
+                        if (currency !== 'PLN' && rateObj?.history) {
+                            // Find closest rate
+                            const rateDate = Object.keys(rateObj.history).reduce((prev, curr) => {
+                                if (curr <= targetDate) return curr;
+                                return prev;
+                            }, Object.keys(rateObj.history)[0]);
+                            rate = rateObj.history[rateDate] || rateObj.current || 1.0;
+                        }
+
+                        h_stocksValue += (shares * price * rate);
+                    }
+                });
+
+                return h_cash + h_stocksValue;
+            };
+
+            // Get benchmark dates - we need the CLOSE price of the PREVIOUS day for these calculations
+            // To be robust, we find the latest date in history strictly < targetDate
+            const getLatestAvailableDateBefore = (targetDate) => {
+                const firstTicker = Object.keys(prices)[0];
+                if (!firstTicker || !prices[firstTicker].history) return targetDate;
+                const dates = prices[firstTicker].history.map(h => h.date).filter(d => d < targetDate);
+                return dates.length > 0 ? dates[dates.length - 1] : targetDate;
+            };
+
+            const prevDayDate = getLatestAvailableDateBefore(todayStr);
+            const prevMonthDate = getLatestAvailableDateBefore(startOfMonth);
+            const prevYearDate = getLatestAvailableDateBefore(startOfYear);
+
+            const v_prev = calculateValueAtDate(prevDayDate);
+            const v_mtd = calculateValueAtDate(prevMonthDate);
+            const v_ytd = calculateValueAtDate(prevYearDate);
+
+            setReturns({
+                today: v_prev > 0 ? (totalValue - v_prev) / v_prev : 0,
+                mtd: v_mtd > 0 ? (totalValue - v_mtd) / v_mtd : 0,
+                ytd: v_ytd > 0 ? (totalValue - v_ytd) / v_ytd : 0
+            });
+
+            // B. Calculate Chart History (Last 5 available days)
             let chartDates = [];
             const firstTicker = Object.keys(prices)[0];
             if (firstTicker && prices[firstTicker]?.history?.length > 0) {
-                chartDates = prices[firstTicker].history.map(h => h.date);
+                // Take last 5 points
+                chartDates = prices[firstTicker].history.slice(-5).map(h => h.date);
             } else {
-                // Fallback if no stocks or no history found
                 for (let i = 4; i >= 0; i--) {
                     const d = new Date();
                     d.setDate(d.getDate() - i);
-                    // Skip weekends in fallback? Simple check:
                     if (d.getDay() !== 0 && d.getDay() !== 6) {
                         chartDates.push(d.toISOString().split('T')[0]);
                     }
                 }
             }
 
-            // Replay for History Points
+            // Replay for Chart Points
             let historyPoints = [];
             let h_cash = 0;
             let h_holdings = {};
             let txIndex = 0;
 
             chartDates.forEach(date => {
-                // Advance state to this date
-                // Txs are sorted by date
-                // Fix: Compare YYYY-MM-DD parts to include transactions from the same day
                 while (txIndex < txData.length && txData[txIndex].date && txData[txIndex].date.substring(0, 10) <= date) {
                     const tx = txData[txIndex];
-                    const t_type = tx.type;
                     const t_qty = parseFloat(tx.quantity) || 0;
                     const t_price = parseFloat(tx.price) || 0;
                     const t_fee = parseFloat(tx.fee_pln) || 0;
                     const t_amount = parseFloat(tx.amount_pln) || 0;
 
-                    if (t_type === 'DEPOSIT') h_cash += Math.abs(t_amount);
-                    else if (t_type === 'WITHDRAWAL') h_cash -= Math.abs(t_amount);
-                    else if (t_type === 'BUY') {
+                    if (tx.type === 'DEPOSIT') h_cash += Math.abs(t_amount);
+                    else if (tx.type === 'WITHDRAWAL') h_cash -= Math.abs(t_amount);
+                    else if (tx.type === 'BUY') {
                         let cost = (t_qty * t_price) + t_fee;
                         if (cost === 0 && t_amount !== 0) cost = Math.abs(t_amount);
                         h_cash -= cost;
                         h_holdings[tx.ticker] = (h_holdings[tx.ticker] || 0) + t_qty;
                     }
-                    else if (t_type === 'SELL') {
+                    else if (tx.type === 'SELL') {
                         let revenue = (t_qty * t_price) - t_fee;
                         if (revenue === 0 && t_amount !== 0) revenue = Math.abs(t_amount);
                         h_cash += revenue;
@@ -174,7 +246,6 @@ const HomeScreen = () => {
                     txIndex++;
                 }
 
-                // Calculate Value at this date
                 let dailyVal = h_cash;
                 let dailyAssets = [];
 
@@ -182,12 +253,10 @@ const HomeScreen = () => {
                     const shares = h_holdings[ticker];
                     if (shares > 0) {
                         const histPriceObj = prices[ticker]?.history?.find(h => h.date === date);
-                        // Fallback to current price if history missing for day?
                         const price = histPriceObj ? histPriceObj.price : (prices[ticker]?.price || 0);
 
                         const currency = prices[ticker]?.currency || 'PLN';
                         const rateObj = currencyRates[currency];
-                        // Get historical rate or current
                         let rate = 1.0;
                         if (currency !== 'PLN') {
                             rate = rateObj?.history?.[date] || rateObj?.current || 1.0;
@@ -226,29 +295,19 @@ const HomeScreen = () => {
                 });
             });
 
-            // Ensure the last point reflects the LIVE totalValue and liveAssets
-            const todayStr = new Date().toISOString().split('T')[0];
+            // Ensure the last point reflects the LIVE totalValue
             if (historyPoints.length > 0) {
                 const lastPoint = historyPoints[historyPoints.length - 1];
                 if (lastPoint.date === todayStr) {
-                    // Overwrite with live value (more accurate than "close")
                     lastPoint.total_value = totalValue;
                     lastPoint.assets = liveAssets;
                 } else {
-                    // Append today if missing (e.g. market open but no close candle yet)
                     historyPoints.push({
                         date: todayStr,
                         total_value: totalValue,
                         assets: liveAssets
                     });
                 }
-            } else {
-                // Fallback if chartDates was empty
-                historyPoints.push({
-                    date: todayStr,
-                    total_value: totalValue,
-                    assets: liveAssets
-                });
             }
 
             setHistory(historyPoints);
@@ -279,6 +338,18 @@ const HomeScreen = () => {
         }
     };
 
+    const ReturnLabel = ({ label, value }) => {
+        const isPositive = value >= 0;
+        return (
+            <View style={styles.returnItem}>
+                <Text style={styles.returnLabelText}>{label}</Text>
+                <Text style={[styles.returnValueText, { color: isPositive ? '#16a34a' : '#dc2626' }]}>
+                    {isPositive ? '+' : ''}{(value * 100).toFixed(2)}%
+                </Text>
+            </View>
+        );
+    };
+
     return (
         <View style={styles.container}>
             <ExpoStatusBar style="auto" />
@@ -295,10 +366,18 @@ const HomeScreen = () => {
                 ) : (
                     <>
                         <View style={styles.summaryCard}>
-                            <Text style={styles.summaryLabel}>Total Value</Text>
-                            <Text style={styles.summaryValue}>
-                                {portfolioValue.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}
-                            </Text>
+                            <View>
+                                <Text style={styles.summaryLabel}>Total Value</Text>
+                                <Text style={styles.summaryValue}>
+                                    {portfolioValue.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}
+                                </Text>
+                            </View>
+
+                            <View style={styles.returnsContainer}>
+                                <ReturnLabel label="Today" value={returns.today} />
+                                <ReturnLabel label="MTD" value={returns.mtd} />
+                                <ReturnLabel label="YTD" value={returns.ytd} />
+                            </View>
                         </View>
 
                         {/* Chart Section */}
@@ -480,6 +559,28 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold',
         color: '#1f2937'
+    },
+    returnsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.2)'
+    },
+    returnItem: {
+        alignItems: 'center',
+        flex: 1
+    },
+    returnLabelText: {
+        color: '#bfdbfe', // Blue-200
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 2
+    },
+    returnValueText: {
+        fontSize: 16,
+        fontWeight: 'bold'
     }
 });
 

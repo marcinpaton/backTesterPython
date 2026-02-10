@@ -28,7 +28,9 @@ export const getMarketPrices = async (tickers) => {
             // Fetch 5 days history + current
             // Using range=1mo to be safe and slice later, or 7d. 5d is exact.
             // Yahoo API: range=5d filters weekends automatically.
-            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d`);
+            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`, {
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
             const data = await response.json();
 
             if (data.chart && data.chart.result && data.chart.result.length > 0) {
@@ -75,7 +77,9 @@ export const getCurrencyRates = async (base = 'PLN') => {
 
     await Promise.all(pairs.map(async (pair) => {
         try {
-            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${pair}?interval=1d&range=5d`);
+            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${pair}?interval=1d&range=1y`, {
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
             const data = await response.json();
             if (data.chart && data.chart.result && data.chart.result.length > 0) {
                 const result = data.chart.result[0];
