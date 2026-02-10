@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, StatusBar, TouchableOpacity } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { supabase } from '../services/supabase';
-import { getMarketPrices, getCurrencyRates } from '../services/marketData';
+import { getMarketPrices, getCurrencyRates, clearCache } from '../services/marketData';
 import { calculatePortfolioState } from '../utils/portfolio'; // Assuming we have this, or simple logic here
 import PortfolioChart from '../components/PortfolioChart';
 
@@ -332,6 +332,12 @@ const HomeScreen = () => {
         fetchData();
     };
 
+    const handleClearCache = async () => {
+        setLoading(true);
+        await clearCache();
+        await fetchData();
+    };
+
     const handleChartPointClick = (index) => {
         if (history[index]) {
             setSelectedPoint(history[index]);
@@ -446,6 +452,15 @@ const HomeScreen = () => {
                                     </View>
                                 );
                             })}
+                        </View>
+
+                        <View style={{ marginBottom: 40, marginTop: 10 }}>
+                            <TouchableOpacity
+                                style={styles.clearCacheButton}
+                                onPress={handleClearCache}
+                            >
+                                <Text style={styles.clearCacheButtonText}>Clear cache</Text>
+                            </TouchableOpacity>
                         </View>
                     </>
                 )}
@@ -581,6 +596,20 @@ const styles = StyleSheet.create({
     returnValueText: {
         fontSize: 16,
         fontWeight: 'bold'
+    },
+    clearCacheButton: {
+        backgroundColor: '#fee2e2', // Red-100
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#fecaca', // Red-200
+    },
+    clearCacheButtonText: {
+        color: '#b91c1c', // Red-700
+        fontWeight: 'bold',
+        fontSize: 14
     }
 });
 
