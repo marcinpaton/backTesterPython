@@ -5,6 +5,7 @@ import { supabase } from '../services/supabase';
 import { getMarketPrices, getCurrencyRates, clearCache } from '../services/marketData';
 import { calculatePortfolioState } from '../utils/portfolio'; // Assuming we have this, or simple logic here
 import PortfolioChart from '../components/PortfolioChart';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const HomeScreen = () => {
     const [loading, setLoading] = useState(true);
@@ -374,6 +375,11 @@ const HomeScreen = () => {
         await fetchData();
     };
 
+    const handleManualRefresh = () => {
+        setRefreshing(true);
+        fetchData();
+    };
+
     const handleChartPointClick = (index) => {
         if (history[index]) {
             setSelectedPoint(history[index]);
@@ -408,11 +414,25 @@ const HomeScreen = () => {
                 ) : (
                     <>
                         <View style={styles.summaryCard}>
-                            <View>
-                                <Text style={styles.summaryLabel}>Total Value</Text>
-                                <Text style={styles.summaryValue}>
-                                    {portfolioValue.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}
-                                </Text>
+                            <View style={styles.summaryHeader}>
+                                <View>
+                                    <Text style={styles.summaryLabel}>Total Value</Text>
+                                    <Text style={styles.summaryValue}>
+                                        {portfolioValue.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={handleManualRefresh}
+                                    style={styles.refreshButton}
+                                    disabled={loading || refreshing}
+                                >
+                                    <MaterialCommunityIcons
+                                        name="refresh"
+                                        size={28}
+                                        color="#ffffff"
+                                        style={{ opacity: (loading || refreshing) ? 0.5 : 1 }}
+                                    />
+                                </TouchableOpacity>
                             </View>
 
                             <View style={styles.returnsContainer}>
@@ -431,9 +451,23 @@ const HomeScreen = () => {
                         {/* Selected Point Details */}
                         {selectedPoint && (
                             <View style={styles.section}>
-                                <Text style={styles.sectionTitle}>
-                                    Details: {new Date(selectedPoint.date).toLocaleDateString()}
-                                </Text>
+                                <View style={styles.summaryHeader}>
+                                    <Text style={styles.sectionTitle}>
+                                        Details: {new Date(selectedPoint.date).toLocaleDateString()}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={handleManualRefresh}
+                                        style={styles.refreshButton}
+                                        disabled={loading || refreshing}
+                                    >
+                                        <MaterialCommunityIcons
+                                            name="refresh"
+                                            size={24}
+                                            color="#2563eb"
+                                            style={{ opacity: (loading || refreshing) ? 0.5 : 1 }}
+                                        />
+                                    </TouchableOpacity>
+                                </View>
                                 <View style={styles.statRow}>
                                     <Text style={styles.statLabel}>Valuation:</Text>
                                     <Text style={styles.statValueSmall}>
@@ -531,14 +565,23 @@ const styles = StyleSheet.create({
     },
     summaryCard: {
         backgroundColor: '#2563eb', // Blue-600
-        borderRadius: 16,
-        padding: 24,
-        marginBottom: 20,
-        shadowColor: '#2563eb',
+        padding: 20,
+        borderRadius: 20,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 5
+    },
+    summaryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start'
+    },
+    refreshButton: {
+        padding: 4,
+        marginTop: -4,
+        marginRight: -4
     },
     summaryLabel: {
         color: '#bfdbfe', // Blue-200
