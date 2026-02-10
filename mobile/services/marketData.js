@@ -8,7 +8,7 @@ const CACHE_KEYS = {
     CURRENCIES: 'currency_rates_cache'
 };
 
-const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours in ms
+const HISTORY_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours for history
 
 // Helper to parsing Yahoo chart timestamps
 const parseYahooHistory = (result) => {
@@ -30,31 +30,32 @@ const parseYahooHistory = (result) => {
 export const getMarketPrices = async (tickers) => {
     if (!tickers || tickers.length === 0) return {};
 
-    // 1. Try to load from cache
-    try {
-        const cachedData = await AsyncStorage.getItem(CACHE_KEYS.PRICES);
-        if (cachedData) {
-            const { data, timestamp } = JSON.parse(cachedData);
-            const now = Date.now();
+    const now = Date.now();
+    let cachedDataObj = null;
 
-            // Check if ALL requested tickers are in cache and cache is fresh
-            const hasAllTickers = tickers.every(t => data[t]);
-            if (hasAllTickers && (now - timestamp < CACHE_DURATION)) {
-                console.log('Using cached market prices');
-                return data;
-            }
+    // 1. Load from cache (to get history)
+    try {
+        const cachedStr = await AsyncStorage.getItem(CACHE_KEYS.PRICES);
+        if (cachedStr) {
+            cachedDataObj = JSON.parse(cachedStr);
         }
     } catch (e) {
         console.error('Error reading prices cache:', e);
     }
 
-    // 2. Fetch fresh data
+    // 2. Fetch fresh data (Always fetch at least current price)
     const prices = {};
-    console.log('Fetching fresh market prices from Yahoo...');
+    const timestamp = cachedDataObj?.timestamp || 0;
+    const isHistoryFresh = (now - timestamp < HISTORY_CACHE_DURATION);
+
+    console.log(`Fetching market prices (Mode: ${isHistoryFresh ? 'Price only' : 'Full history'})...`);
 
     const promises = tickers.map(async (ticker) => {
         try {
-            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`, {
+            const cachedTicker = cachedDataObj?.data?.[ticker];
+            const range = (isHistoryFresh && cachedTicker?.history) ? '1d' : '1y';
+
+            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`, {
                 headers: { 'User-Agent': 'Mozilla/5.0' }
             });
             const data = await response.json();
@@ -63,26 +64,41 @@ export const getMarketPrices = async (tickers) => {
                 const result = data.chart.result[0];
                 let price = result.meta.regularMarketPrice;
                 let currency = result.meta.currency;
-                const previousClose = result.meta.previousClose;
+                let prevClose = result.meta.previousClose;
 
-                // Parse history
-                let history = parseYahooHistory(result);
-
+                // 1. Handle GBp (pence) to GBP conversion immediately
                 if (currency === 'GBp') {
                     price = price / 100;
+                    prevClose = prevClose / 100;
                     currency = 'GBP';
+                }
+
+                // 2. Parse history from fetch
+                let history = parseYahooHistory(result);
+                if (result.meta.currency === 'GBp') {
                     history = history.map(h => ({ ...h, price: h.price / 100 }));
+                }
+
+                // 3. If we only fetched 1d, merge with cached history (which is already in GBP)
+                if (range === '1d' && cachedTicker?.history) {
+                    history = cachedTicker.history;
                 }
 
                 prices[ticker] = {
                     price: price,
                     currency: currency,
-                    change_pct: (price - previousClose) / previousClose,
+                    change_pct: (price - prevClose) / prevClose,
                     history: history
                 };
+            } else if (cachedTicker) {
+                // Fallback to cache if fetch fails
+                prices[ticker] = cachedTicker;
             }
         } catch (error) {
             console.error(`Error fetching price for ${ticker}:`, error);
+            if (cachedDataObj?.data?.[ticker]) {
+                prices[ticker] = cachedDataObj.data[ticker];
+            }
         }
     });
 
@@ -91,9 +107,11 @@ export const getMarketPrices = async (tickers) => {
     // 3. Save to cache
     if (Object.keys(prices).length > 0) {
         try {
+            // Only update timestamp if we did a full history fetch
+            const newTimestamp = isHistoryFresh ? timestamp : now;
             await AsyncStorage.setItem(CACHE_KEYS.PRICES, JSON.stringify({
                 data: prices,
-                timestamp: Date.now()
+                timestamp: newTimestamp
             }));
         } catch (e) {
             console.error('Error saving prices cache:', e);
@@ -105,17 +123,14 @@ export const getMarketPrices = async (tickers) => {
 
 // Helper for currency conversion
 export const getCurrencyRates = async (base = 'PLN') => {
-    // 1. Try to load from cache
-    try {
-        const cachedData = await AsyncStorage.getItem(CACHE_KEYS.CURRENCIES);
-        if (cachedData) {
-            const { data, timestamp } = JSON.parse(cachedData);
-            const now = Date.now();
+    const now = Date.now();
+    let cachedDataObj = null;
 
-            if (now - timestamp < CACHE_DURATION) {
-                console.log('Using cached currency rates');
-                return data;
-            }
+    // 1. Load from cache
+    try {
+        const cachedStr = await AsyncStorage.getItem(CACHE_KEYS.CURRENCIES);
+        if (cachedStr) {
+            cachedDataObj = JSON.parse(cachedStr);
         }
     } catch (e) {
         console.error('Error reading currency cache:', e);
@@ -127,39 +142,56 @@ export const getCurrencyRates = async (base = 'PLN') => {
         'PLN': { current: 1.0, history: {} }
     };
 
-    console.log('Fetching fresh currency rates from Yahoo...');
+    const timestamp = cachedDataObj?.timestamp || 0;
+    const isHistoryFresh = (now - timestamp < HISTORY_CACHE_DURATION);
+
+    console.log(`Fetching currency rates (Mode: ${isHistoryFresh ? 'Rate only' : 'Full history'})...`);
 
     await Promise.all(pairs.map(async (pair) => {
         try {
-            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${pair}?interval=1d&range=1y`, {
+            const currency = pair.substring(0, 3);
+            const cachedCurrency = cachedDataObj?.data?.[currency];
+            const range = (isHistoryFresh && cachedCurrency?.history) ? '1d' : '1y';
+
+            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${pair}?interval=1d&range=${range}`, {
                 headers: { 'User-Agent': 'Mozilla/5.0' }
             });
             const data = await response.json();
             if (data.chart && data.chart.result && data.chart.result.length > 0) {
                 const result = data.chart.result[0];
                 const price = result.meta.regularMarketPrice;
-                const currency = pair.substring(0, 3); // USD, EUR -> PLN rate
 
-                const historyArr = parseYahooHistory(result);
-                const historyMap = {};
-                historyArr.forEach(h => historyMap[h.date] = h.price);
+                let historyMap = {};
+                if (range === '1y') {
+                    const historyArr = parseYahooHistory(result);
+                    historyArr.forEach(h => historyMap[h.date] = h.price);
+                } else if (cachedCurrency?.history) {
+                    historyMap = cachedCurrency.history;
+                }
 
                 rates[currency] = {
                     current: price,
                     history: historyMap
                 };
+            } else if (cachedCurrency) {
+                rates[currency] = cachedCurrency;
             }
         } catch (e) {
             console.error(`Error fetching rate for ${pair}:`, e);
+            const currency = pair.substring(0, 3);
+            if (cachedDataObj?.data?.[currency]) {
+                rates[currency] = cachedDataObj.data[currency];
+            }
         }
     }));
 
     // 3. Save to cache
     if (Object.keys(rates).length > 1) {
         try {
+            const newTimestamp = isHistoryFresh ? timestamp : now;
             await AsyncStorage.setItem(CACHE_KEYS.CURRENCIES, JSON.stringify({
                 data: rates,
-                timestamp: Date.now()
+                timestamp: newTimestamp
             }));
         } catch (e) {
             console.error('Error saving currency cache:', e);
@@ -179,3 +211,4 @@ export const clearCache = async () => {
         console.error('Error clearing cache:', e);
     }
 };
+
