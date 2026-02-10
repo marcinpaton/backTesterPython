@@ -78,13 +78,39 @@ const HomeScreen = () => {
                         const val = shares * priceInfo.price * rate;
                         stocksValue += val;
 
+                        // Calculate daily change from history
+                        const tickerHistory = priceInfo.history || [];
+                        let changePct = priceInfo.change_pct; // Fallback
+                        if (tickerHistory.length > 1) {
+                            // If market is open, history might contain today's partial candle at the end.
+                            // If range=1y, history contains many points.
+                            // We compare the current price (regularMarketPrice) with the PREVIOUS trading day's close.
+                            // If today's date is at the end of history, previous close is history[len-2]
+                            const todayStrStrict = new Date().toISOString().split('T')[0];
+                            const lastHistPoint = tickerHistory[tickerHistory.length - 1];
+
+                            let prevClose;
+                            if (lastHistPoint.date === todayStrStrict) {
+                                // Last point is today, previous close is one before
+                                prevClose = tickerHistory[tickerHistory.length - 2]?.price;
+                            } else {
+                                // Last point is yesterday, it IS the previous close
+                                prevClose = lastHistPoint.price;
+                            }
+
+                            if (prevClose) {
+                                changePct = (priceInfo.price - prevClose) / prevClose;
+                            }
+                        }
+
                         liveAssets.push({
                             ticker,
                             shares,
                             price: priceInfo.price,
                             currency,
                             rate,
-                            valuePLN: val
+                            valuePLN: val,
+                            change_pct: changePct
                         });
                     }
                 }
@@ -265,13 +291,23 @@ const HomeScreen = () => {
                         const val = shares * price * rate;
                         dailyVal += val;
 
+                        // Calculate daily change for historical date
+                        const tickerHistory = prices[ticker]?.history || [];
+                        const histPriceIdx = tickerHistory.findIndex(h => h.date === date);
+                        let histChange = 0;
+                        if (histPriceIdx > 0) {
+                            const prevPrice = tickerHistory[histPriceIdx - 1].price;
+                            histChange = (price - prevPrice) / prevPrice;
+                        }
+
                         dailyAssets.push({
                             ticker,
                             shares,
                             price,
                             currency,
                             rate,
-                            valuePLN: val
+                            valuePLN: val,
+                            change_pct: histChange
                         });
                     }
                 });
@@ -408,7 +444,14 @@ const HomeScreen = () => {
                                 {selectedPoint.assets && selectedPoint.assets.map((asset, idx) => (
                                     <View key={idx} style={styles.assetRow}>
                                         <View>
-                                            <Text style={styles.assetTicker}>{asset.ticker}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={styles.assetTicker}>{asset.ticker}</Text>
+                                                {asset.change_pct != null && asset.ticker !== 'CASH' && (
+                                                    <Text style={[styles.assetChange, { color: asset.change_pct >= 0 ? '#16a34a' : '#dc2626' }]}>
+                                                        {asset.change_pct >= 0 ? '+' : ''}{(asset.change_pct * 100).toFixed(2)}%
+                                                    </Text>
+                                                )}
+                                            </View>
                                             {asset.ticker !== 'CASH' && (
                                                 <Text style={styles.assetSub}>
                                                     {asset.shares.toFixed(0)} x {asset.price.toFixed(2)} {asset.currency}
@@ -565,6 +608,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#374151'
+    },
+    assetChange: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginLeft: 6
     },
     assetSub: {
         fontSize: 12,
