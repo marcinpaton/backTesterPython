@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "MyPortfolio",
     "slug": "investment-backtester-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon-new.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon-new.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.investmentbacktester.mobile",
