@@ -69,16 +69,16 @@ const PortfolioChart = ({ data, onPointClick, selectedDate }) => {
                             <Circle
                                 cx={x}
                                 cy={y}
-                                r={isSelected ? 8 : 6} // Slightly larger if selected
+                                r={6} // Same size as other points
                                 stroke={color}
                                 strokeWidth={2}
                                 fill={color}
                             />
                             <Rect
-                                x={x - 24}
-                                y={y - 24}
-                                width={48}
-                                height={48}
+                                x={x - 50}
+                                y={y - 50}
+                                width={100}
+                                height={100}
                                 fill="transparent"
                                 onPress={() => onPointClick && onPointClick(index)}
                             />
