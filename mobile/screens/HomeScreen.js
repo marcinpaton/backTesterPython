@@ -143,7 +143,7 @@ const HomeScreen = () => {
                     valuePLN: cash
                 });
             }
-            liveAssets.sort((a, b) => b.valuePLN - a.valuePLN);
+            liveAssets.sort((a, b) => a.ticker.localeCompare(b.ticker));
 
             const totalValue = cash + stocksValue;
             setPortfolioValue(totalValue);
@@ -367,7 +367,7 @@ const HomeScreen = () => {
                         shares: h_cash
                     });
                 }
-                dailyAssets.sort((a, b) => b.valuePLN - a.valuePLN);
+                dailyAssets.sort((a, b) => a.ticker.localeCompare(b.ticker));
 
                 historyPoints.push({
                     date: date,
