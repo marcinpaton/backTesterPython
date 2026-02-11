@@ -15,6 +15,7 @@ const HomeScreen = () => {
     const [history, setHistory] = useState([]); // Simplified history for chart
     const [selectedPoint, setSelectedPoint] = useState(null); // For interactive chart
     const [returns, setReturns] = useState({ today: 0, mtd: 0, ytd: 0 });
+    const [returnDisplayMode, setReturnDisplayMode] = useState('both'); // 'daily', 'mtd', 'both'
 
     const fetchData = async () => {
         try {
@@ -586,18 +587,19 @@ const HomeScreen = () => {
                                 </View>
                                 <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 8 }} />
                                 {selectedPoint.assets && selectedPoint.assets.map((asset, idx) => (
-                                    <View key={idx} style={styles.assetRow}>
-                                        <View>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <View key={idx} style={[styles.assetRow, { alignItems: 'flex-start' }]}>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
                                                 <Text style={styles.assetTicker}>{asset.ticker}</Text>
-                                                {asset.change_pct != null && asset.ticker !== 'CASH' && (
+
+                                                {(returnDisplayMode === 'daily' || returnDisplayMode === 'both') && asset.change_pct != null && asset.ticker !== 'CASH' && (
                                                     <Text style={[styles.assetChange, { color: asset.change_pct >= 0 ? '#16a34a' : '#dc2626' }]}>
                                                         {asset.change_pct >= 0 ? '+' : ''}{(asset.change_pct * 100).toFixed(2)}%
                                                     </Text>
                                                 )}
-                                                {asset.change_mtd != null && asset.ticker !== 'CASH' && (
+                                                {(returnDisplayMode === 'mtd' || returnDisplayMode === 'both') && asset.change_mtd != null && asset.ticker !== 'CASH' && (
                                                     <Text style={[styles.assetChange, { marginLeft: 4, color: asset.change_mtd >= 0 ? '#16a34a' : '#dc2626' }]}>
-                                                        ({asset.change_mtd >= 0 ? '+' : ''}{(asset.change_mtd * 100).toFixed(2)}% MTD)
+                                                        {asset.change_mtd >= 0 ? '+' : ''}{(asset.change_mtd * 100).toFixed(2)}%
                                                     </Text>
                                                 )}
                                             </View>
@@ -607,11 +609,33 @@ const HomeScreen = () => {
                                                 </Text>
                                             )}
                                         </View>
-                                        <Text style={styles.assetValue}>
+                                        <Text style={[styles.assetValue, { marginTop: 2 }]}>
                                             {asset.valuePLN.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}
                                         </Text>
                                     </View>
                                 ))}
+
+                                {/* Return Mode Selector */}
+                                <View style={styles.displayModeContainer}>
+                                    <TouchableOpacity
+                                        style={[styles.displayModeButton, returnDisplayMode === 'daily' && styles.displayModeButtonActive]}
+                                        onPress={() => setReturnDisplayMode('daily')}
+                                    >
+                                        <Text style={[styles.displayModeButtonText, returnDisplayMode === 'daily' && styles.displayModeButtonTextActive]}>Daily</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.displayModeButton, returnDisplayMode === 'mtd' && styles.displayModeButtonActive]}
+                                        onPress={() => setReturnDisplayMode('mtd')}
+                                    >
+                                        <Text style={[styles.displayModeButtonText, returnDisplayMode === 'mtd' && styles.displayModeButtonTextActive]}>MTD</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.displayModeButton, returnDisplayMode === 'both' && styles.displayModeButtonActive]}
+                                        onPress={() => setReturnDisplayMode('both')}
+                                    >
+                                        <Text style={[styles.displayModeButtonText, returnDisplayMode === 'both' && styles.displayModeButtonTextActive]}>Both</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         )}
 
@@ -821,6 +845,35 @@ const styles = StyleSheet.create({
         color: '#b91c1c', // Red-700
         fontWeight: 'bold',
         fontSize: 14
+    },
+    displayModeContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#f3f4f6',
+        borderRadius: 12,
+        padding: 4,
+        marginTop: 16
+    },
+    displayModeButton: {
+        flex: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        borderRadius: 8
+    },
+    displayModeButtonActive: {
+        backgroundColor: '#ffffff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2
+    },
+    displayModeButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#6b7280'
+    },
+    displayModeButtonTextActive: {
+        color: '#2563eb'
     }
 });
 
