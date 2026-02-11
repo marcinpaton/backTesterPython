@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, StatusBar, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, StatusBar, TouchableOpacity, PanResponder } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { supabase } from '../services/supabase';
 import { getMarketPrices, getCurrencyRates, clearCache } from '../services/marketData';
@@ -430,6 +430,37 @@ const HomeScreen = () => {
         }
     };
 
+    const handlePrevPoint = () => {
+        if (!selectedPoint) return;
+        const currentIndex = history.findIndex(p => p.date === selectedPoint.date);
+        if (currentIndex > 0) {
+            setSelectedPoint(history[currentIndex - 1]);
+        }
+    };
+
+    const handleNextPoint = () => {
+        if (!selectedPoint) return;
+        const currentIndex = history.findIndex(p => p.date === selectedPoint.date);
+        if (currentIndex < history.length - 1) {
+            setSelectedPoint(history[currentIndex + 1]);
+        }
+    };
+
+    const panResponder = PanResponder.create({
+        onStartShouldSetPanResponder: () => false, // Don't block clicks on details
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+            // Only capture if horizontal movement is dominant and > 20px
+            return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 20;
+        },
+        onPanResponderRelease: (_, gestureState) => {
+            if (gestureState.dx > 50) {
+                handlePrevPoint();
+            } else if (gestureState.dx < -50) {
+                handleNextPoint();
+            }
+        },
+    });
+
     const ReturnLabel = ({ label, value }) => {
         const isPositive = value >= 0;
         return (
@@ -495,11 +526,8 @@ const HomeScreen = () => {
 
                         {/* Selected Point Details */}
                         {selectedPoint && (
-                            <View style={styles.section}>
-                                <View style={styles.summaryHeader}>
-                                    <Text style={styles.sectionTitle}>
-                                        Details: {new Date(selectedPoint.date).toLocaleDateString()}
-                                    </Text>
+                            <View style={styles.section} {...panResponder.panHandlers}>
+                                <View style={[styles.summaryHeader, { alignItems: 'center' }]}>
                                     <TouchableOpacity
                                         onPress={handleManualRefresh}
                                         style={styles.refreshButton}
@@ -512,10 +540,39 @@ const HomeScreen = () => {
                                             style={{ opacity: (loading || refreshing) ? 0.5 : 1 }}
                                         />
                                     </TouchableOpacity>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <TouchableOpacity
+                                            onPress={handlePrevPoint}
+                                            disabled={history.findIndex(p => p.date === selectedPoint.date) === 0}
+                                            style={{ padding: 4 }}
+                                        >
+                                            <MaterialCommunityIcons
+                                                name="chevron-left"
+                                                size={32}
+                                                color={history.findIndex(p => p.date === selectedPoint.date) === 0 ? "#cbd5e1" : "#2563eb"}
+                                            />
+                                        </TouchableOpacity>
+
+                                        <Text style={[styles.sectionTitle, { marginBottom: 0, marginHorizontal: 8 }]}>
+                                            {new Date(selectedPoint.date).toLocaleDateString()}
+                                        </Text>
+
+                                        <TouchableOpacity
+                                            onPress={handleNextPoint}
+                                            disabled={history.findIndex(p => p.date === selectedPoint.date) === history.length - 1}
+                                            style={{ padding: 4 }}
+                                        >
+                                            <MaterialCommunityIcons
+                                                name="chevron-right"
+                                                size={32}
+                                                color={history.findIndex(p => p.date === selectedPoint.date) === history.length - 1 ? "#cbd5e1" : "#2563eb"}
+                                            />
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
-                                <View style={styles.statRow}>
-                                    <Text style={styles.statLabel}>Valuation:</Text>
-                                    <Text style={styles.statValueSmall}>
+                                <View style={[styles.statRow, { justifyContent: 'flex-start', marginTop: 16 }]}>
+                                    <Text style={styles.statLabel}>Total Value:</Text>
+                                    <Text style={[styles.statValueSmall, { marginLeft: 10 }]}>
                                         {selectedPoint.total_value.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}
                                     </Text>
                                 </View>
