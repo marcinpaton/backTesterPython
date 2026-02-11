@@ -490,6 +490,7 @@ const HomeScreen = () => {
                         <PortfolioChart
                             data={history}
                             onPointClick={handleChartPointClick}
+                            selectedDate={selectedPoint?.date}
                         />
 
                         {/* Selected Point Details */}
