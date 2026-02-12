@@ -45,7 +45,7 @@ const HomeScreen = () => {
 
             // 4. Calculate Current Value (Simplified Replayer)
             let cash = 0;
-            let holdings = {};
+            let holdings = {}; // { ticker: { qty, totalCost } }
 
             txData.forEach(tx => {
                 const t_type = tx.type;
@@ -60,13 +60,30 @@ const HomeScreen = () => {
                     let cost = (t_qty * t_price) + t_fee;
                     if (cost === 0 && t_amount !== 0) cost = Math.abs(t_amount);
                     cash -= cost;
-                    holdings[tx.ticker] = (holdings[tx.ticker] || 0) + t_qty;
+
+                    if (!holdings[tx.ticker]) {
+                        holdings[tx.ticker] = { qty: 0, totalCost: 0 };
+                    }
+                    holdings[tx.ticker].qty += t_qty;
+                    holdings[tx.ticker].totalCost += cost;
                 }
                 else if (t_type === 'SELL') {
                     let revenue = (t_qty * t_price) - t_fee;
                     if (revenue === 0 && t_amount !== 0) revenue = Math.abs(t_amount);
                     cash += revenue;
-                    holdings[tx.ticker] = (holdings[tx.ticker] || 0) - t_qty;
+
+                    if (holdings[tx.ticker]) {
+                        // Proportional reduction of cost basis
+                        const currentQty = holdings[tx.ticker].qty;
+                        if (currentQty > 0) {
+                            const costPortion = (t_qty / currentQty) * holdings[tx.ticker].totalCost;
+                            holdings[tx.ticker].totalCost = Math.max(0, holdings[tx.ticker].totalCost - costPortion);
+                        }
+                        holdings[tx.ticker].qty -= t_qty;
+                        if (holdings[tx.ticker].qty <= 1e-9) {
+                            delete holdings[tx.ticker];
+                        }
+                    }
                 }
             });
 
@@ -75,7 +92,8 @@ const HomeScreen = () => {
             let liveAssets = [];
 
             Object.keys(holdings).forEach(ticker => {
-                const shares = holdings[ticker];
+                const h = holdings[ticker];
+                const shares = h.qty;
                 if (shares > 0) {
                     const priceInfo = prices[ticker];
                     if (priceInfo) {
@@ -108,16 +126,17 @@ const HomeScreen = () => {
                             }
 
                             // MTD Change
-                            // Find price at prevMonthDate
-                            // For live calculation, we want the price at the close of the PREVIOUS month.
-                            // However, we can't assume every ticker has a history point at exactly `prevMonthDate` (which is based on the first ticker).
-                            // So we find the last price strictly before startOfMonth.
-
                             const priceAtMtdStartObj = tickerHistory.filter(h => h.date < startOfMonth).pop();
 
                             if (priceAtMtdStartObj && priceAtMtdStartObj.price) {
                                 changeMtd = (priceInfo.price - priceAtMtdStartObj.price) / priceAtMtdStartObj.price;
                             }
+                        }
+
+                        // Total Return (since purchase)
+                        let changeTotal = 0;
+                        if (h.totalCost > 0) {
+                            changeTotal = (val - h.totalCost) / h.totalCost;
                         }
 
                         liveAssets.push({
@@ -128,7 +147,9 @@ const HomeScreen = () => {
                             rate,
                             valuePLN: val,
                             change_pct: changePct,
-                            change_mtd: changeMtd
+                            change_mtd: changeMtd,
+                            change_total: changeTotal,
+                            total_cost: h.totalCost
                         });
                     }
                 }
@@ -271,7 +292,7 @@ const HomeScreen = () => {
             // Replay for Chart Points
             let historyPoints = [];
             let h_cash = 0;
-            let h_holdings = {};
+            let h_holdings = {}; // { ticker: { qty, totalCost } }
             let txIndex = 0;
 
             chartDates.forEach(date => {
@@ -288,13 +309,25 @@ const HomeScreen = () => {
                         let cost = (t_qty * t_price) + t_fee;
                         if (cost === 0 && t_amount !== 0) cost = Math.abs(t_amount);
                         h_cash -= cost;
-                        h_holdings[tx.ticker] = (h_holdings[tx.ticker] || 0) + t_qty;
+
+                        if (!h_holdings[tx.ticker]) h_holdings[tx.ticker] = { qty: 0, totalCost: 0 };
+                        h_holdings[tx.ticker].qty += t_qty;
+                        h_holdings[tx.ticker].totalCost += cost;
                     }
                     else if (tx.type === 'SELL') {
                         let revenue = (t_qty * t_price) - t_fee;
                         if (revenue === 0 && t_amount !== 0) revenue = Math.abs(t_amount);
                         h_cash += revenue;
-                        h_holdings[tx.ticker] = (h_holdings[tx.ticker] || 0) - t_qty;
+
+                        if (h_holdings[tx.ticker]) {
+                            const currentQty = h_holdings[tx.ticker].qty;
+                            if (currentQty > 0) {
+                                const costPortion = (t_qty / currentQty) * h_holdings[tx.ticker].totalCost;
+                                h_holdings[tx.ticker].totalCost = Math.max(0, h_holdings[tx.ticker].totalCost - costPortion);
+                            }
+                            h_holdings[tx.ticker].qty -= t_qty;
+                            if (h_holdings[tx.ticker].qty <= 1e-9) delete h_holdings[tx.ticker];
+                        }
                     }
                     txIndex++;
                 }
@@ -303,7 +336,8 @@ const HomeScreen = () => {
                 let dailyAssets = [];
 
                 Object.keys(h_holdings).forEach(ticker => {
-                    const shares = h_holdings[ticker];
+                    const h = h_holdings[ticker];
+                    const shares = h.qty;
                     if (shares > 0) {
                         const histPriceObj = prices[ticker]?.history?.find(h => h.date === date);
                         const price = histPriceObj ? histPriceObj.price : (prices[ticker]?.price || 0);
@@ -330,23 +364,19 @@ const HomeScreen = () => {
                         }
 
                         // Calculate MTD change for historical date
-                        // 1. Get start of month for 'date'
                         const currentRefDate = new Date(date);
                         const startOfMonthForDate = new Date(currentRefDate.getFullYear(), currentRefDate.getMonth(), 1).toISOString().split('T')[0];
-
-                        // 2. Find latest available date BEFORE startOfMonthForDate (End of Prev Month)
-                        // We can verify if 'startOfMonthForDate' is actually the date we need to look back from.
-                        // Actually, MTD return is (Price_Current - Price_End_Of_Prev_Month) / Price_End_Of_Prev_Month
-                        let prevMonthEndPrice = 0;
-
-                        // Find the last history point strictly before startOfMonthForDate
-                        // We can't use 'getLatestAvailableDateBefore' easily here as it might not be in scope or correct context, 
-                        // but we have 'tickerHistory'.
                         const prevMonthEndPoint = tickerHistory.filter(h => h.date < startOfMonthForDate).pop();
 
                         if (prevMonthEndPoint) {
-                            prevMonthEndPrice = prevMonthEndPoint.price;
+                            const prevMonthEndPrice = prevMonthEndPoint.price;
                             histChangeMtd = (price - prevMonthEndPrice) / prevMonthEndPrice;
+                        }
+
+                        // Total change for historical date
+                        let histChangeTotal = 0;
+                        if (h.totalCost > 0) {
+                            histChangeTotal = (val - h.totalCost) / h.totalCost;
                         }
 
                         dailyAssets.push({
@@ -357,7 +387,8 @@ const HomeScreen = () => {
                             rate,
                             valuePLN: val,
                             change_pct: histChange,
-                            change_mtd: histChangeMtd
+                            change_mtd: histChangeMtd,
+                            change_total: histChangeTotal
                         });
                     }
                 });
@@ -602,6 +633,11 @@ const HomeScreen = () => {
                                                         {asset.change_mtd >= 0 ? '+' : ''}{(asset.change_mtd * 100).toFixed(2)}%
                                                     </Text>
                                                 )}
+                                                {(returnDisplayMode === 'total') && asset.change_total != null && asset.ticker !== 'CASH' && (
+                                                    <Text style={[styles.assetChange, { color: asset.change_total >= 0 ? '#16a34a' : '#dc2626' }]}>
+                                                        {asset.change_total >= 0 ? '+' : ''}{(asset.change_total * 100).toFixed(2)}%
+                                                    </Text>
+                                                )}
                                             </View>
                                             {asset.ticker !== 'CASH' && (
                                                 <Text style={styles.assetSub}>
@@ -630,10 +666,16 @@ const HomeScreen = () => {
                                         <Text style={[styles.displayModeButtonText, returnDisplayMode === 'mtd' && styles.displayModeButtonTextActive]}>MTD</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
+                                        style={[styles.displayModeButton, returnDisplayMode === 'total' && styles.displayModeButtonActive]}
+                                        onPress={() => setReturnDisplayMode('total')}
+                                    >
+                                        <Text style={[styles.displayModeButtonText, returnDisplayMode === 'total' && styles.displayModeButtonTextActive]}>Total</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
                                         style={[styles.displayModeButton, returnDisplayMode === 'both' && styles.displayModeButtonActive]}
                                         onPress={() => setReturnDisplayMode('both')}
                                     >
-                                        <Text style={[styles.displayModeButtonText, returnDisplayMode === 'both' && styles.displayModeButtonTextActive]}>Both</Text>
+                                        <Text style={[styles.displayModeButtonText, returnDisplayMode === 'both' && styles.displayModeButtonTextActive]}>D/MTD</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
