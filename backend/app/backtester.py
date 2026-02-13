@@ -289,7 +289,7 @@ class Portfolio:
             interest = abs(self.cash) * daily_rate
             self.cash -= interest
 
-def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None):
+def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_enabled: bool = False, smart_sell_on_profit_threshold_pct: float = None):
     # Preprocessing to get Close prices only
     if isinstance(data.columns, pd.MultiIndex):
         try:
@@ -315,8 +315,9 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
     if capital_gains_tax_enabled:
         print(f"Capital Gains Tax enabled: {capital_gains_tax_pct}%")
     
-        print(f"Capital Gains Tax enabled: {capital_gains_tax_pct}%")
     print(f"Margin Trading enabled: {margin_enabled}")
+    if smart_sell_on_profit_enabled:
+        print(f"Smart Sell on Profit enabled: {smart_sell_on_profit_threshold_pct*100}%")
     
     portfolio = Portfolio(initial_capital, transaction_fee_enabled, transaction_fee_type, transaction_fee_value, capital_gains_tax_enabled, capital_gains_tax_pct, margin_enabled, sizing_method)
     last_rebalance_date = None
@@ -374,16 +375,75 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                                          if buy_record:
                                              bought_performance.append(buy_record)
 
-                     if sold_performance or bought_performance:
-                         portfolio.rebalance_history.append({
-                             "date": date,
-                             "type": "stop_loss_smart" if smart_stop_loss else "stop_loss",
-                             "sold": sold_performance,
-                             "bought": bought_performance,
-                             "cash": float(portfolio.cash)
-                         })
+                 if sold_performance or bought_performance:
+                     portfolio.rebalance_history.append({
+                         "date": date,
+                         "type": "stop_loss_smart" if smart_stop_loss else "stop_loss",
+                         "sold": sold_performance,
+                         "bought": bought_performance,
+                         "cash": float(portfolio.cash)
+                     })
         
-        # Check Sell on Profit (Take Profit)
+        # Check Smart Sell on Profit (Take Profit)
+        if smart_sell_on_profit_enabled and smart_sell_on_profit_threshold_pct and prev_prices:
+            profit_candidates = []
+            for ticker, quantity in portfolio.holdings.items():
+                if ticker in prev_prices and not pd.isna(prev_prices[ticker]):
+                    trigger_price = prev_prices[ticker]
+                    entry_price = portfolio.entry_prices.get(ticker, 0)
+                    
+                    if entry_price > 0:
+                        current_return = (trigger_price - entry_price) / entry_price
+
+                        if current_return >= smart_sell_on_profit_threshold_pct:
+                            profit_candidates.append(ticker)
+            
+            if profit_candidates:
+                # We need top picks for today to check if candidates are still in top picks
+                available_tickers = [t for t, p in current_prices.items() if not pd.isna(p)]
+                top_tickers_with_scores = strategy.select_tickers(available_tickers, date)
+                top_tickers_set = {t for t, s in top_tickers_with_scores}
+
+                
+                sold_performance = {}
+                bought_performance = []
+                
+                for ticker in profit_candidates:
+                    # Condition: return > threshold AND not in top picks
+                    if ticker not in top_tickers_set:
+
+                        if ticker in current_prices and not pd.isna(current_prices[ticker]):
+                            price = current_prices[ticker]
+                            record = portfolio.sell_ticker(ticker, price, date, reason="smart_sell_on_profit")
+                            if record:
+                                sold_performance[ticker] = record
+                                
+                                # Buy replacement from top picks
+                                replacement = None
+                                replacement_score = 0
+                                for t, s in top_tickers_with_scores:
+                                    if t not in portfolio.holdings and t != ticker:
+                                        replacement = t
+                                        replacement_score = s
+                                        break
+                                
+                                if replacement and replacement in current_prices:
+                                    buy_amount = record['revenue']
+                                    buy_price = current_prices[replacement]
+                                    buy_record = portfolio.buy_ticker(replacement, buy_amount, buy_price, replacement_score, date)
+                                    if buy_record:
+                                        bought_performance.append(buy_record)
+                
+                if sold_performance or bought_performance:
+                    portfolio.rebalance_history.append({
+                        "date": date,
+                        "type": "smart_sell_on_profit",
+                        "sold": sold_performance,
+                        "bought": bought_performance,
+                        "cash": float(portfolio.cash)
+                    })
+
+        # Check Sell on Profit (Take Profit) - Old simple logic
         # Logic: If yesterday's close (trigger) >= entry * (1 + threshold), sell at today's close.
         if sell_on_profit_enabled and sell_on_profit_threshold_pct and prev_prices:
              profit_candidates = []
@@ -468,6 +528,7 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
         
     print("Backtest completed.")
     return portfolio
+
 
 def calculate_metrics(portfolio: Portfolio):
     history_df = pd.DataFrame(portfolio.history)

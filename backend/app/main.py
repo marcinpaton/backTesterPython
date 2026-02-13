@@ -615,6 +615,8 @@ class BacktestRequest(BaseModel):
     sma_period: int = -1
     sell_on_profit_enabled: bool = False
     sell_on_profit_threshold_pct: Optional[float] = None
+    smart_sell_on_profit_enabled: bool = False
+    smart_sell_on_profit_threshold_pct: Optional[float] = None
 
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
@@ -625,7 +627,7 @@ def run_backtest_endpoint(request: BacktestRequest):
     
     if request.strategy == 'random':
         strategy = RandomSelectionStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit)
-    elif request.strategy == 'momentum':
+    elif request.strategy == 'momentum' or request.strategy == 'momentum_smart_tp':
         strategy = MomentumStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit, df, request.momentum_lookback_days, request.filter_negative_momentum, request.sma_period)
     elif request.strategy == 'scoring':
         strategy = ScoringStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit, df)
@@ -650,7 +652,9 @@ def run_backtest_endpoint(request: BacktestRequest):
             request.margin_enabled,
             request.sizing_method,
             request.sell_on_profit_enabled,
-            request.sell_on_profit_threshold_pct
+            request.sell_on_profit_threshold_pct,
+            request.smart_sell_on_profit_enabled or request.strategy == 'momentum_smart_tp',
+            request.smart_sell_on_profit_threshold_pct
         )
         metrics = calculate_metrics(portfolio)
         return metrics
