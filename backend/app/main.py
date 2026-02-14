@@ -617,6 +617,7 @@ class BacktestRequest(BaseModel):
     sell_on_profit_threshold_pct: Optional[float] = None
     smart_sell_on_profit_enabled: bool = False
     smart_sell_on_profit_threshold_pct: Optional[float] = None
+    smart_sell_on_profit_check_freq: int = 1 # Default to daily check
 
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
@@ -654,7 +655,8 @@ def run_backtest_endpoint(request: BacktestRequest):
             request.sell_on_profit_enabled,
             request.sell_on_profit_threshold_pct,
             request.smart_sell_on_profit_enabled or request.strategy == 'momentum_smart_tp',
-            request.smart_sell_on_profit_threshold_pct
+            request.smart_sell_on_profit_threshold_pct,
+            request.smart_sell_on_profit_check_freq
         )
         metrics = calculate_metrics(portfolio)
         return metrics

@@ -289,7 +289,7 @@ class Portfolio:
             interest = abs(self.cash) * daily_rate
             self.cash -= interest
 
-def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_enabled: bool = False, smart_sell_on_profit_threshold_pct: float = None):
+def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_enabled: bool = False, smart_sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_check_freq: int = 1):
     # Preprocessing to get Close prices only
     if isinstance(data.columns, pd.MultiIndex):
         try:
@@ -323,7 +323,9 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
     last_rebalance_date = None
     prev_prices = None
     
+    today_index = 0
     for date, prices in close_prices.iterrows():
+        today_index += 1
         current_prices = prices.to_dict()
         
         # Check Stop Loss (using previous day's close as trigger)
@@ -385,7 +387,10 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                      })
         
         # Check Smart Sell on Profit (Take Profit)
-        if smart_sell_on_profit_enabled and smart_sell_on_profit_threshold_pct and prev_prices:
+        # Check only if enabled AND frequency condition met
+        should_check_smart_tp = smart_sell_on_profit_enabled and smart_sell_on_profit_threshold_pct and prev_prices
+        
+        if should_check_smart_tp and (today_index % smart_sell_on_profit_check_freq == 0 or smart_sell_on_profit_check_freq <= 1):
             profit_candidates = []
             for ticker, quantity in portfolio.holdings.items():
                 if ticker in prev_prices and not pd.isna(prev_prices[ticker]):

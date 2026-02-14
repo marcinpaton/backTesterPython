@@ -20,6 +20,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
 
   const [smartSellOnProfitEnabled, setSmartSellOnProfitEnabled] = useState(initialValues?.smart_sell_on_profit_enabled || false);
   const [smartSellOnProfitThreshold, setSmartSellOnProfitThreshold] = useState(initialValues?.smart_sell_on_profit_threshold_pct ? initialValues.smart_sell_on_profit_threshold_pct * 100 : '');
+  const [smartSellOnProfitCheckFreq, setSmartSellOnProfitCheckFreq] = useState(initialValues?.smart_sell_on_profit_check_freq || 1);
 
   const [marginEnabled, setMarginEnabled] = useState(initialValues?.margin_enabled !== undefined ? initialValues.margin_enabled : false);
   const [strategy, setStrategy] = useState(initialValues?.strategy || 'momentum');
@@ -62,6 +63,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
 
       if (initialValues.smart_sell_on_profit_enabled !== undefined) setSmartSellOnProfitEnabled(initialValues.smart_sell_on_profit_enabled);
       if (initialValues.smart_sell_on_profit_threshold_pct !== undefined) setSmartSellOnProfitThreshold(initialValues.smart_sell_on_profit_threshold_pct ? initialValues.smart_sell_on_profit_threshold_pct * 100 : '');
+      if (initialValues.smart_sell_on_profit_check_freq !== undefined) setSmartSellOnProfitCheckFreq(initialValues.smart_sell_on_profit_check_freq);
       if (initialValues.margin_enabled !== undefined) setMarginEnabled(initialValues.margin_enabled);
       if (initialValues.strategy) setStrategy(initialValues.strategy);
       if (initialValues.sizing_method) setSizingMethod(initialValues.sizing_method);
@@ -100,7 +102,8 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
       sma_period: parseInt(smaPeriod),
 
       smart_sell_on_profit_enabled: smartSellOnProfitEnabled || strategy === 'momentum_smart_tp',
-      smart_sell_on_profit_threshold_pct: (smartSellOnProfitEnabled || strategy === 'momentum_smart_tp') && smartSellOnProfitThreshold ? parseFloat(smartSellOnProfitThreshold) / 100 : null
+      smart_sell_on_profit_threshold_pct: (smartSellOnProfitEnabled || strategy === 'momentum_smart_tp') && smartSellOnProfitThreshold ? parseFloat(smartSellOnProfitThreshold) / 100 : null,
+      smart_sell_on_profit_check_freq: parseInt(smartSellOnProfitCheckFreq)
     });
   };
 
@@ -263,8 +266,21 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
             </div>
             {(smartSellOnProfitEnabled || strategy === 'momentum_smart_tp') && (
               <p className="text-xs text-gray-600 ml-6">
-                Daily check: if return since purchase &ge; threshold AND ticker is NOT in the current top picks, sell and replace with best available ticker.
+                Check every {smartSellOnProfitCheckFreq} day(s): if return since purchase &ge; threshold AND ticker is NOT in the current top picks, sell and replace with best available ticker.
               </p>
+            )}
+
+            {(smartSellOnProfitEnabled || strategy === 'momentum_smart_tp') && (
+              <div className="flex items-center space-x-2 ml-6">
+                <label className="text-sm font-medium text-gray-700">Check Frequency (days):</label>
+                <input
+                  type="number"
+                  value={smartSellOnProfitCheckFreq}
+                  onChange={(e) => setSmartSellOnProfitCheckFreq(e.target.value)}
+                  min="1"
+                  className="w-20 border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                />
+              </div>
             )}
           </div>
         </div>
