@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const ResultsDashboard = ({ results }) => {
@@ -7,10 +7,109 @@ const ResultsDashboard = ({ results }) => {
     const [showTax, setShowTax] = useState(false);
     const [showMonthlyReturn, setShowMonthlyReturn] = useState(false);
     const [showAnnualReturns, setShowAnnualReturns] = useState(true);
+    const [visibleEventsCount, setVisibleEventsCount] = useState(50); // Pagination state
+
+    // Reset pagination when results change
+    useEffect(() => {
+        setVisibleEventsCount(50);
+    }, [results]);
+
+
+
+
+
+    // Memoize the events calculation
+    const events = useMemo(() => {
+        if (!results) return [];
+        const allEvents = [];
+        const { monthly_returns, rebalance_history } = results;
+
+        // Add monthly returns ONLY if enabled
+        if (showMonthlyReturn && monthly_returns) {
+            Object.entries(monthly_returns).forEach(([month, ret]) => {
+                allEvents.push({
+                    type: 'monthly_return',
+                    date: month, // "YYYY-MM"
+                    // Use day 32 to ensure it's after all events in the month (max day is 31)
+                    // but still sorts before next month (e.g., 2020-01-32 < 2020-02-01)
+                    sortDate: month + '-32',
+                    sortPriority: 1, // Monthly returns come after rebalancing events
+                    value: ret
+                });
+            });
+        }
+
+        // Add rebalancing events ONLY if enabled (or tax enabled for tax events)
+        if (rebalance_history && (showRebalancing || showTax || showAnnualReturns)) {
+            rebalance_history.forEach(event => {
+                // Optimization: Only add events we care about
+                const isTax = event.type === 'tax_settlement';
+                const isAnnual = event.type === 'annual_summary';
+                const isRebalance = event.type === 'rebalance' || event.type === 'stop_loss' || event.type === 'stop_loss_smart' || event.type === 'sell_on_profit';
+
+                if (isTax && showTax) {
+                    allEvents.push({
+                        type: 'rebalance', // Keeping type generic for sorting, but data has specific type
+                        date: event.date,
+                        sortDate: event.date,
+                        sortPriority: 0,
+                        data: event
+                    });
+                } else if (isAnnual && showAnnualReturns) {
+                    allEvents.push({
+                        type: 'rebalance',
+                        date: event.date,
+                        sortDate: event.date,
+                        sortPriority: 2, // Annual summary at end of year
+                        data: event
+                    });
+                } else if (isRebalance && showRebalancing) {
+                    allEvents.push({
+                        type: 'rebalance',
+                        date: event.date,
+                        sortDate: event.date,
+                        sortPriority: 0,
+                        data: event
+                    });
+                }
+            });
+        }
+
+        // Sort by date, then by priority (rebalancing before monthly returns)
+        allEvents.sort((a, b) => {
+            const dateCompare = a.sortDate.localeCompare(b.sortDate);
+            if (dateCompare !== 0) return dateCompare;
+            return a.sortPriority - b.sortPriority;
+        });
+
+        return allEvents;
+    }, [results, showMonthlyReturn, showRebalancing, showTax, showAnnualReturns]);
+
+    // Memoize the chart to prevent re-renders
+    const chart = useMemo(() => {
+        if (!results || !results.history) return null;
+        return (
+            <div className="bg-white p-4 rounded-lg shadow h-96">
+                <h3 className="text-lg font-bold mb-4">Portfolio Value Over Time</h3>
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={results.history}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis domain={['auto', 'auto']} />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="total_value" stroke="#8884d8" name="Portfolio Value" />
+                    </LineChart>
+                </ResponsiveContainer>
+            </div>
+        );
+    }, [results]);
+
+    const visibleEvents = events.slice(0, visibleEventsCount);
 
     if (!results) return null;
 
-    const { total_return, cagr, final_value, monthly_returns, history } = results;
+    const { total_return, cagr, final_value } = results;
 
     return (
         <div className="space-y-6">
@@ -35,19 +134,7 @@ const ResultsDashboard = ({ results }) => {
             </div>
 
             {/* Chart */}
-            <div className="bg-white p-4 rounded-lg shadow h-96">
-                <h3 className="text-lg font-bold mb-4">Portfolio Value Over Time</h3>
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={history}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis domain={['auto', 'auto']} />
-                        <Tooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="total_value" stroke="#8884d8" name="Portfolio Value" />
-                    </LineChart>
-                </ResponsiveContainer>
-            </div>
+            {chart}
 
             {/* Combined History */}
             <div className="bg-white p-4 rounded-lg shadow">
@@ -103,261 +190,208 @@ const ResultsDashboard = ({ results }) => {
                     </div>
                 </div>
                 <div className="space-y-4">
-                    {(() => {
-                        // Merge and sort events
-                        const events = [];
+                    {visibleEvents.map((event, index) => {
+                        if (event.type === 'monthly_return') {
+                            return (
+                                <div key={`mr-${index}`} className="flex justify-between items-center bg-gray-100 p-3 rounded">
+                                    <span className="font-medium text-gray-700">Monthly Return ({event.date})</span>
+                                    <span className={`font-bold ${event.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {(event.value * 100).toFixed(2)}%
+                                    </span>
+                                </div>
+                            );
+                        } else {
+                            const { sold, bought, type, tax, annual_pnl, taxable_profit, loss_deductions, remaining_losses } = event.data;
+                            const isStopLoss = type === 'stop_loss' || type === 'stop_loss_smart';
+                            const isTaxSettlement = type === 'tax_settlement';
 
-                        // Add monthly returns ONLY if enabled
-                        if (showMonthlyReturn) {
-                            Object.entries(monthly_returns).forEach(([month, ret]) => {
-                                events.push({
-                                    type: 'monthly_return',
-                                    date: month, // "YYYY-MM"
-                                    // Use day 32 to ensure it's after all events in the month (max day is 31)
-                                    // but still sorts before next month (e.g., 2020-01-32 < 2020-02-01)
-                                    sortDate: month + '-32',
-                                    sortPriority: 1, // Monthly returns come after rebalancing events
-                                    value: ret
-                                });
-                            });
-                        }
-
-                        // Add rebalancing events ONLY if enabled (or tax enabled for tax events)
-                        if (results.rebalance_history && (showRebalancing || showTax || showAnnualReturns)) {
-                            results.rebalance_history.forEach(event => {
-                                // Optimization: Only add events we care about
-                                const isTax = event.type === 'tax_settlement';
-                                const isAnnual = event.type === 'annual_summary';
-                                const isRebalance = event.type === 'rebalance' || event.type === 'stop_loss' || event.type === 'stop_loss_smart' || event.type === 'sell_on_profit';
-
-                                if (isTax && showTax) {
-                                    events.push({
-                                        type: 'rebalance', // Keeping type generic for sorting, but data has specific type
-                                        date: event.date,
-                                        sortDate: event.date,
-                                        sortPriority: 0,
-                                        data: event
-                                    });
-                                } else if (isAnnual && showAnnualReturns) {
-                                    events.push({
-                                        type: 'rebalance',
-                                        date: event.date,
-                                        sortDate: event.date,
-                                        sortPriority: 2, // Annual summary at end of year
-                                        data: event
-                                    });
-                                } else if (isRebalance && showRebalancing) {
-                                    events.push({
-                                        type: 'rebalance',
-                                        date: event.date,
-                                        sortDate: event.date,
-                                        sortPriority: 0,
-                                        data: event
-                                    });
-                                }
-                            });
-                        }
-
-                        // Sort by date, then by priority (rebalancing before monthly returns)
-                        events.sort((a, b) => {
-                            const dateCompare = a.sortDate.localeCompare(b.sortDate);
-                            if (dateCompare !== 0) return dateCompare;
-                            return a.sortPriority - b.sortPriority;
-                        });
-
-                        return events.map((event, index) => {
-                            if (event.type === 'monthly_return') {
+                            if (isTaxSettlement) {
+                                if (!showTax) return null; // Should be handled by memo logic but safe to keep
                                 return (
-                                    <div key={`mr-${index}`} className="flex justify-between items-center bg-gray-100 p-3 rounded">
-                                        <span className="font-medium text-gray-700">Monthly Return ({event.date})</span>
-                                        <span className={`font-bold ${event.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {(event.value * 100).toFixed(2)}%
-                                        </span>
-                                    </div>
-                                );
-                            } else {
-                                const { sold, bought, type, tax, annual_pnl, taxable_profit, loss_deductions, remaining_losses } = event.data;
-                                const isStopLoss = type === 'stop_loss' || type === 'stop_loss_smart';
-                                const isTaxSettlement = type === 'tax_settlement';
-
-                                if (isTaxSettlement) {
-                                    if (!showTax) return null;
-                                    return (
-                                        <div key={`tax-${index}`} className="border rounded p-3 bg-white border-yellow-200">
-                                            <div className="font-semibold text-yellow-800 bg-yellow-50 p-2 rounded mb-2 flex justify-between">
-                                                <span>💰 Tax Settlement</span>
-                                                <span>{event.date}</span>
-                                            </div>
-                                            <div className="space-y-2 text-sm">
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Annual P&L:</span>
-                                                    <span className={`font-bold ${annual_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        ${annual_pnl?.toFixed(2) || '0.00'}
-                                                    </span>
-                                                </div>
-                                                {loss_deductions && loss_deductions.length > 0 && (
-                                                    <div className="bg-blue-50 p-2 rounded">
-                                                        <div className="font-semibold text-blue-800 mb-1">Loss Carryforward Applied:</div>
-                                                        {loss_deductions.map((deduction, idx) => (
-                                                            <div key={idx} className="text-xs text-blue-700 flex justify-between">
-                                                                <span>From {deduction.year}:</span>
-                                                                <span>-${deduction.deduction?.toFixed(2)}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Taxable Profit:</span>
-                                                    <span className="font-bold text-gray-800">
-                                                        ${taxable_profit?.toFixed(2) || '0.00'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between border-t pt-2">
-                                                    <span className="font-semibold text-gray-700">Tax Paid:</span>
-                                                    <span className="font-bold text-red-600">
-                                                        ${tax?.toFixed(2) || '0.00'}
-                                                    </span>
-                                                </div>
-                                                {remaining_losses && remaining_losses.length > 0 && (
-                                                    <div className="bg-gray-50 p-2 rounded mt-2">
-                                                        <div className="font-semibold text-gray-700 mb-1 text-xs">Remaining Losses:</div>
-                                                        {remaining_losses.map((loss, idx) => (
-                                                            <div key={idx} className="text-xs text-gray-600 flex justify-between">
-                                                                <span>Year {loss[0]}:</span>
-                                                                <span>${loss[1]?.toFixed(2)}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
+                                    <div key={`tax-${index}`} className="border rounded p-3 bg-white border-yellow-200">
+                                        <div className="font-semibold text-yellow-800 bg-yellow-50 p-2 rounded mb-2 flex justify-between">
+                                            <span>💰 Tax Settlement</span>
+                                            <span>{event.date}</span>
                                         </div>
-                                    );
-                                }
-
-
-
-                                // Annual Summary
-                                const isAnnualSummary = type === 'annual_summary';
-                                if (isAnnualSummary) {
-                                    if (!showAnnualReturns) return null;
-                                    const { year, year_start_value, year_end_value, annual_pnl_dollars, annual_pnl_percent } = event.data;
-                                    return (
-                                        <div key={`annual-${index}`} className="border rounded p-3 bg-white border-purple-200">
-                                            <div className="font-semibold text-purple-800 bg-purple-50 p-2 rounded mb-2 flex justify-between">
-                                                <span>📊 Annual Summary - {year}</span>
-                                                <span>{event.date}</span>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Annual P&L:</span>
+                                                <span className={`font-bold ${annual_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                    ${annual_pnl?.toFixed(2) || '0.00'}
+                                                </span>
                                             </div>
-                                            <div className="space-y-2 text-sm">
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Year Start Value:</span>
-                                                    <span className="font-bold text-gray-800">
-                                                        ${year_start_value?.toFixed(2) || '0.00'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Year End Value:</span>
-                                                    <span className="font-bold text-gray-800">
-                                                        ${year_end_value?.toFixed(2) || '0.00'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between border-t pt-2">
-                                                    <span className="font-semibold text-gray-700">P&L (Dollars):</span>
-                                                    <span className={`font-bold ${annual_pnl_dollars >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {annual_pnl_dollars >= 0 ? '+' : ''}${annual_pnl_dollars?.toFixed(2) || '0.00'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="font-semibold text-gray-700">P&L (Percent):</span>
-                                                    <span className={`font-bold ${annual_pnl_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {annual_pnl_percent >= 0 ? '+' : ''}{(annual_pnl_percent * 100)?.toFixed(2) || '0.00'}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-
-
-                                if (!showRebalancing) return null;
-
-                                return (
-                                    <div key={`rb-${index}`} className={`border rounded p-3 bg-white ${isStopLoss ? 'border-red-200' : 'border-blue-200'}`}>
-                                        <div className={`font-semibold ${isStopLoss ? 'text-red-800 bg-red-50' : 'text-blue-800 bg-blue-50'} p-2 rounded mb-2 flex justify-between`}>
-                                            <span>{isStopLoss ? 'Stop Loss Triggered' : 'Rebalancing Event'}</span>
-                                            <div className="flex gap-4">
-                                                {event.data.cash !== undefined && (
-                                                    <span className="text-sm font-normal text-gray-600">
-                                                        Cash: ${event.data.cash.toFixed(2)}
-                                                    </span>
-                                                )}
-                                                <span>{event.date}</span>
-                                            </div>
-                                        </div>
-                                        {showSoldBought && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-red-600 mb-1">Sold</h4>
-                                                    {Object.keys(sold).length === 0 ? (
-                                                        <p className="text-sm text-gray-500">Nothing sold</p>
-                                                    ) : (
-                                                        <ul className="text-sm space-y-1">
-                                                            {Object.entries(sold).map(([ticker, data]) => (
-                                                                <li key={ticker} className="flex justify-between">
-                                                                    <span>{ticker}</span>
-                                                                    <span className={data.profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                                        {data.profit >= 0 ? '+' : ''}{data.profit.toFixed(2)} ({(data.return_pct * 100).toFixed(2)}%)
-                                                                    </span>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-green-600 mb-1">Bought</h4>
-                                                    {bought.length === 0 ? (
-                                                        <p className="text-sm text-gray-500">Nothing bought</p>
-                                                    ) : (
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {bought.map((item, index) => {
-                                                                // Handle both old format (string) and new format (object)
-                                                                const ticker = typeof item === 'string' ? item : item.ticker;
-                                                                const score = typeof item === 'string' ? null : item.score;
-                                                                const varValue = typeof item === 'string' ? null : item.var;
-
-                                                                return (
-                                                                    <span key={`${ticker}-${index}`} className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded flex items-center">
-                                                                        <span className="font-bold">{ticker}</span>
-                                                                        {score !== null && score !== undefined && (
-                                                                            <span className="ml-1 text-green-600">
-                                                                                ({score.toFixed(2)})
-                                                                            </span>
-                                                                        )}
-                                                                        {varValue !== null && varValue !== undefined && (
-                                                                            <span className="ml-2 text-red-500 font-semibold border-l border-green-300 pl-2" title="Value At Risk (95%, 252 days)">
-                                                                                VaR: {(varValue * 100).toFixed(2)}%
-                                                                            </span>
-                                                                        )}
-                                                                        {item.quantity && (
-                                                                            <span className="ml-1 text-gray-600 font-normal">
-                                                                                - {Math.floor(item.quantity)} shares
-                                                                            </span>
-                                                                        )}
-                                                                    </span>
-                                                                );
-                                                            })}
+                                            {loss_deductions && loss_deductions.length > 0 && (
+                                                <div className="bg-blue-50 p-2 rounded">
+                                                    <div className="font-semibold text-blue-800 mb-1">Loss Carryforward Applied:</div>
+                                                    {loss_deductions.map((deduction, idx) => (
+                                                        <div key={idx} className="text-xs text-blue-700 flex justify-between">
+                                                            <span>From {deduction.year}:</span>
+                                                            <span>-${deduction.deduction?.toFixed(2)}</span>
                                                         </div>
-                                                    )}
+                                                    ))}
                                                 </div>
+                                            )}
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Taxable Profit:</span>
+                                                <span className="font-bold text-gray-800">
+                                                    ${taxable_profit?.toFixed(2) || '0.00'}
+                                                </span>
                                             </div>
-                                        )}
+                                            <div className="flex justify-between border-t pt-2">
+                                                <span className="font-semibold text-gray-700">Tax Paid:</span>
+                                                <span className="font-bold text-red-600">
+                                                    ${tax?.toFixed(2) || '0.00'}
+                                                </span>
+                                            </div>
+                                            {remaining_losses && remaining_losses.length > 0 && (
+                                                <div className="bg-gray-50 p-2 rounded mt-2">
+                                                    <div className="font-semibold text-gray-700 mb-1 text-xs">Remaining Losses:</div>
+                                                    {remaining_losses.map((loss, idx) => (
+                                                        <div key={idx} className="text-xs text-gray-600 flex justify-between">
+                                                            <span>Year {loss[0]}:</span>
+                                                            <span>${loss[1]?.toFixed(2)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             }
-                        });
-                    })()}
+
+
+
+                            // Annual Summary
+                            const isAnnualSummary = type === 'annual_summary';
+                            if (isAnnualSummary) {
+                                if (!showAnnualReturns) return null;
+                                const { year, year_start_value, year_end_value, annual_pnl_dollars, annual_pnl_percent } = event.data;
+                                return (
+                                    <div key={`annual-${index}`} className="border rounded p-3 bg-white border-purple-200">
+                                        <div className="font-semibold text-purple-800 bg-purple-50 p-2 rounded mb-2 flex justify-between">
+                                            <span>📊 Annual Summary - {year}</span>
+                                            <span>{event.date}</span>
+                                        </div>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Year Start Value:</span>
+                                                <span className="font-bold text-gray-800">
+                                                    ${year_start_value?.toFixed(2) || '0.00'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Year End Value:</span>
+                                                <span className="font-bold text-gray-800">
+                                                    ${year_end_value?.toFixed(2) || '0.00'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between border-t pt-2">
+                                                <span className="font-semibold text-gray-700">P&L (Dollars):</span>
+                                                <span className={`font-bold ${annual_pnl_dollars >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {annual_pnl_dollars >= 0 ? '+' : ''}${annual_pnl_dollars?.toFixed(2) || '0.00'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="font-semibold text-gray-700">P&L (Percent):</span>
+                                                <span className={`font-bold ${annual_pnl_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {annual_pnl_percent >= 0 ? '+' : ''}{(annual_pnl_percent * 100)?.toFixed(2) || '0.00'}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+
+                            if (!showRebalancing) return null;
+
+                            return (
+                                <div key={`rb-${index}`} className={`border rounded p-3 bg-white ${isStopLoss ? 'border-red-200' : 'border-blue-200'}`}>
+                                    <div className={`font-semibold ${isStopLoss ? 'text-red-800 bg-red-50' : 'text-blue-800 bg-blue-50'} p-2 rounded mb-2 flex justify-between`}>
+                                        <span>{isStopLoss ? 'Stop Loss Triggered' : 'Rebalancing Event'}</span>
+                                        <div className="flex gap-4">
+                                            {event.data.cash !== undefined && (
+                                                <span className="text-sm font-normal text-gray-600">
+                                                    Cash: ${event.data.cash.toFixed(2)}
+                                                </span>
+                                            )}
+                                            <span>{event.date}</span>
+                                        </div>
+                                    </div>
+                                    {showSoldBought && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <h4 className="text-sm font-bold text-red-600 mb-1">Sold</h4>
+                                                {Object.keys(sold).length === 0 ? (
+                                                    <p className="text-sm text-gray-500">Nothing sold</p>
+                                                ) : (
+                                                    <ul className="text-sm space-y-1">
+                                                        {Object.entries(sold).map(([ticker, data]) => (
+                                                            <li key={ticker} className="flex justify-between">
+                                                                <span>{ticker}</span>
+                                                                <span className={data.profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                    {data.profit >= 0 ? '+' : ''}{data.profit.toFixed(2)} ({(data.return_pct * 100).toFixed(2)}%)
+                                                                </span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-green-600 mb-1">Bought</h4>
+                                                {bought.length === 0 ? (
+                                                    <p className="text-sm text-gray-500">Nothing bought</p>
+                                                ) : (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {bought.map((item, index) => {
+                                                            // Handle both old format (string) and new format (object)
+                                                            const ticker = typeof item === 'string' ? item : item.ticker;
+                                                            const score = typeof item === 'string' ? null : item.score;
+                                                            const varValue = typeof item === 'string' ? null : item.var;
+
+                                                            return (
+                                                                <span key={`${ticker}-${index}`} className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded flex items-center">
+                                                                    <span className="font-bold">{ticker}</span>
+                                                                    {score !== null && score !== undefined && (
+                                                                        <span className="ml-1 text-green-600">
+                                                                            ({score.toFixed(2)})
+                                                                        </span>
+                                                                    )}
+                                                                    {varValue !== null && varValue !== undefined && (
+                                                                        <span className="ml-2 text-red-500 font-semibold border-l border-green-300 pl-2" title="Value At Risk (95%, 252 days)">
+                                                                            VaR: {(varValue * 100).toFixed(2)}%
+                                                                        </span>
+                                                                    )}
+                                                                    {item.quantity && (
+                                                                        <span className="ml-1 text-gray-600 font-normal">
+                                                                            - {Math.floor(item.quantity)} shares
+                                                                        </span>
+                                                                    )}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
+                    })}
+                    {visibleEventsCount < events.length && (
+                        <div className="text-center pt-4">
+                            <button
+                                onClick={() => setVisibleEventsCount(prev => prev + 50)}
+                                className="px-6 py-2 bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition font-medium"
+                            >
+                                Show More ({events.length - visibleEventsCount} remaining)
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
