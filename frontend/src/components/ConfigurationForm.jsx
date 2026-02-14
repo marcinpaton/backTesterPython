@@ -16,8 +16,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
   const [capitalGainsTaxEnabled, setCapitalGainsTaxEnabled] = useState(initialValues?.capital_gains_tax_enabled || false);
   const [capitalGainsTaxPct, setCapitalGainsTaxPct] = useState(initialValues?.capital_gains_tax_pct || 19);
 
-  const [sellOnProfitEnabled, setSellOnProfitEnabled] = useState(initialValues?.sell_on_profit_enabled || false);
-  const [sellOnProfitThreshold, setSellOnProfitThreshold] = useState(initialValues?.sell_on_profit_threshold_pct ? initialValues.sell_on_profit_threshold_pct * 100 : '');
+
 
   const [smartSellOnProfitEnabled, setSmartSellOnProfitEnabled] = useState(initialValues?.smart_sell_on_profit_enabled || false);
   const [smartSellOnProfitThreshold, setSmartSellOnProfitThreshold] = useState(initialValues?.smart_sell_on_profit_threshold_pct ? initialValues.smart_sell_on_profit_threshold_pct * 100 : '');
@@ -60,8 +59,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
       if (initialValues.transaction_fee_value !== undefined) setTransactionFeeValue(initialValues.transaction_fee_value);
       if (initialValues.capital_gains_tax_enabled !== undefined) setCapitalGainsTaxEnabled(initialValues.capital_gains_tax_enabled);
       if (initialValues.capital_gains_tax_pct !== undefined) setCapitalGainsTaxPct(initialValues.capital_gains_tax_pct);
-      if (initialValues.sell_on_profit_enabled !== undefined) setSellOnProfitEnabled(initialValues.sell_on_profit_enabled);
-      if (initialValues.sell_on_profit_threshold_pct !== undefined) setSellOnProfitThreshold(initialValues.sell_on_profit_threshold_pct ? initialValues.sell_on_profit_threshold_pct * 100 : '');
+
       if (initialValues.smart_sell_on_profit_enabled !== undefined) setSmartSellOnProfitEnabled(initialValues.smart_sell_on_profit_enabled);
       if (initialValues.smart_sell_on_profit_threshold_pct !== undefined) setSmartSellOnProfitThreshold(initialValues.smart_sell_on_profit_threshold_pct ? initialValues.smart_sell_on_profit_threshold_pct * 100 : '');
       if (initialValues.margin_enabled !== undefined) setMarginEnabled(initialValues.margin_enabled);
@@ -100,8 +98,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
       momentum_lookback_days: parseInt(momentumLookbackDays),
       filter_negative_momentum: filterNegativeMomentum,
       sma_period: parseInt(smaPeriod),
-      sell_on_profit_enabled: sellOnProfitEnabled,
-      sell_on_profit_threshold_pct: sellOnProfitEnabled && sellOnProfitThreshold ? parseFloat(sellOnProfitThreshold) / 100 : null,
+
       smart_sell_on_profit_enabled: smartSellOnProfitEnabled || strategy === 'momentum_smart_tp',
       smart_sell_on_profit_threshold_pct: (smartSellOnProfitEnabled || strategy === 'momentum_smart_tp') && smartSellOnProfitThreshold ? parseFloat(smartSellOnProfitThreshold) / 100 : null
     });
@@ -235,39 +232,8 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
         </div>
 
         <div className="mt-4 border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r-lg">
+          {/* Smart Sell on Profit Section */}
           <div className="flex flex-col space-y-4">
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={sellOnProfitEnabled}
-                  onChange={(e) => setSellOnProfitEnabled(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  Simple Sell on Profit
-                </span>
-              </label>
-
-              {sellOnProfitEnabled && (
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="number"
-                    value={sellOnProfitThreshold}
-                    onChange={(e) => setSellOnProfitThreshold(e.target.value)}
-                    placeholder="%"
-                    className="w-24 border border-gray-300 rounded-md shadow-sm p-2 bg-white"
-                  />
-                  <span className="text-sm text-gray-500">%</span>
-                </div>
-              )}
-            </div>
-            {sellOnProfitEnabled && (
-              <p className="text-xs text-gray-600 ml-6">
-                Sell ticker if daily return &ge; threshold (compared to entry). Cash is held until next rebalance.
-              </p>
-            )}
-
             <div className="flex items-center space-x-4">
               <label className="flex items-center space-x-2">
                 <input
@@ -302,8 +268,6 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
             )}
           </div>
         </div>
-
-
 
         <div>
           <label className="flex items-center space-x-2">
@@ -506,7 +470,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
           {isLoading ? 'Processing...' : '2. Run Backtest'}
         </button>
       </div>
-    </div>
+    </div >
   );
 };
 
