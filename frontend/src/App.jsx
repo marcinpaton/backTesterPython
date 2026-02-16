@@ -32,6 +32,7 @@ function App() {
   const handleRunBacktest = async (params) => {
     setIsLoading(true);
     setError(null);
+    setResults(null); // Clear previous results to free up DOM/memory
     try {
       const response = await axios.post('http://127.0.0.1:8000/api/backtest', params);
       setResults(response.data);
