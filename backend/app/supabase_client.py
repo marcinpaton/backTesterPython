@@ -35,3 +35,5 @@ def get_supabase_client() -> Client:
 # Table names
 TRANSACTIONS_TABLE = "transactions"
 TICKERS_TABLE = "tickers"
+TICKER_GROUPS_TABLE = "ticker_groups"
+TICKER_GROUP_MEMBERS_TABLE = "ticker_group_members"

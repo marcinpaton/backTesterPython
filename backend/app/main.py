@@ -43,6 +43,12 @@ class TransactionList(BaseModel):
 class TickerList(BaseModel):
     tickers: List[str]
 
+class TickerGroup(BaseModel):
+    id: Optional[str] = None
+    name: str
+    valid_from: str
+    tickers: List[str]
+
 @app.get("/api/portfolio/performance")
 def get_portfolio_performance():
     try:
@@ -308,6 +314,41 @@ def save_tickers(request: TickerList):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/ticker-groups")
+def get_ticker_groups():
+    try:
+        from app.db_tickers import get_all_ticker_groups
+        return get_all_ticker_groups()
+    except Exception as e:
+        print(f"Error fetching ticker groups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/ticker-groups")
+def save_ticker_group_endpoint(group: TickerGroup):
+    try:
+        from app.db_tickers import save_ticker_group
+        success = save_ticker_group(group.name, group.valid_from, group.tickers, group.id)
+        if success:
+            return success
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save ticker group")
+    except Exception as e:
+        print(f"Error saving ticker group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/ticker-groups/{group_id}")
+def delete_ticker_group_endpoint(group_id: str):
+    try:
+        from app.db_tickers import delete_ticker_group
+        success = delete_ticker_group(group_id)
+        if success:
+            return {"message": "Ticker group deleted successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete ticker group")
+    except Exception as e:
+        print(f"Error deleting ticker group: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/portfolio/transactions")
@@ -637,6 +678,23 @@ def run_backtest_endpoint(request: BacktestRequest):
         strategy = ScoringStrategy(request.n_tickers, request.rebalance_period, request.rebalance_period_unit, df)
     
     try:
+        # Fetch ticker groups for the backtest
+        from app.db_tickers import get_all_ticker_groups
+        ticker_groups = get_all_ticker_groups()
+        
+        # Coverage check
+        if not ticker_groups:
+             raise HTTPException(status_code=400, detail="No ticker groups defined. Please add ticker groups first.")
+        
+        # Sort by valid_from to check coverage
+        sorted_groups = sorted(ticker_groups, key=lambda x: x['valid_from'])
+        simulation_start = request.start_date
+        simulation_end = request.end_date
+        
+        # Check if first group starts before or at simulation start
+        if sorted_groups[0]['valid_from'] > simulation_start:
+             raise HTTPException(status_code=400, detail=f"No ticker group data for the period before {sorted_groups[0]['valid_from']}. Please adjust start date or add earlier ticker group.")
+
         portfolio = run_backtest(
             strategy, 
             df, 
@@ -656,7 +714,8 @@ def run_backtest_endpoint(request: BacktestRequest):
             request.sell_on_profit_threshold_pct,
             request.smart_sell_on_profit_enabled or request.strategy == 'momentum_smart_tp',
             request.smart_sell_on_profit_threshold_pct,
-            request.smart_sell_on_profit_check_freq
+            request.smart_sell_on_profit_check_freq,
+            ticker_groups=ticker_groups
         )
         metrics = calculate_metrics(portfolio)
         return metrics

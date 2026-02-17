@@ -121,6 +121,24 @@ const ConfigurationView = ({ onBack }) => {
                     <li>Changes are saved to the database and synced across all devices</li>
                 </ul>
             </div>
+
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="text-lg font-semibold text-blue-800 mb-2">🚀 New Feature: Ticker Groups</h4>
+                <p className="text-sm text-blue-700 mb-3">
+                    You can now manage multiple ticker groups with different validity dates.
+                    This allows you to change the list of tickers used in your strategy over time.
+                </p>
+                <button
+                    onClick={() => window.setCurrentView && window.setCurrentView('ticker_groups')}
+                    className="text-blue-600 hover:text-blue-800 font-bold text-sm"
+                    style={{ display: 'none' }} /* Temporary hidden until I figure out state sharing if needed, but App.jsx nav is primary */
+                >
+                    Go to Ticker Groups →
+                </button>
+                <div className="text-xs text-blue-500 italic">
+                    Access Ticker Groups via the top navigation menu.
+                </div>
+            </div>
         </div>
     );
 };
