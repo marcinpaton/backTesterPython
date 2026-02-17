@@ -778,9 +778,10 @@ class OptimizationRequest(BaseModel):
     walk_forward_end: Optional[str] = None    # Overall end date  
     walk_forward_step_months: Optional[int] = 6  # Step size in months
     walk_forward_dynamic_step: bool = False  # If True, step size is determined by winning strategy's rebalance period
+    use_ticker_groups: bool = False  # If True, use dynamic ticker groups from database
 
 # Helper function to run a single backtest for optimization
-def run_single_backtest(df, config, start_date, end_date, margin_enabled, initial_capital=10000):
+def run_single_backtest(df, config, start_date, end_date, margin_enabled, initial_capital=10000, ticker_groups=None):
     broker_configs = {
         'bossa': {
             'transaction_fee_enabled': True,
@@ -831,7 +832,8 @@ def run_single_backtest(df, config, start_date, end_date, margin_enabled, initia
         broker_config['capital_gains_tax_enabled'],
         broker_config['capital_gains_tax_pct'],
         margin_enabled,
-        config['sizing_method']
+        config['sizing_method'],
+        ticker_groups=ticker_groups
     )
     
     metrics = calculate_metrics(portfolio)
@@ -971,6 +973,14 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
     if not request.train_months or not request.test_months:
         raise ValueError("Walk-Forward Optimization requires train_months and test_months to be set. Please enable Train/Test Split.")
     
+    # Fetch ticker groups if enabled
+    ticker_groups = None
+    if request.use_ticker_groups:
+        from app.db_tickers import get_all_ticker_groups
+        ticker_groups = get_all_ticker_groups()
+        if not ticker_groups:
+             print("Warning: use_ticker_groups is True but no groups found in Walk-Forward.")
+    
     # Run train/test for each window iteratively
     all_window_results = []
     
@@ -1022,7 +1032,8 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
             test_months=request.test_months,
             top_n_for_test=request.top_n_for_test,
             scoring_config=request.scoring_config,
-            enable_walk_forward=False  # Prevent recursion
+            enable_walk_forward=False,  # Prevent recursion
+            use_ticker_groups=request.use_ticker_groups
         )
         
         # Run train/test for this window
@@ -1102,7 +1113,8 @@ def run_walk_forward_optimization(request: OptimizationRequest, df):
                         sim_start_date.strftime('%Y-%m-%d'),
                         sim_end_date.strftime('%Y-%m-%d'),
                         request.margin_enabled,
-                        initial_capital=current_capital  # Use capital from previous window
+                        initial_capital=current_capital,  # Use capital from previous window
+                        ticker_groups=ticker_groups
                     )
                     
                     if sim_result:
@@ -1215,6 +1227,14 @@ def run_optimization_endpoint(request: OptimizationRequest):
     if df is None:
         raise HTTPException(status_code=404, detail="No data found. Please download data first.")
     
+    # Fetch ticker groups if enabled
+    ticker_groups = None
+    if request.use_ticker_groups:
+        from app.db_tickers import get_all_ticker_groups
+        ticker_groups = get_all_ticker_groups()
+        if not ticker_groups:
+             print("Warning: use_ticker_groups is True but no groups found.")
+    
     # Handle Walk-Forward Optimization
     if request.enable_walk_forward:
         return run_walk_forward_optimization(request, df)
@@ -1250,7 +1270,8 @@ def run_optimization_endpoint(request: OptimizationRequest):
             margin_enabled=request.margin_enabled,
             strategies=request.strategies,
             sizing_methods=request.sizing_methods,
-            enable_train_test=False  # Disable recursion
+            enable_train_test=False,  # Disable recursion
+            use_ticker_groups=request.use_ticker_groups
         )
         
         # Get training results
@@ -1274,7 +1295,7 @@ def run_optimization_endpoint(request: OptimizationRequest):
             
             # Run backtest on test period
             test_result = run_single_backtest(
-                df, test_config, test_start_str, test_end_str, request.margin_enabled
+                df, test_config, test_start_str, test_end_str, request.margin_enabled, ticker_groups=ticker_groups
             )
             
             # Calculate score based on both train and test results
@@ -1451,7 +1472,8 @@ def run_optimization_endpoint(request: OptimizationRequest):
                                                     broker_config['capital_gains_tax_enabled'],
                                                     broker_config['capital_gains_tax_pct'],
                                                     request.margin_enabled,
-                                                    sizing_method
+                                                    sizing_method,
+                                                    ticker_groups=ticker_groups
                                                 )
                                                 
                                                 metrics = calculate_metrics(portfolio)

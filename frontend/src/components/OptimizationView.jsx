@@ -3,6 +3,7 @@ import OptimizationResults from './OptimizationResults';
 
 const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis, results, onLoadResults }) => {
     const [tickers, setTickers] = useState('');
+    const [useTickerGroups, setUseTickerGroups] = useState(false);
 
     useEffect(() => {
         fetch('http://127.0.0.1:8000/api/tickers')
@@ -208,7 +209,9 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
             walk_forward_start: enableTrainTest ? startDate : null,
             walk_forward_end: enableTrainTest ? endDate : null,
             walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null,
-            walk_forward_dynamic_step: enableTrainTest ? walkForwardDynamicStep : false
+            walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null,
+            walk_forward_dynamic_step: enableTrainTest ? walkForwardDynamicStep : false,
+            use_ticker_groups: useTickerGroups
         };
 
         onRunOptimization(params, autoSaveAfterOptimization);
@@ -338,7 +341,10 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
             enable_walk_forward: enableTrainTest,
             walk_forward_start: enableTrainTest ? startDate : null,
             walk_forward_end: enableTrainTest ? endDate : null,
-            walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null
+            walk_forward_start: enableTrainTest ? startDate : null,
+            walk_forward_end: enableTrainTest ? endDate : null,
+            walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null,
+            use_ticker_groups: useTickerGroups
         };
 
         try {
@@ -793,17 +799,37 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
                     </div>
                 </div>
 
-                {/* Tickers */}
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <h3 className="text-lg font-semibold text-gray-700 mb-3">Tickers</h3>
-                    <textarea
-                        value={tickers}
-                        onChange={(e) => setTickers(e.target.value)}
-                        rows={3}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                        placeholder="Comma separated"
-                    />
+
+                    <div className="mb-3">
+                        <label className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                checked={useTickerGroups}
+                                onChange={(e) => setUseTickerGroups(e.target.checked)}
+                                className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                            />
+                            <span className="text-sm font-medium text-gray-700">
+                                Use Dynamic Ticker Groups (ignores list below)
+                            </span>
+                        </label>
+                    </div>
+
+                    {useTickerGroups ? (
+                        <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded border border-blue-200 mb-3">
+                            Using defined Ticker Groups from database. The universe of available tickers will change over time based on group definitions.
+                        </div>
+                    ) : (
+                        <textarea
+                            value={tickers}
+                            onChange={(e) => setTickers(e.target.value)}
+                            placeholder="AAPL, MSFT, GOOGL..."
+                            className="w-full h-32 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    )}
                 </div>
+
 
                 {/* Number of Tickers Range */}
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
