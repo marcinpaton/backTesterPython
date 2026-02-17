@@ -7,12 +7,13 @@ import OptimizationAnalysisPage from './components/OptimizationAnalysisPage';
 import MomentumScanner from './components/MomentumScanner';
 import PortfolioView from './components/PortfolioView';
 import ConfigurationView from './components/ConfigurationView';
+import TickerGroupsView from './components/TickerGroupsView';
 
 function App() {
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [currentView, setCurrentView] = useState('portfolio'); // 'portfolio', 'dashboard', 'optimization', 'analysis', 'momentum_scanner', 'configuration'
+  const [currentView, setCurrentView] = useState('portfolio'); // 'portfolio', 'dashboard', 'optimization', 'analysis', 'momentum_scanner', 'configuration', 'ticker_groups'
 
   const handleDownload = async (params) => {
     setIsLoading(true);
@@ -193,10 +194,16 @@ function App() {
               Optimization
             </button>
             <button
+              onClick={() => setCurrentView('ticker_groups')}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'ticker_groups' ? 'bg-green-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
+            >
+              Ticker Groups
+            </button>
+            <button
               onClick={() => setCurrentView('configuration')}
               className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'configuration' ? 'bg-green-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
             >
-              Configuration
+              Config
             </button>
           </div>
         </div>
@@ -237,6 +244,10 @@ function App() {
           />
         ) : currentView === 'configuration' ? (
           <ConfigurationView
+            onBack={() => setCurrentView('portfolio')}
+          />
+        ) : currentView === 'ticker_groups' ? (
+          <TickerGroupsView
             onBack={() => setCurrentView('portfolio')}
           />
         ) : (

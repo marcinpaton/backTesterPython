@@ -289,7 +289,7 @@ class Portfolio:
             interest = abs(self.cash) * daily_rate
             self.cash -= interest
 
-def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_enabled: bool = False, smart_sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_check_freq: int = 1):
+def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_enabled: bool = False, smart_sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_check_freq: int = 1, ticker_groups: List[Dict[str, Any]] = None):
     # Preprocessing to get Close prices only
     if isinstance(data.columns, pd.MultiIndex):
         try:
@@ -324,9 +324,29 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
     prev_prices = None
     
     today_index = 0
+    
+    # Sort ticker groups by date descending for easier matching
+    if ticker_groups:
+        sorted_groups = sorted(ticker_groups, key=lambda x: x['valid_from'], reverse=True)
+    else:
+        sorted_groups = []
+
     for date, prices in close_prices.iterrows():
         today_index += 1
         current_prices = prices.to_dict()
+        
+        # Determine active ticker group for current date
+        active_tickers = None
+        if sorted_groups:
+            date_str = date.strftime('%Y-%m-%d')
+            for group in sorted_groups:
+                if group['valid_from'] <= date_str:
+                    active_tickers = set(group['tickers'])
+                    break
+        
+        # Filter current_prices based on active group
+        if active_tickers is not None:
+            current_prices = {t: p for t, p in current_prices.items() if t in active_tickers}
         
         # Check Stop Loss (using previous day's close as trigger)
         if stop_loss_pct and prev_prices:
