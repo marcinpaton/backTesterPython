@@ -344,9 +344,10 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                     active_tickers = set(group['tickers'])
                     break
         
-        # Filter current_prices based on active group
-        if active_tickers is not None:
-            current_prices = {t: p for t, p in current_prices.items() if t in active_tickers}
+        # Filter current_prices based on active group - REMOVED to allow holding/selling of tickers not in active group
+        # The filtering will happen when selecting *new* tickers to buy
+        # if active_tickers is not None:
+        #     current_prices = {t: p for t, p in current_prices.items() if t in active_tickers}
         
         # Check Stop Loss (using previous day's close as trigger)
         if stop_loss_pct and prev_prices:
@@ -358,6 +359,10 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                  top_tickers_set = set()
                  if smart_stop_loss:
                      available_tickers = [t for t, p in current_prices.items() if not pd.isna(p)]
+                     # Apply Ticker Group filtering for Smart SL replacements
+                     if active_tickers is not None:
+                         available_tickers = [t for t in available_tickers if t in active_tickers]
+                     
                      top_tickers_with_scores = strategy.select_tickers(available_tickers, date)
                      top_tickers_set = {t for t, s in top_tickers_with_scores}
                  
@@ -426,6 +431,10 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
             if profit_candidates:
                 # We need top picks for today to check if candidates are still in top picks
                 available_tickers = [t for t, p in current_prices.items() if not pd.isna(p)]
+                # Apply Ticker Group filtering for Smart TP replacements
+                if active_tickers is not None:
+                    available_tickers = [t for t in available_tickers if t in active_tickers]
+
                 top_tickers_with_scores = strategy.select_tickers(available_tickers, date)
                 top_tickers_set = {t for t, s in top_tickers_with_scores}
 
@@ -512,6 +521,11 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
         if strategy.should_rebalance(date, last_rebalance_date):
             print(f"[{date.date()}] Rebalancing...")
             available_tickers = [t for t, p in current_prices.items() if not pd.isna(p)]
+            
+            # Apply Ticker Group filtering for NEW selections
+            if active_tickers is not None:
+                available_tickers = [t for t in available_tickers if t in active_tickers]
+                
             target_tickers_with_scores = strategy.select_tickers(available_tickers, date)
             print(f"  Target tickers: {target_tickers_with_scores}")
             # Calculate VaR for target tickers
