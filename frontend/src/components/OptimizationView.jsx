@@ -209,7 +209,6 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
             walk_forward_start: enableTrainTest ? startDate : null,
             walk_forward_end: enableTrainTest ? endDate : null,
             walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null,
-            walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null,
             walk_forward_dynamic_step: enableTrainTest ? walkForwardDynamicStep : false,
             use_ticker_groups: useTickerGroups
         };
@@ -339,8 +338,6 @@ const OptimizationView = ({ onRunOptimization, isLoading, onBack, onGoToAnalysis
 
             // Walk-Forward parameters (always enabled with train/test)
             enable_walk_forward: enableTrainTest,
-            walk_forward_start: enableTrainTest ? startDate : null,
-            walk_forward_end: enableTrainTest ? endDate : null,
             walk_forward_start: enableTrainTest ? startDate : null,
             walk_forward_end: enableTrainTest ? endDate : null,
             walk_forward_step_months: enableTrainTest ? parseInt(walkForwardStep) : null,
