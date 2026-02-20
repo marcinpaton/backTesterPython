@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const TickerGroupsView = ({ onBack }) => {
@@ -12,6 +12,9 @@ const TickerGroupsView = ({ onBack }) => {
         valid_from: new Date().toISOString().split('T')[0],
         tickers: ''
     });
+    const [currentPage, setCurrentPage] = useState(1);
+    const groupsPerPage = 10;
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         fetchGroups();
@@ -71,6 +74,51 @@ const TickerGroupsView = ({ onBack }) => {
         }
     };
 
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        setIsLoading(true);
+        setError(null);
+        setSuccessMessage('');
+
+        try {
+            const filePromises = files.map(file => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => resolve({ filename: file.name, content: event.target.result });
+                    reader.onerror = (error) => reject(error);
+                    reader.readAsText(file);
+                });
+            });
+
+            const fileContents = await Promise.all(filePromises);
+            const response = await axios.post('http://127.0.0.1:8000/api/ticker-groups/import', { files: fileContents });
+
+            const results = response.data.results;
+            const successCount = results.filter(r => r.status === 'success').length;
+            const skippedCount = results.filter(r => r.status === 'skipped').length;
+            const errorCount = results.filter(r => r.status === 'error').length;
+
+            let msg = `Import complete: ${successCount} groups added.`;
+            if (skippedCount > 0) msg += ` ${skippedCount} skipped (already exists).`;
+            if (errorCount > 0) msg += ` ${errorCount} errors.`;
+
+            setSuccessMessage(msg);
+            fetchGroups();
+        } catch (err) {
+            setError('Failed to import groups: ' + (err.response?.data?.detail || err.message));
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
     const startEditing = (group = null) => {
         if (group) {
             setCurrentGroup({
@@ -93,12 +141,29 @@ const TickerGroupsView = ({ onBack }) => {
                 <h2 className="text-2xl font-bold text-gray-800">Ticker Groups</h2>
                 <div className="space-x-4">
                     {!isEditing && (
-                        <button
-                            onClick={() => startEditing()}
-                            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-                        >
-                            + Add Group
-                        </button>
+                        <>
+                            <input
+                                type="file"
+                                multiple
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                style={{ display: 'none' }}
+                                accept=".txt,*"
+                            />
+                            <button
+                                onClick={handleImportClick}
+                                disabled={isLoading}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
+                            >
+                                {isLoading ? 'Importing...' : 'Import Groups'}
+                            </button>
+                            <button
+                                onClick={() => startEditing()}
+                                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                            >
+                                + Add Group
+                            </button>
+                        </>
                     )}
                     <button
                         onClick={onBack}
@@ -178,44 +243,77 @@ const TickerGroupsView = ({ onBack }) => {
                     </div>
                 </form>
             ) : (
-                <div className="grid grid-cols-1 gap-6">
-                    {groups.length === 0 ? (
-                        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                            <p className="text-gray-500">No ticker groups defined. Click "Add Group" to create one.</p>
-                        </div>
-                    ) : (
-                        groups.map(group => (
-                            <div key={group.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h4 className="text-lg font-bold text-gray-800">{group.name}</h4>
-                                        <p className="text-sm text-blue-600 font-medium">Valid from: {group.valid_from}</p>
-                                    </div>
-                                    <div className="flex space-x-2">
-                                        <button
-                                            onClick={() => startEditing(group)}
-                                            className="text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded hover:bg-blue-50"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(group.id)}
-                                            className="text-red-600 hover:text-red-800 font-medium px-3 py-1 rounded hover:bg-red-50"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="bg-gray-50 p-3 rounded text-sm text-gray-600 font-mono max-h-24 overflow-y-auto">
-                                    {group.tickers.join(', ')}
-                                </div>
-                                <div className="mt-2 text-xs text-gray-400">
-                                    {group.tickers.length} tickers
-                                </div>
+                <>
+                    <div className="grid grid-cols-1 gap-6">
+                        {groups.length === 0 ? (
+                            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                                <p className="text-gray-500">No ticker groups defined. Click "Add Group" to create one.</p>
                             </div>
-                        ))
+                        ) : (
+                            groups.slice((currentPage - 1) * groupsPerPage, currentPage * groupsPerPage).map(group => (
+                                <div key={group.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <p className="text-xl text-blue-600 font-bold mb-1">Valid from: {group.valid_from}</p>
+                                            <h4 className="text-sm font-medium text-gray-500">{group.name}</h4>
+                                        </div>
+                                        <div className="flex space-x-2">
+                                            <button
+                                                onClick={() => startEditing(group)}
+                                                className="text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded hover:bg-blue-50"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(group.id)}
+                                                className="text-red-600 hover:text-red-800 font-medium px-3 py-1 rounded hover:bg-red-50"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-50 p-3 rounded text-sm text-gray-600 font-mono max-h-24 overflow-y-auto">
+                                        {group.tickers.join(', ')}
+                                    </div>
+                                    <div className="mt-2 text-xs text-gray-400">
+                                        {group.tickers.length} tickers
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Pagination Controls */}
+                    {groups.length > groupsPerPage && (
+                        <div className="flex justify-center items-center space-x-2 mt-8">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="px-4 py-2 border rounded border-gray-300 disabled:opacity-20 hover:bg-gray-50"
+                            >
+                                Previous
+                            </button>
+
+                            {Array.from({ length: Math.ceil(groups.length / groupsPerPage) }, (_, i) => i + 1).map(page => (
+                                <button
+                                    key={page}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`px-4 py-2 border rounded ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50'}`}
+                                >
+                                    {page}
+                                </button>
+                            ))}
+
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(groups.length / groupsPerPage)))}
+                                disabled={currentPage === Math.ceil(groups.length / groupsPerPage)}
+                                className="px-4 py-2 border rounded border-gray-300 disabled:opacity-20 hover:bg-gray-50"
+                            >
+                                Next
+                            </button>
+                        </div>
                     )}
-                </div>
+                </>
             )}
 
             <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">

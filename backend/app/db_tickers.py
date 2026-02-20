@@ -161,29 +161,33 @@ def save_all_tickers(tickers: List[str]) -> bool:
 
 def get_all_ticker_groups() -> List[Dict[str, Any]]:
     """
-    Retrieves all ticker groups with their members.
+    Retrieves all ticker groups with their members using a single joined query.
     """
     try:
-        # Get groups
-        groups_response = supabase.table(TICKER_GROUPS_TABLE)\
-            .select("*")\
+        # Get groups with members in a single query
+        # We use the join syntax: ticker_group_members(ticker)
+        # This assumes a foreign key exists from ticker_group_members to ticker_groups
+        response = supabase.table(TICKER_GROUPS_TABLE)\
+            .select(f"*, {TICKER_GROUP_MEMBERS_TABLE}(ticker)")\
             .order("valid_from", desc=True)\
             .execute()
         
-        groups = groups_response.data if groups_response.data else []
+        groups = response.data if response.data else []
         
-        # Get members for each group
+        # Flatten the members list
         for group in groups:
-            members_response = supabase.table(TICKER_GROUP_MEMBERS_TABLE)\
-                .select("ticker")\
-                .eq("group_id", group['id'])\
-                .execute()
-            
-            group['tickers'] = [row['ticker'] for row in members_response.data] if members_response.data else []
+            # members are in a list under the table name key
+            members = group.get(TICKER_GROUP_MEMBERS_TABLE, [])
+            group['tickers'] = [m['ticker'] for m in members] if members else []
+            # Remove the raw members list to keep results clean
+            if TICKER_GROUP_MEMBERS_TABLE in group:
+                del group[TICKER_GROUP_MEMBERS_TABLE]
             
         return groups
     except Exception as e:
         print(f"Error fetching ticker groups: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
@@ -243,3 +247,19 @@ def delete_ticker_group(group_id: str) -> bool:
     except Exception as e:
         print(f"Error deleting ticker group {group_id}: {e}")
         return False
+
+
+def get_ticker_group_by_date(valid_from: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieves a ticker group by its valid_from date.
+    """
+    try:
+        response = supabase.table(TICKER_GROUPS_TABLE)\
+            .select("*")\
+            .eq("valid_from", valid_from)\
+            .execute()
+        
+        return response.data[0] if response.data else None
+    except Exception as e:
+        print(f"Error fetching ticker group for date {valid_from}: {e}")
+        return None

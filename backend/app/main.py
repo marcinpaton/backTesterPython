@@ -1,7 +1,7 @@
 from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates, DATA_FILE, PORTFOLIO_DATA_FILE, PORTFOLIO_CURRENCY_DATA_FILE, CURRENCY_DATA_FILE
@@ -16,6 +16,7 @@ from queue import Queue
 from queue import Queue
 from datetime import datetime
 from app.currency_utils import infer_currency
+from app.ticker_group_parser import parse_ticker_group_file
 
 app = FastAPI()
 
@@ -48,6 +49,11 @@ class TickerGroup(BaseModel):
     name: str
     valid_from: str
     tickers: List[str]
+
+class ImportTickerGroupsRequest(BaseModel):
+    files: List[Dict[str, str]] # List of {filename: str, content: str}
+
+ImportTickerGroupsRequest.model_rebuild()
 
 @app.get("/api/portfolio/performance")
 def get_portfolio_performance():
@@ -349,6 +355,59 @@ def delete_ticker_group_endpoint(group_id: str):
             raise HTTPException(status_code=500, detail="Failed to delete ticker group")
     except Exception as e:
         print(f"Error deleting ticker group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/ticker-groups/import")
+def import_ticker_groups(request: ImportTickerGroupsRequest):
+    try:
+        from app.db_tickers import save_ticker_group, get_ticker_group_by_date
+        
+        results = []
+        import_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+        
+        for file_data in request.files:
+            filename = file_data.get('filename', 'unknown')
+            content = file_data.get('content', '')
+            
+            valid_from, tickers = parse_ticker_group_file(content)
+            
+            if not valid_from:
+                results.append({"filename": filename, "status": "error", "message": "Could not parse date from file"})
+                continue
+                
+            if not tickers:
+                results.append({"filename": filename, "status": "error", "message": "No tickers found in file"})
+                continue
+                
+            # Check if group already exists for this date
+            existing = get_ticker_group_by_date(valid_from)
+            if existing:
+                results.append({
+                    "filename": filename, 
+                    "status": "skipped", 
+                    "message": f"Group for {valid_from} already exists: {existing['name']}",
+                    "date": valid_from
+                })
+                continue
+                
+            # Save new group
+            group_name = f"imported {import_date}"
+            success = save_ticker_group(group_name, valid_from, tickers)
+            
+            if success:
+                results.append({
+                    "filename": filename, 
+                    "status": "success", 
+                    "message": f"Imported {len(tickers)} tickers for {valid_from}",
+                    "date": valid_from
+                })
+            else:
+                results.append({"filename": filename, "status": "error", "message": "Database save failed"})
+                
+        return {"results": results}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/portfolio/transactions")
