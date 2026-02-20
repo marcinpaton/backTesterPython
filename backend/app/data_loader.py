@@ -26,9 +26,24 @@ def download_data(tickers: list[str], start_date: str, end_date: str, filename: 
     global _data_cache
     
     print(f"Downloading data from {start_date} to {end_date}...")
+    print(f"Tickers to download ({len(tickers)}): {tickers}")
     
     # Download data
     data = yf.download(tickers, start=start_date, end=end_date, group_by='ticker', progress=False)
+    
+    # Keep only Close prices to optimize file size and simplify structure
+    if not data.empty:
+        if isinstance(data.columns, pd.MultiIndex):
+            # For multiple tickers, Close prices are at level 1
+            try:
+                data = data.xs('Close', level=1, axis=1)
+            except KeyError:
+                if 'Close' in data.columns:
+                    data = data['Close']
+        else:
+            # For single ticker, Close might be a column or data itself might be the Close series if requested specifically
+            if 'Close' in data.columns:
+                data = data[['Close']]
     
     # Sort columns to ensure deterministic order
     data = data.sort_index(axis=1)
@@ -41,7 +56,7 @@ def download_data(tickers: list[str], start_date: str, end_date: str, filename: 
         os.makedirs(DATA_DIR)
     
     data.to_csv(filename)
-    print(f"Data saved to {filename}")
+    print(f"Data saved to {filename}. Columns saved ({len(data.columns)}): {list(data.columns)}")
     
     # Invalidate cache
     if filename in _data_cache:

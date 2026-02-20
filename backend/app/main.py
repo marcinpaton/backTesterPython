@@ -444,6 +444,20 @@ class DownloadRequest(BaseModel):
     currency_filename: Optional[str] = None
     use_transaction_file: bool = False
 
+@app.get("/api/ticker-groups/active")
+def get_active_ticker_group_endpoint(date: str):
+    try:
+        from app.db_tickers import get_active_ticker_group_for_date
+        group = get_active_ticker_group_for_date(date)
+        if not group:
+            raise HTTPException(status_code=404, detail=f"No active ticker group found for date {date}")
+        return group
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/ticker-groups/unique-tickers")
 def get_unique_tickers_endpoint():
     try:
@@ -517,6 +531,8 @@ def scan_momentum(request: MomentumScanRequest):
     
     try:
         analysis_dt = datetime.strptime(request.analysis_date, '%Y-%m-%d')
+        print(f"--- Momentum Scan Started for Date: {request.analysis_date} ---")
+        print(f"Scanning {len(request.tickers)} tickers...")
         
         # Use new detailed method - strategy handles loose date matching per ticker
         detailed_results = strategy.get_detailed_momentum(request.tickers, analysis_dt)

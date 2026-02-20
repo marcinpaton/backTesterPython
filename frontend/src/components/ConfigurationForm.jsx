@@ -81,6 +81,7 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
       const tickerList = await response.json();
 
       if (tickerList && tickerList.length > 0) {
+        console.log(`[Backtest] Requesting download for ${tickerList.length} tickers:`, tickerList);
         onDownloadData({ tickers: tickerList, start_date: startDate, end_date: endDate });
       } else {
         alert('No tickers found in any ticker groups. Please add some tickers to a group first.');

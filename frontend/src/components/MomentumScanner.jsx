@@ -44,6 +44,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
             const tickerList = await response.json();
 
             if (tickerList && tickerList.length > 0) {
+                console.log(`[Scanner] Requesting download for ${tickerList.length} tickers:`, tickerList);
                 if (onDownloadData) {
                     onDownloadData({ tickers: tickerList, start_date: startDate, end_date: endDate });
                 }
@@ -62,8 +63,25 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
         setResults(null);
 
         try {
-            // Split by comma OR whitespace
-            const tickerList = tickers.split(/[\s,]+/).map(t => t.trim()).filter(t => t.length > 0);
+            // Fetch the ticker group that was active for the analysisDate
+            const tickerResponse = await fetch(`http://127.0.0.1:8000/api/ticker-groups/active?date=${analysisDate}`);
+
+            if (!tickerResponse.ok) {
+                const errorData = await tickerResponse.json();
+                throw new Error(errorData.detail || 'Failed to fetch active ticker group');
+            }
+
+            const activeGroup = await tickerResponse.json();
+            const tickerList = activeGroup.tickers;
+
+            console.log(`[Scanner] Active Ticker Group for ${analysisDate}:`, activeGroup.name, `(${activeGroup.valid_from})`);
+            console.log(`[Scanner] Tickers to scan:`, tickerList);
+
+            if (!tickerList || tickerList.length === 0) {
+                alert(`No tickers found in the active group for date ${analysisDate}.`);
+                setIsLoading(false);
+                return;
+            }
 
             const response = await axios.post('http://127.0.0.1:8000/api/momentum_scan', {
                 tickers: tickerList,

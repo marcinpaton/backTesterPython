@@ -161,15 +161,16 @@ def save_all_tickers(tickers: List[str]) -> bool:
 
 def get_all_ticker_groups() -> List[Dict[str, Any]]:
     """
-    Retrieves all ticker groups with their members using a single joined query.
+    Retrieves all ticker groups with their members.
     """
     try:
-        # Get groups with members in a single query
-        # We use the join syntax: ticker_group_members(ticker)
-        # This assumes a foreign key exists from ticker_group_members to ticker_groups
+        # Get groups with members. Supabase join default limit is 1000.
+        # Since we have > 2000 total members, a single group might eventually exceed this,
+        # or the total rows in the joined view might be truncated.
         response = supabase.table(TICKER_GROUPS_TABLE)\
             .select(f"*, {TICKER_GROUP_MEMBERS_TABLE}(ticker)")\
             .order("valid_from", desc=True)\
+            .limit(1000)\
             .execute()
         
         groups = response.data if response.data else []
@@ -268,17 +269,54 @@ def get_ticker_group_by_date(valid_from: str) -> Optional[Dict[str, Any]]:
 def get_unique_tickers_from_groups() -> List[str]:
     """
     Retrieves all unique tickers from all ticker groups.
+    Handles Supabase 1000-row limit by using pagination.
     """
     try:
-        response = supabase.table(TICKER_GROUP_MEMBERS_TABLE)\
-            .select("ticker")\
-            .execute()
+        all_tickers = set()
+        page_size = 1000
+        offset = 0
         
-        if not response.data:
-            return []
+        while True:
+            response = supabase.table(TICKER_GROUP_MEMBERS_TABLE)\
+                .select("ticker")\
+                .range(offset, offset + page_size - 1)\
+                .execute()
             
-        tickers = {row['ticker'] for row in response.data}
-        return sorted(list(tickers))
+            if not response.data:
+                break
+                
+            for row in response.data:
+                all_tickers.add(row['ticker'])
+            
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+            
+        return sorted(list(all_tickers))
     except Exception as e:
         print(f"Error fetching unique tickers from groups: {e}")
         return []
+
+
+def get_active_ticker_group_for_date(target_date: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieves the ticker group that is active for a given date.
+    Active group is the one with the latest valid_from <= target_date.
+    """
+    try:
+        # Get all groups
+        groups = get_all_ticker_groups()
+        if not groups:
+            return None
+            
+        # Filter for groups that started before or on target_date
+        # groups are already sorted by valid_from DESC in get_all_ticker_groups
+        for group in groups:
+            if group['valid_from'] <= target_date:
+                return group
+                
+        return None
+    except Exception as e:
+        print(f"Error fetching active ticker group for date {target_date}: {e}")
+        return None

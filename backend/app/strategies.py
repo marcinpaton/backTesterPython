@@ -128,6 +128,10 @@ class MomentumStrategy(Strategy):
                 
                 ret = (end_price - start_price) / start_price
                 
+                # Print calculation logs
+                print(f"[{ticker}] Momentum Calculation: ({end_price:.2f} - {start_price:.2f}) / {start_price:.2f} = {ret:.4f} "
+                      f"(Dates: {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}, Period: {self.lookback_days} trading days)")
+                
                 # Filter negative momentum if enabled
                 if self.filter_negative_momentum and ret < 0:
                     continue
