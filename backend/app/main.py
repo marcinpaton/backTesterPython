@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, List, Any, Dict
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from app.data_loader import download_data, load_data, DATA_DIR, download_currency_rates, DATA_FILE, PORTFOLIO_DATA_FILE, PORTFOLIO_CURRENCY_DATA_FILE, CURRENCY_DATA_FILE
+from app.data_loader import download_data, smart_download_data, load_data, DATA_DIR, download_currency_rates, DATA_FILE, PORTFOLIO_DATA_FILE, PORTFOLIO_CURRENCY_DATA_FILE, CURRENCY_DATA_FILE
 from app.portfolio_replayer import PortfolioReplayer
 import uvicorn
 import os
@@ -477,8 +477,8 @@ def download_stock_data(request: DownloadRequest):
         if target_file and not os.path.isabs(target_file):
             target_file = os.path.join(DATA_DIR, target_file)
             
-        # Save to CSV for all cases
-        result = download_data(request.tickers, request.start_date, request.end_date, filename=target_file)
+        # Use smart incremental download – only fetches what is missing
+        result = smart_download_data(request.tickers, request.start_date, request.end_date, filename=target_file)
         
         # Also download currency rates to CSV
         currency_target = request.currency_filename if request.currency_filename else CURRENCY_DATA_FILE
