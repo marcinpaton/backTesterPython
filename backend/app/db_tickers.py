@@ -263,3 +263,22 @@ def get_ticker_group_by_date(valid_from: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         print(f"Error fetching ticker group for date {valid_from}: {e}")
         return None
+
+
+def get_unique_tickers_from_groups() -> List[str]:
+    """
+    Retrieves all unique tickers from all ticker groups.
+    """
+    try:
+        response = supabase.table(TICKER_GROUP_MEMBERS_TABLE)\
+            .select("ticker")\
+            .execute()
+        
+        if not response.data:
+            return []
+            
+        tickers = {row['ticker'] for row in response.data}
+        return sorted(list(tickers))
+    except Exception as e:
+        print(f"Error fetching unique tickers from groups: {e}")
+        return []

@@ -74,9 +74,21 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
     }
   }, [initialValues]);
 
-  const handleDownload = () => {
-    const tickerList = tickers.split(',').map(t => t.trim());
-    onDownloadData({ tickers: tickerList, start_date: startDate, end_date: endDate });
+  const handleDownload = async () => {
+    try {
+      // Fetch all unique tickers from all groups in the database
+      const response = await fetch('http://127.0.0.1:8000/api/ticker-groups/unique-tickers');
+      const tickerList = await response.json();
+
+      if (tickerList && tickerList.length > 0) {
+        onDownloadData({ tickers: tickerList, start_date: startDate, end_date: endDate });
+      } else {
+        alert('No tickers found in any ticker groups. Please add some tickers to a group first.');
+      }
+    } catch (err) {
+      console.error("Failed to fetch unique tickers for download:", err);
+      alert('Failed to fetch tickers from groups.');
+    }
   };
 
   const handleRun = () => {
@@ -478,6 +490,9 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
         >
           {isLoading ? 'Processing...' : '1. Download Data'}
         </button>
+        <p className="text-xs text-blue-600 mt-2 font-medium">
+          * Downloads data for ALL unique tickers found in ALL ticker groups in the database.
+        </p>
         <button
           onClick={handleRun}
           disabled={isLoading}

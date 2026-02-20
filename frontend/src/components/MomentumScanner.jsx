@@ -37,11 +37,22 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     const [error, setError] = useState(null);
     const [expandedRow, setExpandedRow] = useState(null); // Ticker of expanded row
 
-    const handleDownload = () => {
-        // Split by comma OR whitespace
-        const tickerList = tickers.split(/[\s,]+/).map(t => t.trim()).filter(t => t.length > 0);
-        if (onDownloadData) {
-            onDownloadData({ tickers: tickerList, start_date: startDate, end_date: endDate });
+    const handleDownload = async () => {
+        try {
+            // Fetch all unique tickers from all groups in the database
+            const response = await fetch('http://127.0.0.1:8000/api/ticker-groups/unique-tickers');
+            const tickerList = await response.json();
+
+            if (tickerList && tickerList.length > 0) {
+                if (onDownloadData) {
+                    onDownloadData({ tickers: tickerList, start_date: startDate, end_date: endDate });
+                }
+            } else {
+                alert('No tickers found in any ticker groups. Please add some tickers to a group first.');
+            }
+        } catch (err) {
+            console.error("Failed to fetch unique tickers for download:", err);
+            alert('Failed to fetch tickers from groups.');
         }
     };
 
@@ -258,8 +269,8 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                             >
                                 {isGlobalLoading ? 'Downloading...' : 'Load Prices from Yahoo'}
                             </button>
-                            <p className="text-xs text-gray-500 mt-1">
-                                * Downloads data for all tickers above and saves to disk. Required before scanning.
+                            <p className="text-xs text-blue-600 mt-1 font-medium">
+                                * Downloads data for ALL unique tickers found in ALL ticker groups in the database. Required before scanning.
                             </p>
                         </div>
                     </div>

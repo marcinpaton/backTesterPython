@@ -444,6 +444,16 @@ class DownloadRequest(BaseModel):
     currency_filename: Optional[str] = None
     use_transaction_file: bool = False
 
+@app.get("/api/ticker-groups/unique-tickers")
+def get_unique_tickers_endpoint():
+    try:
+        from app.db_tickers import get_unique_tickers_from_groups
+        tickers = get_unique_tickers_from_groups()
+        return tickers
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/download")
 def download_stock_data(request: DownloadRequest):
     try:
