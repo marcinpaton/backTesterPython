@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
 const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialValues }) => {
-  const [tickers, setTickers] = useState(
-    initialValues?.tickers?.join(', ') || '');
   const [startDate, setStartDate] = useState(initialValues?.start_date || '2024-01-01');
   const [endDate, setEndDate] = useState(initialValues?.end_date || new Date().toISOString().split('T')[0]);
   const [nTickers, setNTickers] = useState(initialValues?.n_tickers || 5);
@@ -30,24 +28,11 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
   const [filterNegativeMomentum, setFilterNegativeMomentum] = useState(initialValues?.filter_negative_momentum || false);
   const [smaPeriod, setSmaPeriod] = useState(initialValues?.sma_period !== undefined ? initialValues.sma_period : -1);
 
-  // Fetch default tickers if not provided in initialValues
-  useEffect(() => {
-    if (!initialValues?.tickers) {
-      fetch('http://127.0.0.1:8000/api/tickers')
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data) && data.length > 0) {
-            setTickers(data.join(', '));
-          }
-        })
-        .catch(err => console.error("Failed to fetch tickers:", err));
-    }
-  }, [initialValues]);
+
 
   // Effect to update state if initialValues changes (e.g., when navigation happens)
   useEffect(() => {
     if (initialValues) {
-      if (initialValues.tickers) setTickers(initialValues.tickers.join(', '));
       if (initialValues.start_date) setStartDate(initialValues.start_date);
       if (initialValues.end_date) setEndDate(initialValues.end_date);
       if (initialValues.n_tickers) setNTickers(initialValues.n_tickers);
@@ -159,16 +144,6 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Tickers (comma separated)</label>
-          <input
-            type="text"
-            value={tickers}
-            onChange={(e) => setTickers(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-          />
-        </div>
-
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Start Date</label>
