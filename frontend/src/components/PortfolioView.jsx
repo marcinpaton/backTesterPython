@@ -31,7 +31,7 @@ const PortfolioView = ({ onBack }) => {
 
     const fetchTickers = async () => {
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/tickers');
+            const response = await fetch('http://127.0.0.1:8000/api/ticker-groups/unique-tickers');
             if (response.ok) {
                 const data = await response.json();
                 setAvailableTickers(data || []);

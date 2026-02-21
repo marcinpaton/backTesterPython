@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import axios from 'axios';
 
 const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
-    // Default tickers will be fetched from server
-    const [tickers, setTickers] = useState('');
-
     // Date states
     // Default analysis date to today
     const [analysisDate, setAnalysisDate] = useState(new Date().toISOString().split('T')[0]);
@@ -17,19 +14,6 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     const [lookbackDays, setLookbackDays] = useState(120);
     const [nBestTickers, setNBestTickers] = useState(5);
     const [smaPeriod, setSmaPeriod] = useState(-1);
-
-    React.useEffect(() => {
-        fetch('http://127.0.0.1:8000/api/tickers')
-            .then(res => res.json())
-            .then(data => {
-                if (Array.isArray(data) && data.length > 0) {
-                    setTickers(data.join(' ')); // Space separated for scanner typically? 
-                    // Actually scanner handles both comma and whitespace in logic. 
-                    // Let's use space to be consistent with previous default visual.
-                }
-            })
-            .catch(err => console.error("Failed to fetch tickers:", err));
-    }, []);
 
     // Results state
     const [results, setResults] = useState(null);
@@ -243,19 +227,6 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
             {/* Configuration */}
             <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-xl font-bold mb-4">Configuration</h2>
-
-                {/* Tickers Input */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tickers (whitespace separated)
-                    </label>
-                    <textarea
-                        value={tickers}
-                        onChange={(e) => setTickers(e.target.value)}
-                        rows={4}
-                        className="w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Data Download Section */}

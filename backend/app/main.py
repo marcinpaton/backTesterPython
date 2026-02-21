@@ -21,7 +21,6 @@ from app.ticker_group_parser import parse_ticker_group_file
 app = FastAPI()
 
 TRANSACTIONS_FILE = os.path.join(DATA_DIR, "transactions.csv")
-TICKERS_FILE = os.path.join(DATA_DIR, "tickers.csv")
 
 class Transaction(BaseModel):
     id: str
@@ -41,8 +40,7 @@ class Transaction(BaseModel):
 class TransactionList(BaseModel):
     transactions: List[Transaction]
 
-class TickerList(BaseModel):
-    tickers: List[str]
+
 
 class TickerGroup(BaseModel):
     id: Optional[str] = None
@@ -291,36 +289,6 @@ def get_transactions():
         traceback.print_exc()
         return []
 
-@app.get("/api/tickers")
-def get_tickers():
-    try:
-        from app.db_tickers import get_all_tickers
-        tickers = get_all_tickers()
-        return tickers
-    except Exception as e:
-        print(f"Error reading tickers: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/tickers")
-def save_tickers(request: TickerList):
-    try:
-        from app.db_tickers import save_all_tickers
-        
-        # Remove empty strings and duplicates, convert to uppercase
-        tickers = list(set([t.strip().upper() for t in request.tickers if t.strip()]))
-        
-        success = save_all_tickers(tickers)
-        
-        if success:
-            return {"message": "Tickers saved successfully", "count": len(tickers)}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to save tickers")
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/ticker-groups")
 def get_ticker_groups():
