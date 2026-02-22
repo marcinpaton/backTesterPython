@@ -20,6 +20,9 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
   const [smartSellOnProfitThreshold, setSmartSellOnProfitThreshold] = useState(initialValues?.smart_sell_on_profit_threshold_pct ? initialValues.smart_sell_on_profit_threshold_pct * 100 : '');
   const [smartSellOnProfitCheckFreq, setSmartSellOnProfitCheckFreq] = useState(initialValues?.smart_sell_on_profit_check_freq || 1);
 
+  const [marketRegimeFilterEnabled, setMarketRegimeFilterEnabled] = useState(initialValues?.market_regime_filter_enabled || false);
+  const [marketRegimeSmaPeriod, setMarketRegimeSmaPeriod] = useState(initialValues?.market_regime_sma_period || 200);
+
   const [marginEnabled, setMarginEnabled] = useState(initialValues?.margin_enabled !== undefined ? initialValues.margin_enabled : false);
   const [strategy, setStrategy] = useState(initialValues?.strategy || 'momentum');
   const [sizingMethod, setSizingMethod] = useState(initialValues?.sizing_method || 'equal');
@@ -56,6 +59,8 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
       if (initialValues.momentum_lookback_days) setMomentumLookbackDays(initialValues.momentum_lookback_days);
       if (initialValues.filter_negative_momentum !== undefined) setFilterNegativeMomentum(initialValues.filter_negative_momentum);
       if (initialValues.sma_period !== undefined) setSmaPeriod(initialValues.sma_period);
+      if (initialValues.market_regime_filter_enabled !== undefined) setMarketRegimeFilterEnabled(initialValues.market_regime_filter_enabled);
+      if (initialValues.market_regime_sma_period) setMarketRegimeSmaPeriod(initialValues.market_regime_sma_period);
     }
   }, [initialValues]);
 
@@ -85,7 +90,9 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
 
       smart_sell_on_profit_enabled: smartSellOnProfitEnabled || strategy === 'momentum_smart_tp',
       smart_sell_on_profit_threshold_pct: (smartSellOnProfitEnabled || strategy === 'momentum_smart_tp') && smartSellOnProfitThreshold ? parseFloat(smartSellOnProfitThreshold) / 100 : null,
-      smart_sell_on_profit_check_freq: parseInt(smartSellOnProfitCheckFreq)
+      smart_sell_on_profit_check_freq: parseInt(smartSellOnProfitCheckFreq),
+      market_regime_filter_enabled: marketRegimeFilterEnabled,
+      market_regime_sma_period: parseInt(marketRegimeSmaPeriod)
     });
   };
 
@@ -371,7 +378,39 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
         )}
       </div>
 
-      <div className="mt-6 border border-blue-200 p-3 bg-blue-50/50 rounded-lg shadow-sm">
+      <div className="mt-6 border border-blue-200 p-3 bg-blue-50/50 rounded-lg shadow-sm space-y-4">
+        {/* Market Regime Filter Section */}
+        <div className="flex flex-col space-y-3 pb-4 border-b border-blue-100">
+          <div className="flex items-center space-x-4">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={marketRegimeFilterEnabled}
+                onChange={(e) => setMarketRegimeFilterEnabled(e.target.checked)}
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm font-bold text-gray-800">
+                Market Regime Filter <span className="text-blue-600">(S&P 500 SMA)</span>
+              </span>
+            </label>
+
+            {marketRegimeFilterEnabled && (
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase">SMA Period:</span>
+                <input
+                  type="number"
+                  value={marketRegimeSmaPeriod}
+                  onChange={(e) => setMarketRegimeSmaPeriod(e.target.value)}
+                  className="w-20 border border-gray-300 rounded-md shadow-sm p-1.5 bg-white font-bold text-center"
+                />
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-gray-600 italic pl-6">
+            If enabled, new purchases are only allowed when S&P 500 (^GSPC) is above its SMA.
+          </p>
+        </div>
+
         {/* Smart Sell on Profit Section */}
         <div className="flex flex-col space-y-4">
           <div className="flex items-center space-x-4">

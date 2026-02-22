@@ -741,6 +741,8 @@ class BacktestRequest(BaseModel):
     smart_sell_on_profit_enabled: bool = False
     smart_sell_on_profit_threshold_pct: Optional[float] = None
     smart_sell_on_profit_check_freq: int = 1 # Default to daily check
+    market_regime_filter_enabled: bool = False
+    market_regime_sma_period: int = 200
 
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
@@ -791,13 +793,15 @@ def run_backtest_endpoint(request: BacktestRequest):
             request.capital_gains_tax_enabled,
             request.capital_gains_tax_pct,
             request.margin_enabled,
-            request.sizing_method,
-            request.sell_on_profit_enabled,
-            request.sell_on_profit_threshold_pct,
-            request.smart_sell_on_profit_enabled or request.strategy == 'momentum_smart_tp',
-            request.smart_sell_on_profit_threshold_pct,
-            request.smart_sell_on_profit_check_freq,
-            ticker_groups=ticker_groups
+            sizing_method=request.sizing_method,
+            sell_on_profit_enabled=request.sell_on_profit_enabled,
+            sell_on_profit_threshold_pct=request.sell_on_profit_threshold_pct,
+            smart_sell_on_profit_enabled=request.smart_sell_on_profit_enabled or request.strategy == 'momentum_smart_tp',
+            smart_sell_on_profit_threshold_pct=request.smart_sell_on_profit_threshold_pct,
+            smart_sell_on_profit_check_freq=request.smart_sell_on_profit_check_freq,
+            ticker_groups=ticker_groups,
+            market_regime_filter_enabled=request.market_regime_filter_enabled,
+            market_regime_sma_period=request.market_regime_sma_period
         )
         metrics = calculate_metrics(portfolio)
         return metrics

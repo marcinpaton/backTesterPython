@@ -200,7 +200,7 @@ class Portfolio:
                     candidates.append(ticker)
         return candidates
 
-    def rebalance(self, target_tickers_with_scores: list[tuple[str, float]], current_prices: dict, date, var_map: dict = None):
+    def rebalance(self, target_tickers_with_scores: list[tuple[str, float]], current_prices: dict, date, var_map: dict = None, should_buy: bool = True):
         sold_performance = {}
         
         target_tickers = [t for t, s in target_tickers_with_scores]
@@ -218,7 +218,10 @@ class Portfolio:
         
         # 2. Buy ONLY tickers that we don't own yet (from the target list)
         bought_performance = []
-        tickers_to_buy = [t for t in target_tickers if t not in self.holdings]
+        tickers_to_buy = []
+        
+        if should_buy:
+             tickers_to_buy = [t for t in target_tickers if t not in self.holdings]
         
         if tickers_to_buy:
              # Allocate available cash (including recent sales) among new buys
@@ -289,7 +292,7 @@ class Portfolio:
             interest = abs(self.cash) * daily_rate
             self.cash -= interest
 
-def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_enabled: bool = False, smart_sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_check_freq: int = 1, ticker_groups: List[Dict[str, Any]] = None):
+def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_enabled: bool = False, smart_sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_check_freq: int = 1, ticker_groups: List[Dict[str, Any]] = None, market_regime_filter_enabled: bool = False, market_regime_sma_period: int = 200):
     # Preprocessing to get Close prices only
     if isinstance(data.columns, pd.MultiIndex):
         try:
@@ -306,6 +309,18 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
     full_close_prices = close_prices.copy()
 
     close_prices = close_prices.loc[start_date:end_date]
+    
+    # Pre-calculate Market Regime Filter (S&P 500 SMA)
+    gspc_regime = None
+    if market_regime_filter_enabled:
+        if '^GSPC' in full_close_prices.columns:
+            gspc_series = full_close_prices['^GSPC']
+            gspc_sma = gspc_series.rolling(window=market_regime_sma_period).mean()
+            # Align with the backtest date range
+            gspc_regime = gspc_sma.loc[start_date:end_date]
+            print(f"Market Regime Filter enabled (S&P 500 SMA {market_regime_sma_period})")
+        else:
+            print("Warning: Market Regime Filter enabled but '^GSPC' not found in data. Skipping filter.")
     
     print(f"Starting backtest from {start_date} to {end_date} with initial capital {initial_capital}")
     if stop_loss_pct:
@@ -334,6 +349,17 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
     for date, prices in close_prices.iterrows():
         today_index += 1
         current_prices = prices.to_dict()
+        
+        # Check Market Regime
+        is_bull_market = True
+        if gspc_regime is not None and date in gspc_regime.index:
+            current_gspc = current_prices.get('^GSPC')
+            current_sma = gspc_regime[date]
+            if not pd.isna(current_gspc) and not pd.isna(current_sma):
+                is_bull_market = current_gspc > current_sma
+                # Optional: log regime change
+                # if today_index > 1 and is_bull_market != previous_bull:
+                #    print(f"[{date.date()}] Regime change: {'Bull' if is_bull_market else 'Bear'}")
         
         # Determine active ticker group for current date
         active_tickers = None
@@ -396,11 +422,15 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                                              break
                                      
                                      if replacement and replacement in current_prices:
-                                         buy_amount = record['revenue']
-                                         buy_price = current_prices[replacement]
-                                         buy_record = portfolio.buy_ticker(replacement, buy_amount, buy_price, replacement_score, date)
-                                         if buy_record:
-                                             bought_performance.append(buy_record)
+                                         if is_bull_market:
+                                             buy_amount = record['revenue']
+                                             buy_price = current_prices[replacement]
+                                             buy_record = portfolio.buy_ticker(replacement, buy_amount, buy_price, replacement_score, date)
+                                             if buy_record:
+                                                 bought_performance.append(buy_record)
+                                         else:
+                                             # Skip buy during bear market
+                                             pass
 
                  if sold_performance or bought_performance:
                      portfolio.rebalance_history.append({
@@ -462,11 +492,15 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                                         break
                                 
                                 if replacement and replacement in current_prices:
-                                    buy_amount = record['revenue']
-                                    buy_price = current_prices[replacement]
-                                    buy_record = portfolio.buy_ticker(replacement, buy_amount, buy_price, replacement_score, date)
-                                    if buy_record:
-                                        bought_performance.append(buy_record)
+                                    if is_bull_market:
+                                        buy_amount = record['revenue']
+                                        buy_price = current_prices[replacement]
+                                        buy_record = portfolio.buy_ticker(replacement, buy_amount, buy_price, replacement_score, date)
+                                        if buy_record:
+                                            bought_performance.append(buy_record)
+                                    else:
+                                        # Skip buy during bear market
+                                        pass
                 
                 if sold_performance or bought_performance:
                     portfolio.rebalance_history.append({
@@ -554,10 +588,10 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                             returns = series.pct_change().dropna()
                             if not returns.empty:
                                 # 95% Confidence VaR (5th percentile)
-                                var_95 = np.percentile(returns, 5)
-                                var_map[ticker] = var_95
+                                 var_95 = np.percentile(returns, 5)
+                                 var_map[ticker] = var_95
 
-            portfolio.rebalance(target_tickers_with_scores, current_prices, date, var_map)
+            portfolio.rebalance(target_tickers_with_scores, current_prices, date, var_map, should_buy=is_bull_market)
             last_rebalance_date = date
             print(f"  Portfolio Value: {portfolio.get_total_value(current_prices):.2f}")
         
