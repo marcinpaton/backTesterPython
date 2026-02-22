@@ -221,7 +221,6 @@ function App() {
         ) : currentView === 'dashboard' ? (
           <>
             <ConfigurationForm
-              onDownloadData={handleDownload}
               onRunBacktest={handleRunBacktest}
               isLoading={isLoading}
               initialValues={initialFormValues}
