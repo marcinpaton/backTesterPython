@@ -303,9 +303,8 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
               onChange={(e) => setStrategy(e.target.value)}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
             >
-              <option value="scoring">Scoring (Default)</option>
-              <option value="momentum">Momentum</option>
-              <option value="momentum_smart_tp">Momentum + Daily Smart TP</option>
+              <option value="scoring">Scoring</option>
+              <option value="momentum">Momentum (Default)</option>
               <option value="random">Random</option>
             </select>
           </div>
@@ -379,9 +378,8 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={smartSellOnProfitEnabled || strategy === 'momentum_smart_tp'}
+                checked={smartSellOnProfitEnabled}
                 onChange={(e) => setSmartSellOnProfitEnabled(e.target.checked)}
-                disabled={strategy === 'momentum_smart_tp'}
                 className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
               <span className="text-sm font-bold text-gray-800">
@@ -389,7 +387,7 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
               </span>
             </label>
 
-            {(smartSellOnProfitEnabled || strategy === 'momentum_smart_tp') && (
+            {smartSellOnProfitEnabled && (
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
@@ -403,7 +401,7 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
             )}
           </div>
 
-          {(smartSellOnProfitEnabled || strategy === 'momentum_smart_tp') && (
+          {smartSellOnProfitEnabled && (
             <div className="space-y-3 ml-6">
               <p className="text-xs text-gray-600 leading-relaxed">
                 Check every <b>{smartSellOnProfitCheckFreq} day(s)</b>: if return since purchase <b>&ge; {smartSellOnProfitThreshold || 'X'}%</b> AND ticker is <b>NOT</b> in the current top picks, sell and replace with the next best available ticker.
