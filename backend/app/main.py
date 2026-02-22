@@ -430,8 +430,37 @@ def get_active_ticker_group_endpoint(date: str):
 def get_unique_tickers_endpoint():
     try:
         from app.db_tickers import get_unique_tickers_from_groups
-        tickers = get_unique_tickers_from_groups()
-        return tickers
+        from app.db_custom_tickers import get_custom_tickers
+        
+        group_tickers = get_unique_tickers_from_groups()
+        custom_tickers = get_custom_tickers()
+        
+        # Merge and remove duplicates
+        all_tickers = list(set(group_tickers + custom_tickers))
+        return sorted(all_tickers)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/custom-tickers")
+def get_custom_tickers_endpoint():
+    try:
+        from app.db_custom_tickers import get_custom_tickers
+        return get_custom_tickers()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class CustomTickersRequest(BaseModel):
+    tickers: List[str]
+
+@app.post("/api/custom-tickers")
+def save_custom_tickers_endpoint(request: CustomTickersRequest):
+    try:
+        from app.db_custom_tickers import save_custom_tickers
+        success = save_custom_tickers(request.tickers)
+        if success:
+            return {"message": "Custom tickers saved successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save custom tickers")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
