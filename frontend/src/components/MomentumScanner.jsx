@@ -6,9 +6,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     // Default analysis date to today
     const [analysisDate, setAnalysisDate] = useState(new Date().toISOString().split('T')[0]);
 
-    // Download params
-    const [startDate, setStartDate] = useState('2006-06-01');
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+
 
     // Scanner params
     const [lookbackDays, setLookbackDays] = useState(120);
@@ -21,25 +19,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     const [error, setError] = useState(null);
     const [expandedRow, setExpandedRow] = useState(null); // Ticker of expanded row
 
-    const handleDownload = async () => {
-        try {
-            // Fetch all unique tickers from all groups in the database
-            const response = await fetch('http://127.0.0.1:8000/api/ticker-groups/unique-tickers');
-            const tickerList = await response.json();
 
-            if (tickerList && tickerList.length > 0) {
-                console.log(`[Scanner] Requesting download for ${tickerList.length} tickers:`, tickerList);
-                if (onDownloadData) {
-                    onDownloadData({ tickers: tickerList, start_date: startDate, end_date: endDate });
-                }
-            } else {
-                alert('No tickers found in any ticker groups. Please add some tickers to a group first.');
-            }
-        } catch (err) {
-            console.error("Failed to fetch unique tickers for download:", err);
-            alert('Failed to fetch tickers from groups.');
-        }
-    };
 
     const handleScan = async () => {
         setIsLoading(true);
@@ -228,42 +208,10 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
             <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-xl font-bold mb-4">Configuration</h2>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Data Download Section */}
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                        <h3 className="text-md font-semibold text-gray-800 mb-3">1. Data Management</h3>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500">Data Start Date</label>
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500">Data End Date</label>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                />
-                            </div>
-                            <button
-                                onClick={handleDownload}
-                                disabled={isGlobalLoading || isLoading}
-                                className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition disabled:bg-gray-400"
-                            >
-                                {isGlobalLoading ? 'Downloading...' : 'Load Prices from Yahoo'}
-                            </button>
-                        </div>
-                    </div>
-
+                <div className="max-w-2xl mx-auto">
                     {/* Scan Settings Section */}
                     <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h3 className="text-md font-semibold text-blue-900 mb-3">2. Scan Settings</h3>
+                        <h3 className="text-md font-semibold text-blue-900 mb-3">Settings</h3>
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -457,67 +405,67 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                 <table className="min-w-full divide-y divide-gray-200 border">
                                     <thead className="bg-purple-100">
                                         <tr>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Ticker</th>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Currency</th>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase w-32">Price (Native)</th>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase w-24">Rate (to PLN)</th>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Price PLN</th>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Owned Qty</th>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">Owned Value (PLN)</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-purple-800 uppercase">Ticker</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-purple-800 uppercase">Curr</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-purple-800 uppercase w-24">Price (Nat)</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-purple-800 uppercase w-20">Rate</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-purple-800 uppercase">Price PLN</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-purple-800 uppercase">Owned Qty</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-purple-800 uppercase">Owned (PLN)</th>
 
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase">To Buy (PLN)</th>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-purple-800 uppercase w-32">Buy Qty</th>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-red-800 uppercase">To Sell (PLN)</th>
-                                            <th className="px-4 py-2 text-left text-xs font-bold text-red-800 uppercase w-32">Sell Qty</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-purple-800 uppercase">To Buy (PLN)</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-purple-800 uppercase w-24">Buy Qty</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-red-800 uppercase">To Sell (PLN)</th>
+                                            <th className="px-2 py-2 text-left text-xs font-bold text-red-800 uppercase w-24">Sell Qty</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {allocationData.rows.map((row, idx) => (
                                             <tr key={row.ticker} className={row.targetValue === 0 ? "bg-red-50" : "bg-green-50"}>
-                                                <td className="px-4 py-2 font-bold">{row.ticker}</td>
-                                                <td className="px-4 py-2 text-gray-600">{row.currency}</td>
-                                                <td className="px-4 py-2">
+                                                <td className="px-2 py-2 font-bold">{row.ticker}</td>
+                                                <td className="px-2 py-2 text-gray-600">{row.currency}</td>
+                                                <td className="px-2 py-2">
                                                     <input
                                                         type="number"
                                                         value={row.price}
                                                         onChange={(e) => handleAllocationChange(idx, 'price', e.target.value)}
-                                                        className="w-24 border rounded p-1 text-right"
-                                                        step="any"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <input
-                                                        type="number"
-                                                        value={row.rate}
-                                                        onChange={(e) => handleAllocationChange(idx, 'rate', e.target.value)}
                                                         className="w-20 border rounded p-1 text-right"
                                                         step="any"
                                                     />
                                                 </td>
-                                                <td className="px-4 py-2 text-right font-medium">{(row.price * row.rate).toFixed(2)}</td>
-                                                <td className="px-4 py-2 text-right">{row.ownedQty?.toFixed(0)}</td>
-                                                <td className="px-4 py-2 text-right">{(row.ownedQty * row.price * row.rate).toFixed(2)}</td>
+                                                <td className="px-2 py-2">
+                                                    <input
+                                                        type="number"
+                                                        value={row.rate}
+                                                        onChange={(e) => handleAllocationChange(idx, 'rate', e.target.value)}
+                                                        className="w-16 border rounded p-1 text-right"
+                                                        step="any"
+                                                    />
+                                                </td>
+                                                <td className="px-2 py-2 text-right font-medium">{(row.price * row.rate).toFixed(2)}</td>
+                                                <td className="px-2 py-2 text-right">{row.ownedQty?.toFixed(0)}</td>
+                                                <td className="px-2 py-2 text-right">{(row.ownedQty * row.price * row.rate).toFixed(2)}</td>
 
-                                                <td className="px-4 py-2 text-right font-semibold text-green-600">{row.buyValue > 0 ? row.buyValue.toFixed(2) : '-'}</td>
-                                                <td className="px-4 py-2">
+                                                <td className="px-2 py-2 text-right font-semibold text-green-600">{row.buyValue > 0 ? row.buyValue.toFixed(2) : '-'}</td>
+                                                <td className="px-2 py-2">
                                                     {row.buyValue > 0 ? (
                                                         <input
                                                             type="number"
                                                             value={row.buyQty}
                                                             onChange={(e) => handleAllocationChange(idx, 'buyQty', e.target.value)}
-                                                            className="w-24 border rounded p-1 text-right font-bold text-green-600"
+                                                            className="w-20 border rounded p-1 text-right font-bold text-green-600"
                                                             step="1"
                                                         />
                                                     ) : '-'}
                                                 </td>
-                                                <td className="px-4 py-2 text-right font-semibold text-red-600">{row.sellValue > 0 ? row.sellValue.toFixed(2) : '-'}</td>
-                                                <td className="px-4 py-2">
+                                                <td className="px-2 py-2 text-right font-semibold text-red-600">{row.sellValue > 0 ? row.sellValue.toFixed(2) : '-'}</td>
+                                                <td className="px-2 py-2">
                                                     {row.sellValue > 0 ? (
                                                         <input
                                                             type="number"
                                                             value={row.sellQty}
                                                             onChange={(e) => handleAllocationChange(idx, 'sellQty', e.target.value)}
-                                                            className="w-24 border rounded p-1 text-right font-bold text-red-600"
+                                                            className="w-20 border rounded p-1 text-right font-bold text-red-600"
                                                             step="any"
                                                         />
                                                     ) : '-'}
