@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialValues }) => {
-  const [startDate, setStartDate] = useState(initialValues?.start_date || '2024-01-01');
+  const [startDate, setStartDate] = useState(initialValues?.start_date || '2006-06-01');
   const [endDate, setEndDate] = useState(initialValues?.end_date || new Date().toISOString().split('T')[0]);
   const [nTickers, setNTickers] = useState(initialValues?.n_tickers || 5);
   const [rebalancePeriod, setRebalancePeriod] = useState(initialValues?.rebalance_period || 1);

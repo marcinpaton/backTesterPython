@@ -7,12 +7,13 @@ import OptimizationAnalysisPage from './components/OptimizationAnalysisPage';
 import MomentumScanner from './components/MomentumScanner';
 import PortfolioView from './components/PortfolioView';
 import TickerGroupsView from './components/TickerGroupsView';
+import DataView from './components/DataView';
 
 function App() {
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [currentView, setCurrentView] = useState('portfolio'); // 'portfolio', 'dashboard', 'optimization', 'analysis', 'momentum_scanner', 'ticker_groups'
+  const [currentView, setCurrentView] = useState('portfolio'); // 'portfolio', 'dashboard', 'optimization', 'analysis', 'momentum_scanner', 'ticker_groups', 'data'
 
   const handleDownload = async (params) => {
     setIsLoading(true);
@@ -198,6 +199,12 @@ function App() {
             >
               Ticker Groups
             </button>
+            <button
+              onClick={() => setCurrentView('data')}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'data' ? 'bg-blue-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
+            >
+              Data
+            </button>
 
           </div>
         </div>
@@ -240,6 +247,11 @@ function App() {
         ) : currentView === 'ticker_groups' ? (
           <TickerGroupsView
             onBack={() => setCurrentView('portfolio')}
+          />
+        ) : currentView === 'data' ? (
+          <DataView
+            onDownloadData={handleDownload}
+            isLoading={isLoading}
           />
         ) : (
           <MomentumScanner

@@ -7,7 +7,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     const [analysisDate, setAnalysisDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Download params
-    const [startDate, setStartDate] = useState('2020-01-01');
+    const [startDate, setStartDate] = useState('2006-06-01');
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Scanner params
