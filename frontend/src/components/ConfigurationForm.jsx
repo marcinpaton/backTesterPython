@@ -466,9 +466,6 @@ const ConfigurationForm = ({ onRunBacktest, onDownloadData, isLoading, initialVa
         >
           {isLoading ? 'Processing...' : '1. Download Data'}
         </button>
-        <p className="text-xs text-blue-600 mt-2 font-medium">
-          * Downloads data for ALL unique tickers found in ALL ticker groups in the database.
-        </p>
         <button
           onClick={handleRun}
           disabled={isLoading}

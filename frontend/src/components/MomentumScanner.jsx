@@ -258,9 +258,6 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                             >
                                 {isGlobalLoading ? 'Downloading...' : 'Load Prices from Yahoo'}
                             </button>
-                            <p className="text-xs text-blue-600 mt-1 font-medium">
-                                * Downloads data for ALL unique tickers found in ALL ticker groups in the database. Required before scanning.
-                            </p>
                         </div>
                     </div>
 
