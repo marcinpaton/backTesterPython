@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 
 const TickerGroupsView = ({ onBack }) => {
@@ -13,7 +13,8 @@ const TickerGroupsView = ({ onBack }) => {
         tickers: ''
     });
     const [currentPage, setCurrentPage] = useState(1);
-    const groupsPerPage = 10;
+    const [groupsPerPage, setGroupsPerPage] = useState(10);
+    const [selectedIds, setSelectedIds] = useState(new Set());
     const fileInputRef = useRef(null);
 
     useEffect(() => {
@@ -25,6 +26,7 @@ const TickerGroupsView = ({ onBack }) => {
         try {
             const response = await axios.get('http://127.0.0.1:8000/api/ticker-groups');
             setGroups(response.data);
+            setSelectedIds(new Set()); // Reset selection on fetch
         } catch (err) {
             setError('Failed to load ticker groups');
             console.error(err);
@@ -68,6 +70,26 @@ const TickerGroupsView = ({ onBack }) => {
             fetchGroups();
         } catch (err) {
             setError('Failed to delete group');
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} selected groups?`)) return;
+
+        setIsLoading(true);
+        setError(null);
+        setSuccessMessage('');
+
+        try {
+            await axios.post('http://127.0.0.1:8000/api/ticker-groups/bulk-delete', { ids: Array.from(selectedIds) });
+            setSuccessMessage(`Successfully deleted ${selectedIds.size} groups`);
+            fetchGroups();
+        } catch (err) {
+            setError('Failed to delete groups: ' + (err.response?.data?.detail || err.message));
             console.error(err);
         } finally {
             setIsLoading(false);
@@ -135,6 +157,34 @@ const TickerGroupsView = ({ onBack }) => {
         setIsEditing(true);
     };
 
+    const currentVisibleGroups = useMemo(() => {
+        const startIndex = (currentPage - 1) * groupsPerPage;
+        return groups.slice(startIndex, startIndex + groupsPerPage);
+    }, [groups, currentPage, groupsPerPage]);
+
+    const toggleSelect = (id) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
+
+    const toggleSelectAllVisible = () => {
+        const allVisibleIds = currentVisibleGroups.map(g => g.id);
+        const allSelected = allVisibleIds.every(id => selectedIds.has(id));
+
+        const newSelected = new Set(selectedIds);
+        if (allSelected) {
+            allVisibleIds.forEach(id => newSelected.delete(id));
+        } else {
+            allVisibleIds.forEach(id => newSelected.add(id));
+        }
+        setSelectedIds(newSelected);
+    };
+
     return (
         <div className="bg-white shadow-md rounded-lg p-6">
             <div className="flex justify-between items-center mb-6">
@@ -182,6 +232,54 @@ const TickerGroupsView = ({ onBack }) => {
             {successMessage && (
                 <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
                     {successMessage}
+                </div>
+            )}
+
+            {!isEditing && groups.length > 0 && (
+                <div className="flex justify-between items-center mb-4 bg-gray-50 p-3 rounded border border-gray-200">
+                    <div className="flex items-center space-x-6">
+                        <label className="flex items-center cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={currentVisibleGroups.length > 0 && currentVisibleGroups.every(g => selectedIds.has(g.id))}
+                                onChange={toggleSelectAllVisible}
+                                className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <span className="ml-2 text-sm font-medium text-gray-700 group-hover:text-blue-600">
+                                Select All (this page)
+                            </span>
+                        </label>
+
+                        <div className="flex items-center">
+                            <span className="text-sm text-gray-500 mr-2">Page size:</span>
+                            <select
+                                value={groupsPerPage}
+                                onChange={(e) => {
+                                    setGroupsPerPage(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                className="text-sm border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white py-1 px-2"
+                            >
+                                {[10, 20, 50, 100].map(size => (
+                                    <option key={size} value={size}>{size}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {selectedIds.size > 0 && (
+                        <div className="flex items-center space-x-4">
+                            <span className="text-sm font-semibold text-blue-700">
+                                {selectedIds.size} selected
+                            </span>
+                            <button
+                                onClick={handleBulkDelete}
+                                className="bg-red-100 hover:bg-red-200 text-red-700 font-bold py-1.5 px-4 rounded border border-red-300 transition-colors"
+                            >
+                                Delete Selected
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -249,9 +347,20 @@ const TickerGroupsView = ({ onBack }) => {
                                 <p className="text-gray-500">No ticker groups defined. Click "Add Group" to create one.</p>
                             </div>
                         ) : (
-                            groups.slice((currentPage - 1) * groupsPerPage, currentPage * groupsPerPage).map(group => (
-                                <div key={group.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-start mb-4">
+                            currentVisibleGroups.map(group => (
+                                <div
+                                    key={group.id}
+                                    className={`relative border rounded-lg p-6 hover:shadow-md transition-all ${selectedIds.has(group.id) ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-200'}`}
+                                >
+                                    <div className="absolute top-6 left-4">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(group.id)}
+                                            onChange={() => toggleSelect(group.id)}
+                                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                    </div>
+                                    <div className="flex justify-between items-start mb-4 ml-8">
                                         <div>
                                             <p className="text-xl text-blue-600 font-bold mb-1">Valid from: {group.valid_from}</p>
                                             <h4 className="text-sm font-medium text-gray-500">{group.name}</h4>
@@ -259,7 +368,7 @@ const TickerGroupsView = ({ onBack }) => {
                                         <div className="flex space-x-2">
                                             <button
                                                 onClick={() => startEditing(group)}
-                                                className="text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded hover:bg-blue-50"
+                                                className="text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded hover:bg-blue-100/50"
                                             >
                                                 Edit
                                             </button>
@@ -271,10 +380,10 @@ const TickerGroupsView = ({ onBack }) => {
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="bg-gray-50 p-3 rounded text-sm text-gray-600 font-mono max-h-24 overflow-y-auto">
+                                    <div className={`ml-8 bg-white p-3 rounded text-sm text-gray-600 font-mono max-h-24 overflow-y-auto border ${selectedIds.has(group.id) ? 'border-blue-200' : 'border-gray-100'}`}>
                                         {group.tickers.join(', ')}
                                     </div>
-                                    <div className="mt-2 text-xs text-gray-400">
+                                    <div className="mt-2 ml-8 text-xs text-gray-400">
                                         {group.tickers.length} tickers
                                     </div>
                                 </div>
@@ -288,25 +397,27 @@ const TickerGroupsView = ({ onBack }) => {
                             <button
                                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                 disabled={currentPage === 1}
-                                className="px-4 py-2 border rounded border-gray-300 disabled:opacity-20 hover:bg-gray-50"
+                                className="px-4 py-2 border rounded border-gray-300 disabled:opacity-20 hover:bg-gray-50 font-medium"
                             >
                                 Previous
                             </button>
 
-                            {Array.from({ length: Math.ceil(groups.length / groupsPerPage) }, (_, i) => i + 1).map(page => (
-                                <button
-                                    key={page}
-                                    onClick={() => setCurrentPage(page)}
-                                    className={`px-4 py-2 border rounded ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50'}`}
-                                >
-                                    {page}
-                                </button>
-                            ))}
+                            <div className="flex items-center space-x-1">
+                                {Array.from({ length: Math.ceil(groups.length / groupsPerPage) }, (_, i) => i + 1).map(page => (
+                                    <button
+                                        key={page}
+                                        onClick={() => setCurrentPage(page)}
+                                        className={`w-10 h-10 flex items-center justify-center border rounded font-medium transition-colors ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50'}`}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                            </div>
 
                             <button
                                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(groups.length / groupsPerPage)))}
                                 disabled={currentPage === Math.ceil(groups.length / groupsPerPage)}
-                                className="px-4 py-2 border rounded border-gray-300 disabled:opacity-20 hover:bg-gray-50"
+                                className="px-4 py-2 border rounded border-gray-300 disabled:opacity-20 hover:bg-gray-50 font-medium"
                             >
                                 Next
                             </button>

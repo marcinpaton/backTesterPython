@@ -325,6 +325,22 @@ def delete_ticker_group_endpoint(group_id: str):
         print(f"Error deleting ticker group: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class BulkDeleteRequest(BaseModel):
+    ids: List[str]
+
+@app.post("/api/ticker-groups/bulk-delete")
+def bulk_delete_ticker_groups_endpoint(request: BulkDeleteRequest):
+    try:
+        from app.db_tickers import delete_ticker_groups_bulk
+        success = delete_ticker_groups_bulk(request.ids)
+        if success:
+            return {"message": f"Successfully deleted {len(request.ids)} ticker groups"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete ticker groups in bulk")
+    except Exception as e:
+        print(f"Error in bulk deletion: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/ticker-groups/import")
 def import_ticker_groups(request: ImportTickerGroupsRequest):
     try:
