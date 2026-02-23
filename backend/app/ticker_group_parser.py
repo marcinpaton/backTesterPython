@@ -4,14 +4,14 @@ from typing import List, Tuple, Optional
 
 def parse_ticker_group_file(content: str) -> Tuple[Optional[str], List[str]]:
     """
-    Parses a ticker group file content.
-    Returns a tuple of (valid_from_date, list_of_tickers).
+    Parses a ticker group file content using simplified logic:
+    1. Extract date from "Scores on" line.
+    2. Tickers are located after the last "current price" header.
     """
     # 1. Extract date
     # Format: "Scores on 1st October, 2006"
     date_match = re.search(r"Scores on (\d+)(?:st|nd|rd|th)? (\w+), (\d{4})", content)
     if not date_match:
-        # Fallback for simpler format if any
         date_match = re.search(r"Scores on (\d\d? \w+ \d{4})", content)
     
     valid_from = None
@@ -20,8 +20,6 @@ def parse_ticker_group_file(content: str) -> Tuple[Optional[str], List[str]]:
             day = date_match.group(1)
             month_name = date_match.group(2)
             year = date_match.group(3)
-            
-            # Map month names if needed, but strptime %B handles full names
             date_str = f"{day} {month_name} {year}"
             dt = datetime.strptime(date_str, "%d %B %Y")
             valid_from = dt.strftime("%Y-%m-%d")
@@ -29,39 +27,52 @@ def parse_ticker_group_file(content: str) -> Tuple[Optional[str], List[str]]:
             print(f"Error parsing date: {e}")
 
     # 2. Extract tickers
-    # Tickers start after "current price" or similar header
-    # Lines look like: "EXL1V.HE\t100.0%\t100%" or "EXL1V.HE 100.0% 100%"
-    # We look for lines that have a ticker-like string followed by a percentage
-    
-    tickers = []
     lines = content.split('\n')
     
-    # Simple regex for ticker: Uppercase followed by optional dots/numbers and exchange suffix
-    # e.g. AAPL, BB.TO, EXL1V.HE, 0682.HK
-    ticker_pattern = re.compile(r"^([A-Z0-9\.]+)\s+[\d\.]+%")
-    
-    for line in lines:
-        line = line.strip()
-        match = ticker_pattern.match(line)
-        if match:
-            tickers.append(match.group(1))
-        elif re.match(r"^[A-Z0-9\.]+$", line) and not any(h in line for h in ["Search", "Ctrl", "Company", "Total", "current price"]):
-            # Exclude single digit numbers (likely page numbers)
-            if not (len(line) == 1 and line.isdigit()):
-                tickers.append(line)
-             
-    # Clean up tickers
-    tickers = [t.strip().upper() for t in tickers if t.strip()]
+    # Find the index of the LAST occurrence of "current price"
+    start_index = -1
+    for i, line in enumerate(lines):
+        if "current price" in line.lower():
+            start_index = i
+
+    tickers = []
+    if start_index != -1:
+        # Tickers are in the lines starting AFTER the header
+        for line in lines[start_index + 1:]:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Usually the line starts with the ticker, or it is the ticker
+            # Format: "AAPL 1.2% 1.0%" or just "AAPL"
+            parts = line.split()
+            if not parts:
+                continue
+                
+            ticker_candidate = parts[0].strip().upper()
+            
+            # Filter out known non-ticker UI noise or marks
+            # '–' is a placeholder for missing values, not a ticker
+            if ticker_candidate in ["–", "‹", "›", "SEARCH", "CTRL"]:
+                continue
+            
+            # Simple ticker validation: must contain at least one uppercase letter or digit
+            if not re.match(r"^[A-Z0-9\.\-]+$", ticker_candidate):
+                continue
+                
+            # Exclude single digit numbers and pagination counts (25, 50, etc.)
+            if ticker_candidate.isdigit():
+                if len(ticker_candidate) == 1 or int(ticker_candidate) in [25, 50, 100, 200, 500]:
+                    continue
+            
+            tickers.append(ticker_candidate)
+
     # Remove duplicates while preserving order
     seen = set()
     cleaned_tickers = []
-    
-    # Common words or patterns to exclude
-    exclude_list = ["SEARCH", "CTRL", "COMPANY", "TOTAL", "CURRENT PRICE", "ROWS", "GOLD", "‹", "›", "‹", "›"]
-    
     for t in tickers:
-        if t not in seen and t not in exclude_list and not (len(t) == 1 and t.isdigit()):
-             cleaned_tickers.append(t)
-             seen.add(t)
+        if t not in seen:
+            cleaned_tickers.append(t)
+            seen.add(t)
 
     return valid_from, cleaned_tickers

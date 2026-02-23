@@ -148,7 +148,6 @@ const TickerGroupsView = ({ onBack }) => {
                                 ref={fileInputRef}
                                 onChange={handleFileChange}
                                 style={{ display: 'none' }}
-                                accept=".txt,*"
                             />
                             <button
                                 onClick={handleImportClick}
