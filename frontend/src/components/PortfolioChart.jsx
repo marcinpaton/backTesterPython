@@ -173,7 +173,7 @@ const PortfolioChart = ({ data, onDownloadPrices }) => {
                         <button
                             onClick={onDownloadPrices}
                             className="bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold py-1 px-3 rounded text-sm transition-colors"
-                            title="Download prices for ALL tickers in tickers.csv"
+                            title="Download prices for tickers in your transactions"
                         >
                             Download Prices
                         </button>

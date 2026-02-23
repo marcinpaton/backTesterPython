@@ -152,9 +152,9 @@ def get_portfolio_performance():
                         if currency_df is not None and not currency_df.empty:
                             last_rates = currency_df.iloc[-1]
                             
-                            def get_rate(ticker):
-                                if ticker in last_rates:
-                                    val = last_rates[ticker]
+                            def get_rate(ticker_str):
+                                if ticker_str in last_rates:
+                                    val = last_rates[ticker_str]
                                     if isinstance(val, pd.Series):
                                         return float(val.iloc[0])
                                     return float(val)
