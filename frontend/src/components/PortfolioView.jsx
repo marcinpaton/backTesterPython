@@ -255,7 +255,17 @@ const PortfolioView = ({ onBack }) => {
                         )}
                     </>
                 ) : (
-                    !performanceLoading && <p className="text-gray-500">Add transactions and ensure data is downloaded to see performance metrics.</p>
+                    !performanceLoading && (
+                        <div className="text-center py-8">
+                            <p className="text-gray-500 mb-4">Add transactions and ensure data is downloaded to see performance metrics.</p>
+                            <button
+                                onClick={handleDownloadAllPrices}
+                                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-md"
+                            >
+                                Download Missing Prices
+                            </button>
+                        </div>
+                    )
                 )}
             </div>
 
@@ -287,7 +297,12 @@ const PortfolioView = ({ onBack }) => {
                         Import tansactions
                     </button>
 
-
+                    <button
+                        onClick={handleDownloadAllPrices}
+                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
+                    >
+                        Download Prices
+                    </button>
                 </div>
             </div>
 

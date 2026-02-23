@@ -250,6 +250,24 @@ def delete_ticker_group(group_id: str) -> bool:
         return False
 
 
+def delete_ticker_groups_bulk(group_ids: List[str]) -> bool:
+    """
+    Deletes multiple ticker groups at once.
+    """
+    try:
+        if not group_ids:
+            return True
+            
+        supabase.table(TICKER_GROUPS_TABLE)\
+            .delete()\
+            .in_("id", group_ids)\
+            .execute()
+        return True
+    except Exception as e:
+        print(f"Error deleting ticker groups in bulk: {e}")
+        return False
+
+
 def get_ticker_group_by_date(valid_from: str) -> Optional[Dict[str, Any]]:
     """
     Retrieves a ticker group by its valid_from date.

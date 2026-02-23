@@ -56,10 +56,9 @@ class PortfolioReplayer:
                         elif col[0] == 'Close':
                              p[col[1]] = row[col]
             else:
-                # If flat CSV (e.g. minimal download), assume columns are tickers
-                # But data_loader usually standardizes to MultiIndex if multiple, or we need to be careful.
-                # Assuming safe dictionary usage
-                pass
+                # If flat CSV (e.g. minimal download), all columns are ticker symbols
+                for col in self.price_data.columns:
+                    p[col] = row[col]
             return p
 
         # Helper to get currency rate
@@ -111,7 +110,7 @@ class PortfolioReplayer:
                     if pd.notna(rate):
                         # Handle both string and tuple (MultiIndex) tickers
                         ticker_str = ticker_item[0] if isinstance(ticker_item, tuple) else ticker_item
-                        if 'PLN=X' in ticker_str:
+                        if ticker_str.endswith('PLN=X'):
                             code = ticker_str.replace('PLN=X', '')
                             last_known_rates[code] = rate
 

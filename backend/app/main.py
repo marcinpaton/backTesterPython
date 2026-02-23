@@ -152,9 +152,9 @@ def get_portfolio_performance():
                         if currency_df is not None and not currency_df.empty:
                             last_rates = currency_df.iloc[-1]
                             
-                            def get_rate(ticker):
-                                if ticker in last_rates:
-                                    val = last_rates[ticker]
+                            def get_rate(ticker_str):
+                                if ticker_str in last_rates:
+                                    val = last_rates[ticker_str]
                                     if isinstance(val, pd.Series):
                                         return float(val.iloc[0])
                                     return float(val)
@@ -323,6 +323,22 @@ def delete_ticker_group_endpoint(group_id: str):
             raise HTTPException(status_code=500, detail="Failed to delete ticker group")
     except Exception as e:
         print(f"Error deleting ticker group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[str]
+
+@app.post("/api/ticker-groups/bulk-delete")
+def bulk_delete_ticker_groups_endpoint(request: BulkDeleteRequest):
+    try:
+        from app.db_tickers import delete_ticker_groups_bulk
+        success = delete_ticker_groups_bulk(request.ids)
+        if success:
+            return {"message": f"Successfully deleted {len(request.ids)} ticker groups"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete ticker groups in bulk")
+    except Exception as e:
+        print(f"Error in bulk deletion: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/ticker-groups/import")
