@@ -18,6 +18,25 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [expandedRow, setExpandedRow] = useState(null); // Ticker of expanded row
+    const [marketStatus, setMarketStatus] = useState(null);
+    const [marketLoading, setMarketLoading] = useState(false);
+
+    const fetchMarketStatus = async (date) => {
+        setMarketLoading(true);
+        try {
+            const response = await axios.get(`http://127.0.0.1:8000/api/market_status?date=${date}`);
+            setMarketStatus(response.data);
+        } catch (err) {
+            console.error("Failed to fetch market status:", err);
+            setMarketStatus(null);
+        } finally {
+            setMarketLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        fetchMarketStatus(analysisDate);
+    }, []);
 
 
 
@@ -57,6 +76,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
             });
 
             setResults(response.data);
+            fetchMarketStatus(analysisDate);
         } catch (err) {
             console.error(err);
             setError(err.response?.data?.detail || err.message || 'Failed to scan momentum');
@@ -219,7 +239,10 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                     <input
                                         type="date"
                                         value={analysisDate}
-                                        onChange={(e) => setAnalysisDate(e.target.value)}
+                                        onChange={(e) => {
+                                            setAnalysisDate(e.target.value);
+                                            fetchMarketStatus(e.target.value);
+                                        }}
                                         className="mt-1 block w-full border border-blue-300 rounded-md shadow-sm p-2"
                                     />
                                 </div>
@@ -265,6 +288,53 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Market Status Card */}
+            {marketStatus && (
+                <div className={`p-5 rounded-xl border-2 shadow-sm transition-all duration-300 ${marketStatus.status_type === 'success' ? 'bg-green-50 border-green-200' :
+                        marketStatus.status_type === 'warning' ? 'bg-yellow-50 border-yellow-200' :
+                            'bg-red-50 border-red-200'
+                    }`}>
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 bg-white px-2 py-0.5 rounded border border-gray-100 shadow-sm">
+                                    S&P 500 Market Regime
+                                </span>
+                                <span className="text-xs font-medium text-gray-500 bg-gray-100/50 px-2 py-0.5 rounded-full">
+                                    {marketStatus.date}
+                                </span>
+                            </div>
+                            <h3 className={`text-xl font-extrabold tracking-tight ${marketStatus.status_type === 'success' ? 'text-green-900' :
+                                    marketStatus.status_type === 'warning' ? 'text-yellow-900' :
+                                        'text-red-900'
+                                }`}>
+                                {marketStatus.recommendation}
+                            </h3>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                            <div className="flex-1 min-w-[100px] p-3 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-100 shadow-sm text-center">
+                                <span className="block text-[9px] text-gray-400 uppercase font-black mb-1 letter-spacing-1">Price</span>
+                                <span className="text-base font-black text-gray-800 tracking-tighter">
+                                    {marketStatus.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="flex-1 min-w-[100px] p-3 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-100 shadow-sm text-center">
+                                <span className="block text-[9px] text-gray-400 uppercase font-black mb-1">SMA200</span>
+                                <span className="text-base font-black text-gray-800 tracking-tighter">
+                                    {marketStatus.sma200.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="flex-1 min-w-[100px] p-3 bg-white shadow-md rounded-xl border border-gray-100 text-center">
+                                <span className="block text-[9px] text-gray-400 uppercase font-black mb-1">Distance</span>
+                                <span className={`text-base font-black tracking-tighter ${marketStatus.diff_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {marketStatus.diff_pct > 0 ? '+' : ''}{marketStatus.diff_pct.toFixed(2)}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Error Message */}
             {error && (
