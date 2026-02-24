@@ -560,6 +560,82 @@ def scan_momentum(request: MomentumScanRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/market_status")
+def get_market_status(date: str):
+    from datetime import datetime
+    import pandas as pd
+    from app.data_loader import load_data, smart_download_data
+    
+    try:
+        # Load local data first
+        df = load_data()
+        
+        # Check if ^GSPC is present and has enough data
+        # We need at least 200 observation points before the date
+        needs_download = False
+        if df is None or '^GSPC' not in df.columns:
+            needs_download = True
+        else:
+            # Check if we have enough history for SMA200
+            target_dt = pd.to_datetime(date)
+            available_history = df.index[df.index <= target_dt]
+            if len(available_history) < 200:
+                needs_download = True
+
+        if needs_download:
+            print(f"S&P 500 data missing or insufficient for {date}. Downloading...")
+            target_dt = pd.to_datetime(date)
+            # Fetch 1.5 years to be safe for 200 business days
+            start_dt = target_dt - pd.Timedelta(days=550) 
+            smart_download_data(['^GSPC'], start_dt.strftime('%Y-%m-%d'), date)
+            df = load_data()
+
+        if df is None or '^GSPC' not in df.columns:
+            raise HTTPException(status_code=404, detail="^GSPC data still missing after download attempt")
+            
+        gspc = df['^GSPC']
+        sma200 = gspc.rolling(window=200).mean()
+        
+        # Determine actual date (might be a weekend/holiday)
+        # Use simple floor-matching
+        target_dt = pd.to_datetime(date)
+        valid_dates = gspc.index[gspc.index <= target_dt]
+        if valid_dates.empty:
+            raise HTTPException(status_code=404, detail=f"No data available for date {date}")
+        
+        actual_date = valid_dates[-1]
+        current_price = float(gspc.loc[actual_date])
+        current_sma = float(sma200.loc[actual_date])
+        
+        if pd.isna(current_sma):
+            raise HTTPException(status_code=400, detail=f"Insufficient historical data to calculate SMA200 for {date}")
+            
+        diff_pct = ((current_price - current_sma) / current_sma) * 100
+        
+        # Recommendation logic
+        status_type = "success"
+        recommendation = "✅ Dobra koniunktura (nad SMA200). Warunki sprzyjające strategii momentum."
+        
+        if diff_pct < 0:
+            status_type = "danger"
+            recommendation = "🚫 Rynek pod SMA200. Wysokie ryzyko kontynuacji spadków. Filtr Market Regime sugeruje wstrzymanie się od zakupów."
+        elif diff_pct > 8.5:
+            status_type = "warning"
+            recommendation = "⚠️ Rynek przegrzany (>8.5% nad SMA200). Zachowaj dużą ostrożność przy nowych wejściach."
+            
+        return {
+            "price": current_price,
+            "sma200": current_sma,
+            "diff_pct": diff_pct,
+            "status_type": status_type,
+            "recommendation": recommendation,
+            "date": actual_date.strftime('%Y-%m-%d')
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 class ScannerAllocationRequest(BaseModel):
     tickers: List[str]
 
