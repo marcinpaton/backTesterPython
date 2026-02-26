@@ -632,6 +632,16 @@ def calculate_metrics(portfolio: Portfolio):
     running_max = history_df['total_value'].cummax()
     drawdown = (history_df['total_value'] - running_max) / running_max
     max_drawdown = drawdown.min()
+    
+    # Identify Max Drawdown dates
+    max_drawdown_end = drawdown.idxmin()
+    # The peak is the last time running_max was equal to the total_value BEFORE the trough
+    # More simply, it's the point where running_max corresponds to the period leading to the trough
+    max_drawdown_start = history_df.loc[:max_drawdown_end, 'total_value'].idxmax()
+
+    # Format dates for JSON
+    max_drawdown_start_str = max_drawdown_start.strftime('%Y-%m-%d') if not pd.isna(max_drawdown_start) else None
+    max_drawdown_end_str = max_drawdown_end.strftime('%Y-%m-%d') if not pd.isna(max_drawdown_end) else None
         
     # Monthly Returns
     monthly_returns = history_df['daily_return'].resample('M').apply(lambda x: (1 + x).prod() - 1)
@@ -699,6 +709,8 @@ def calculate_metrics(portfolio: Portfolio):
         "total_return": float(total_return),
         "cagr": float(cagr),
         "max_drawdown": float(max_drawdown),
+        "max_drawdown_start": max_drawdown_start_str,
+        "max_drawdown_end": max_drawdown_end_str,
         "final_value": float(end_value),
         "monthly_returns": monthly_returns_dict,
         "history": history_records,

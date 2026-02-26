@@ -126,6 +126,11 @@ const ResultsDashboard = ({ results }) => {
                 <div className="bg-white p-4 rounded-lg shadow">
                     <h3 className="text-gray-500 text-sm uppercase">Max Drawdown</h3>
                     <p className="text-2xl font-bold text-red-600">{(results.max_drawdown * 100).toFixed(2)}%</p>
+                    {results.max_drawdown_start && results.max_drawdown_end && (
+                        <p className="text-xs text-gray-500 mt-1">
+                            {results.max_drawdown_start} - {results.max_drawdown_end}
+                        </p>
+                    )}
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow">
                     <h3 className="text-gray-500 text-sm uppercase">Final Value</h3>
