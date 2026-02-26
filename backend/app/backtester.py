@@ -635,9 +635,63 @@ def calculate_metrics(portfolio: Portfolio):
     
     # Identify Max Drawdown dates
     max_drawdown_end = drawdown.idxmin()
-    # The peak is the last time running_max was equal to the total_value BEFORE the trough
-    # More simply, it's the point where running_max corresponds to the period leading to the trough
     max_drawdown_start = history_df.loc[:max_drawdown_end, 'total_value'].idxmax()
+
+    # Identify Top 10 Drawdowns with Recovery Periods
+    drawdowns_list = []
+    
+    # Simple algorithm to find distinct drawdown periods (Peak to Peak)
+    # 1. Identify where we are in a drawdown (value < cummax)
+    # 2. For each drawdown period, find the trough and the recovery date
+    
+    is_in_dd = False
+    current_peak_val = -1
+    current_peak_date = None
+    trough_val = float('inf')
+    trough_date = None
+    
+    for date, row in history_df.iterrows():
+        val = row['total_value']
+        # If we hit a new high or equal to current peak, we are not in/out of a drawdown
+        if val >= current_peak_val:
+            if is_in_dd:
+                # We just recovered!
+                drawdowns_list.append({
+                    'drawdown': (trough_val - current_peak_val) / current_peak_val,
+                    'peak_date': current_peak_date.strftime('%Y-%m-%d'),
+                    'trough_date': trough_date.strftime('%Y-%m-%d'),
+                    'recovery_date': date.strftime('%Y-%m-%d'),
+                    'days_to_trough': (trough_date - current_peak_date).days,
+                    'days_to_recover': (date - trough_date).days,
+                    'total_days': (date - current_peak_date).days
+                })
+                is_in_dd = False
+            
+            current_peak_val = val
+            current_peak_date = date
+            trough_val = val
+            trough_date = date
+        else:
+            # We are below the peak
+            is_in_dd = True
+            if val < trough_val:
+                trough_val = val
+                trough_date = date
+    
+    # Special case: If we are CURRENTLY in a drawdown at the end of the history
+    if is_in_dd:
+        drawdowns_list.append({
+            'drawdown': (trough_val - current_peak_val) / current_peak_val,
+            'peak_date': current_peak_date.strftime('%Y-%m-%d'),
+            'trough_date': trough_date.strftime('%Y-%m-%d'),
+            'recovery_date': None, # Still in drawdown
+            'days_to_trough': (trough_date - current_peak_date).days,
+            'days_to_recover': None,
+            'total_days': (history_df.index[-1] - current_peak_date).days
+        })
+    
+    # Sort by drawdown (most negative first) and take top 10
+    top_10_drawdowns = sorted(drawdowns_list, key=lambda x: x['drawdown'])[:10]
 
     # Format dates for JSON
     max_drawdown_start_str = max_drawdown_start.strftime('%Y-%m-%d') if not pd.isna(max_drawdown_start) else None
@@ -711,6 +765,7 @@ def calculate_metrics(portfolio: Portfolio):
         "max_drawdown": float(max_drawdown),
         "max_drawdown_start": max_drawdown_start_str,
         "max_drawdown_end": max_drawdown_end_str,
+        "top_10_drawdowns": top_10_drawdowns,
         "final_value": float(end_value),
         "monthly_returns": monthly_returns_dict,
         "history": history_records,
