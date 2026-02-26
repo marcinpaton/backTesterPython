@@ -17,3 +17,4 @@ backend/data/stock_prices.csv
 backend/data/currency_prices.csv
 backend/data/portfolio_stock_prices.csv
 backend/data/portfolio_currency_prices.csv
+*.pkl
