@@ -138,6 +138,9 @@ const ResultsDashboard = ({ results }) => {
                 </div>
             </div>
 
+            {/* Performance Chart */}
+            {chart}
+
             {/* Top 10 Drawdowns Table */}
             {results.top_10_drawdowns && results.top_10_drawdowns.length > 0 && (
                 <div className="bg-white p-4 rounded-lg shadow">
