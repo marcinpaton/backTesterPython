@@ -247,60 +247,63 @@ const TransactionImportModal = ({ onClose, onImport, availableTickers = [] }) =>
                     )}
 
                     {step === 2 && (
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50 sticky top-0">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paper (Name)</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticker (Required)</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency (Required)</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {parsedData.map((row, idx) => {
-                                    if (!selectedIndices.has(idx)) return null;
-                                    const enrich = enrichmentData[idx] || {};
-                                    return (
-                                        <tr key={idx}>
-                                            <td className="px-6 py-4 text-sm text-gray-900 w-1/3">{row.name}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">
-                                                <div>{row.displayDate}</div>
-                                                <div className={`font-bold ${row.type === 'BUY' ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {row.type} {row.quantity} x {row.price}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <input
-                                                    type="text"
-                                                    className="border rounded p-2 w-full uppercase"
-                                                    list="import-ticker-suggestions"
-                                                    value={enrich.ticker || ''}
-                                                    onChange={(e) => handleEnrichmentChange(idx, 'ticker', e.target.value)}
-                                                    placeholder="Ticker..."
-                                                />
-                                                <datalist id="import-ticker-suggestions">
-                                                    {availableTickers.map(t => <option key={t} value={t} />)}
-                                                </datalist>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <select
-                                                    className="border rounded p-2 w-full"
-                                                    value={enrich.currency || 'USD'}
-                                                    onChange={(e) => handleEnrichmentChange(idx, 'currency', e.target.value)}
-                                                >
-                                                    <option value="USD">USD</option>
-                                                    <option value="PLN">PLN</option>
-                                                    <option value="EUR">EUR</option>
-                                                    <option value="GBP">GBP</option>
-                                                </select>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                        <>
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paper (Name)</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticker (Required)</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency (Required)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {parsedData.map((row, idx) => {
+                                        if (!selectedIndices.has(idx)) return null;
+                                        const enrich = enrichmentData[idx] || {};
+                                        return (
+                                            <tr key={idx}>
+                                                <td className="px-6 py-4 text-sm text-gray-900 w-1/3">{row.name}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">
+                                                    <div>{row.displayDate}</div>
+                                                    <div className={`font-bold ${row.type === 'BUY' ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {row.type} {row.quantity} x {row.price}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <input
+                                                        type="text"
+                                                        className="border rounded p-2 w-full uppercase"
+                                                        list="import-ticker-suggestions"
+                                                        value={enrich.ticker || ''}
+                                                        onChange={(e) => handleEnrichmentChange(idx, 'ticker', e.target.value)}
+                                                        placeholder="Ticker..."
+                                                        autoComplete="off"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <select
+                                                        className="border rounded p-2 w-full"
+                                                        value={enrich.currency || 'USD'}
+                                                        onChange={(e) => handleEnrichmentChange(idx, 'currency', e.target.value)}
+                                                    >
+                                                        <option value="USD">USD</option>
+                                                        <option value="PLN">PLN</option>
+                                                        <option value="EUR">EUR</option>
+                                                        <option value="GBP">GBP</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                            <datalist id="import-ticker-suggestions">
+                                {availableTickers.map(t => <option key={t} value={t} />)}
+                            </datalist>
+                        </>
                     )}
-                </div>
+                </div >
 
                 <div className="mt-4 flex justify-end space-x-3 border-t pt-4">
                     <button onClick={onClose} className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
@@ -331,8 +334,8 @@ const TransactionImportModal = ({ onClose, onImport, availableTickers = [] }) =>
                         </>
                     )}
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 
