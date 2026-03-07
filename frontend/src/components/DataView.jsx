@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 const DataView = ({ onDownloadData, isLoading }) => {
-    const [startDate, setStartDate] = useState('2006-06-01');
+    const [startDate, setStartDate] = useState('2019-01-01');
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [customTickers, setCustomTickers] = useState('');
     const [isSavingCustom, setIsSavingCustom] = useState(false);

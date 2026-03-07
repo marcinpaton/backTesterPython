@@ -126,6 +126,11 @@ const ResultsDashboard = ({ results }) => {
                 <div className="bg-white p-4 rounded-lg shadow">
                     <h3 className="text-gray-500 text-sm uppercase">Max Drawdown</h3>
                     <p className="text-2xl font-bold text-red-600">{(results.max_drawdown * 100).toFixed(2)}%</p>
+                    {results.max_drawdown_start && results.max_drawdown_end && (
+                        <p className="text-xs text-gray-500 mt-1">
+                            {results.max_drawdown_start} - {results.max_drawdown_end}
+                        </p>
+                    )}
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow">
                     <h3 className="text-gray-500 text-sm uppercase">Final Value</h3>
@@ -133,8 +138,51 @@ const ResultsDashboard = ({ results }) => {
                 </div>
             </div>
 
-            {/* Chart */}
+            {/* Performance Chart */}
             {chart}
+
+            {/* Top 10 Drawdowns Table */}
+            {results.top_10_drawdowns && results.top_10_drawdowns.length > 0 && (
+                <div className="bg-white p-4 rounded-lg shadow">
+                    <h3 className="text-lg font-bold mb-4">Top 10 Largest Drawdowns</h3>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Rank</th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Drawdown</th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Peak Date</th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Trough Date</th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Recovery Date</th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Days to Trough</th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Recovery Time</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {results.top_10_drawdowns.map((dd, index) => (
+                                    <tr key={index} className="hover:bg-gray-50">
+                                        <td className="px-3 py-2 text-sm text-gray-900">{index + 1}</td>
+                                        <td className="px-3 py-2 text-sm font-bold text-red-600">
+                                            {(dd.drawdown * 100).toFixed(2)}%
+                                        </td>
+                                        <td className="px-3 py-2 text-sm text-gray-600">{dd.peak_date}</td>
+                                        <td className="px-3 py-2 text-sm text-gray-600">{dd.trough_date}</td>
+                                        <td className="px-3 py-2 text-sm text-gray-600">
+                                            {dd.recovery_date || (
+                                                <span className="text-orange-600 italic">In Progress</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2 text-sm text-gray-500">{dd.days_to_trough}d</td>
+                                        <td className="px-3 py-2 text-sm text-gray-500">
+                                            {dd.days_to_recover !== null ? `${dd.days_to_recover}d` : '-'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {/* Combined History */}
             <div className="bg-white p-4 rounded-lg shadow">

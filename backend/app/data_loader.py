@@ -2,7 +2,9 @@ from __future__ import annotations
 import yfinance as yf
 import pandas as pd
 import os
+import pickle
 from datetime import datetime
+from typing import Optional, List, Tuple
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 DATA_FILE = os.path.join(DATA_DIR, "stock_prices.csv")
@@ -264,6 +266,11 @@ def smart_download_data(tickers: list[str], start_date: str, end_date: str, file
     # Invalidate cache
     if filename in _data_cache:
         del _data_cache[filename]
+    
+    # Remove pickle cache if exists
+    pickle_path = filename + ".pkl"
+    if os.path.exists(pickle_path):
+        os.remove(pickle_path)
 
     return {"message": "Data downloaded successfully", "path": filename}
 
@@ -301,6 +308,11 @@ def download_currency_rates(filename: str = CURRENCY_DATA_FILE, start_date: str 
         # Invalidate cache
         if filename in _data_cache:
             del _data_cache[filename]
+            
+        # Remove pickle cache if exists
+        pickle_path = filename + ".pkl"
+        if os.path.exists(pickle_path):
+            os.remove(pickle_path)
             
         return True
     except Exception as e:
@@ -404,6 +416,21 @@ def load_data(filename: str = DATA_FILE, tickers: list[str] = None, start_date: 
     
     print(f"Loading data from disk ({filename})...")
     
+    pickle_path = filename + ".pkl"
+    
+    # Attempt to load from pickle cache first
+    if os.path.exists(pickle_path):
+        pickle_mtime = os.path.getmtime(pickle_path)
+        if pickle_mtime >= current_mtime:
+            try:
+                with open(pickle_path, 'rb') as f:
+                    df = pickle.load(f)
+                # print(f"Loaded from pickle cache: {pickle_path}")
+                _data_cache[filename] = (df, current_mtime)
+                return df
+            except Exception as e:
+                print(f"Error loading pickle cache {pickle_path}: {e}")
+
     # Detect if MultiIndex header is present
     # We read the first two lines to check
     try:
@@ -452,6 +479,13 @@ def load_data(filename: str = DATA_FILE, tickers: list[str] = None, start_date: 
         # Forward fill missing prices (use previous day's price)
         df.ffill(inplace=True)
     
+    # Save to pickle cache
+    try:
+        with open(pickle_path, 'wb') as f:
+            pickle.dump(df, f)
+    except Exception as e:
+        print(f"Error saving to pickle cache {pickle_path}: {e}")
+
     _data_cache[filename] = (df, current_mtime)
     
     return df
