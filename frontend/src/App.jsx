@@ -187,7 +187,12 @@ function App() {
             >
               Backtest
             </button>
-
+            <button
+              onClick={() => setCurrentView('simulation')}
+              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'simulation' ? 'bg-indigo-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
+            >
+              Simulation
+            </button>
             <button
               onClick={() => setCurrentView('optimization')}
               className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'optimization' ? 'bg-green-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
@@ -205,12 +210,6 @@ function App() {
               className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'data' ? 'bg-blue-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
             >
               Data
-            </button>
-            <button
-              onClick={() => setCurrentView('simulation')}
-              className={`px-4 py-2 rounded-lg transition font-semibold ${currentView === 'simulation' ? 'bg-indigo-600 text-white' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
-            >
-              Simulation
             </button>
           </div>
         </div>
