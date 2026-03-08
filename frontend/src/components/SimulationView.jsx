@@ -20,7 +20,19 @@ const SimulationView = () => {
 
     useEffect(() => {
         fetchTickers();
+        fetchCurrentPortfolioTickers();
     }, []);
+
+    const fetchCurrentPortfolioTickers = async () => {
+        try {
+            const response = await axios.get('http://127.0.0.1:8000/api/portfolio/current-tickers');
+            if (response.data && response.data.length > 0) {
+                setTickers(response.data);
+            }
+        } catch (err) {
+            console.error('Error fetching current portfolio tickers:', err);
+        }
+    };
 
     const fetchTickers = async () => {
         try {

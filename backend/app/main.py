@@ -268,7 +268,6 @@ def get_portfolio_performance():
             import traceback
             traceback.print_exc()
 
-        print("Performance Debug: Success.")
         return results
 
     except Exception as e:
@@ -276,6 +275,49 @@ def get_portfolio_performance():
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/portfolio/current-tickers")
+def get_portfolio_current_tickers():
+    try:
+        from app.db_transactions import get_all_transactions
+        from app.currency_utils import infer_currency
+        from app.portfolio_replayer import PortfolioReplayer
+        
+        transactions = get_all_transactions()
+        if not transactions:
+            return []
+            
+        oldest_tx_date = min([t['date'] for t in transactions if t.get('date')])
+        if isinstance(oldest_tx_date, datetime):
+            oldest_tx_date = oldest_tx_date.strftime('%Y-%m-%d')
+        elif isinstance(oldest_tx_date, str):
+            oldest_tx_date = oldest_tx_date.split('T')[0]
+            
+        unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
+        price_df = load_data(filename=PORTFOLIO_DATA_FILE, tickers=unique_tickers, start_date=oldest_tx_date)
+        
+        if price_df is None or price_df.empty:
+             return []
+        
+        from app.data_loader import load_currency_data
+        unique_currencies = list(set([t.get('currency', 'PLN') for t in transactions]))
+        currency_df = load_currency_data(start_date=oldest_tx_date, currencies=unique_currencies, filename=PORTFOLIO_CURRENCY_DATA_FILE)
+        
+        if currency_df is None or currency_df.empty:
+            currency_df = pd.DataFrame(index=price_df.index)
+            
+        replayer = PortfolioReplayer(transactions, price_df, currency_df)
+        results = replayer.calculate_history()
+        
+        if results and results.get('history'):
+            latest = results['history'][-1]
+            current_tickers = [item['ticker'] for item in latest['details'] if item['shares'] > 0]
+            return sorted(list(set(current_tickers)))
+            
+        return []
+    except Exception as e:
+        print(f"Error getting current tickers: {e}")
+        return []
 
 @app.get("/api/portfolio/transactions")
 def get_transactions():
