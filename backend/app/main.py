@@ -1835,7 +1835,8 @@ async def save_optimization_results(request: SaveOptimizationResultsRequest):
                     
                     for i, (train, test, score) in enumerate(zip(window['train_results'], window['test_results'], window['scores']), 1):
                         lookback = train.get('momentum_lookback_days', '-')
-                        f.write(f"{i}. {train['broker']} | N:{train['n_tickers']} | Rebal:{train['rebalance_period']} | Look:{lookback} | ")
+                        stop_loss = f"{train.get('stop_loss_pct')}%" if train.get('stop_loss_pct') else '-'
+                        f.write(f"{i}. {train['broker']} | N:{train['n_tickers']} | Rebal:{train['rebalance_period']} | Look:{lookback} | SL:{stop_loss} | ")
                         f.write(f"Train CAGR:{train['cagr']*100:.2f}% DD:{train['max_drawdown']*100:.2f}% | ")
                         f.write(f"Test CAGR:{test['cagr']*100:.2f}% DD:{test['max_drawdown']*100:.2f}% | ")
                         f.write(f"Score:{score:.1f}\n")
