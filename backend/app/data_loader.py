@@ -350,6 +350,10 @@ def get_intraday_prices(tickers: list[str]):
             # Single ticker - data is a simple DataFrame
             if 'Close' in data.columns and not data['Close'].empty:
                 last_price = data['Close'].iloc[-1]
+                # If yfinance returns a single-element series instead of a scalar
+                if hasattr(last_price, 'iloc'):
+                    last_price = last_price.iloc[0]
+                
                 last_timestamp = data.index[-1]
                 result[tickers[0]] = {
                     'price': float(last_price),
@@ -364,6 +368,10 @@ def get_intraday_prices(tickers: list[str]):
                         ticker_data = close_data[ticker].dropna()
                         if not ticker_data.empty:
                             last_price = ticker_data.iloc[-1]
+                            # Handle potential single-element series
+                            if hasattr(last_price, 'iloc'):
+                                last_price = last_price.iloc[0]
+                            
                             last_timestamp = ticker_data.index[-1]
                             result[ticker] = {
                                 'price': float(last_price),

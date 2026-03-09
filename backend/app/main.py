@@ -171,9 +171,14 @@ def get_portfolio_performance():
                         
                         for item in record_to_update['details']:
                             t = item['ticker']
-                            if t in intraday_data and item['shares'] > 0:
-                                curr = infer_currency(t)
-                                live_price = intraday_data[t]['price']
+                            if item['shares'] > 0:
+                                if t in intraday_data:
+                                    # Use the currency recorded in the transaction if available
+                                    curr = item.get('currency', infer_currency(t))
+                                    live_price = intraday_data[t]['price']
+                                else:
+                                    print(f"Performance Warning: No intraday price for held ticker {t}")
+                                    continue
                                 
                                 # Special handling for GBP (LSE stocks usually in pence)
                                 if curr == 'GBP':
