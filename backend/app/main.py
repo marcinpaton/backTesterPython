@@ -273,7 +273,6 @@ def get_portfolio_performance():
             import traceback
             traceback.print_exc()
 
-        print("Performance Debug: Success.")
         return results
 
     except Exception as e:
@@ -281,6 +280,49 @@ def get_portfolio_performance():
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/portfolio/current-tickers")
+def get_portfolio_current_tickers():
+    try:
+        from app.db_transactions import get_all_transactions
+        from app.currency_utils import infer_currency
+        from app.portfolio_replayer import PortfolioReplayer
+        
+        transactions = get_all_transactions()
+        if not transactions:
+            return []
+            
+        oldest_tx_date = min([t['date'] for t in transactions if t.get('date')])
+        if isinstance(oldest_tx_date, datetime):
+            oldest_tx_date = oldest_tx_date.strftime('%Y-%m-%d')
+        elif isinstance(oldest_tx_date, str):
+            oldest_tx_date = oldest_tx_date.split('T')[0]
+            
+        unique_tickers = list(set([t['ticker'] for t in transactions if t.get('ticker')]))
+        price_df = load_data(filename=PORTFOLIO_DATA_FILE, tickers=unique_tickers, start_date=oldest_tx_date)
+        
+        if price_df is None or price_df.empty:
+             return []
+        
+        from app.data_loader import load_currency_data
+        unique_currencies = list(set([t.get('currency', 'PLN') for t in transactions]))
+        currency_df = load_currency_data(start_date=oldest_tx_date, currencies=unique_currencies, filename=PORTFOLIO_CURRENCY_DATA_FILE)
+        
+        if currency_df is None or currency_df.empty:
+            currency_df = pd.DataFrame(index=price_df.index)
+            
+        replayer = PortfolioReplayer(transactions, price_df, currency_df)
+        results = replayer.calculate_history()
+        
+        if results and results.get('history'):
+            latest = results['history'][-1]
+            current_tickers = [item['ticker'] for item in latest['details'] if item['shares'] > 0]
+            return sorted(list(set(current_tickers)))
+            
+        return []
+    except Exception as e:
+        print(f"Error getting current tickers: {e}")
+        return []
 
 @app.get("/api/portfolio/transactions")
 def get_transactions():
@@ -1906,6 +1948,147 @@ async def parse_results(request: ParseResultsRequest):
         
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail=f"Invalid JSON format: {str(e)}")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class SimulationRequest(BaseModel):
+    tickers: List[str]
+    start_date: str
+    end_date: str
+
+@app.get("/api/simulation/tickers")
+def get_simulation_tickers():
+    try:
+        all_tickers = set()
+        
+        # Try general stock prices
+        try:
+            df = load_data()
+            if df is not None and not df.empty:
+                if isinstance(df.columns, pd.MultiIndex):
+                    all_tickers.update(df.columns.get_level_values(0).unique())
+                else:
+                    all_tickers.update(df.columns)
+        except Exception as e:
+            print(f"Error loading general data: {e}")
+        
+        # Try portfolio stock prices
+        try:
+            pdf = load_data(filename=PORTFOLIO_DATA_FILE)
+            if pdf is not None and not pdf.empty:
+                if isinstance(pdf.columns, pd.MultiIndex):
+                    all_tickers.update(pdf.columns.get_level_values(0).unique())
+                else:
+                    all_tickers.update(pdf.columns)
+        except Exception as e:
+            print(f"Error loading portfolio data: {e}")
+                
+        # Clean up
+        result = [t for t in all_tickers if t and t != 'Date' and not pd.isna(t)]
+        final_list = sorted(list(set(result)))
+        print(f"Simulation tickers found: {len(final_list)}")
+        return final_list
+    except Exception as e:
+        print(f"Error getting simulation tickers: {e}")
+        return []
+
+@app.post("/api/simulation/run")
+def run_simulation(request: SimulationRequest):
+    try:
+        df_general = load_data()
+        df_portfolio = load_data(filename=PORTFOLIO_DATA_FILE)
+        
+        df = None
+        if df_general is not None and not df_general.empty and df_portfolio is not None and not df_portfolio.empty:
+             df = pd.concat([df_general, df_portfolio], axis=1)
+             df = df.loc[:, ~df.columns.duplicated()]
+        elif df_general is not None and not df_general.empty:
+             df = df_general
+        elif df_portfolio is not None and not df_portfolio.empty:
+             df = df_portfolio
+             
+        if df is None:
+            raise HTTPException(status_code=404, detail="No data found. Please download data first.")
+        
+        start_dt = pd.to_datetime(request.start_date)
+        end_dt = pd.to_datetime(request.end_date)
+        
+        # Filter dates within range
+        available_dates = df.index[(df.index >= start_dt) & (df.index <= end_dt)]
+        if available_dates.empty:
+             raise HTTPException(status_code=400, detail="No data available for the selected date range.")
+             
+        actual_start_date = available_dates[0]
+        actual_end_date = available_dates[-1]
+        
+        results = []
+        initial_capital = 10000.0
+        
+        if not request.tickers:
+            return {"error": "No tickers provided"}
+            
+        allocation_per_ticker = initial_capital / len(request.tickers)
+        total_final_value = 0.0
+        
+        is_multi = isinstance(df.columns, pd.MultiIndex)
+        
+        for ticker in request.tickers:
+            try:
+                if is_multi:
+                    # Check if ticker exists
+                    if ticker not in df.columns.get_level_values(0):
+                         results.append({"ticker": ticker, "error": "Ticker not found in data"})
+                         continue
+                    price_start = float(df.loc[actual_start_date, (ticker, 'Close')])
+                    price_end = float(df.loc[actual_end_date, (ticker, 'Close')])
+                else:
+                    if ticker not in df.columns:
+                         results.append({"ticker": ticker, "error": "Ticker not found in data"})
+                         continue
+                    price_start = float(df.loc[actual_start_date, ticker])
+                    price_end = float(df.loc[actual_end_date, ticker])
+                
+                if pd.isna(price_start) or pd.isna(price_end):
+                     results.append({
+                        "ticker": ticker,
+                        "error": "Missing price data for selected dates"
+                     })
+                     continue
+                     
+                shares = allocation_per_ticker / price_start
+                final_value = shares * price_end
+                return_pct = (price_end - price_start) / price_start if price_start != 0 else 0
+                
+                results.append({
+                    "ticker": ticker,
+                    "price_start": price_start,
+                    "price_end": price_end,
+                    "shares": shares,
+                    "initial_value": allocation_per_ticker,
+                    "final_value": final_value,
+                    "return_pct": return_pct
+                })
+                total_final_value += final_value
+            except Exception as e:
+                results.append({
+                    "ticker": ticker,
+                    "error": str(e)
+                })
+                
+        total_return_pct = (total_final_value - initial_capital) / initial_capital
+        
+        return {
+            "summary": {
+                "initial_capital": initial_capital,
+                "final_value": total_final_value,
+                "total_return_pct": total_return_pct,
+                "start_date": actual_start_date.strftime('%Y-%m-%d'),
+                "end_date": actual_end_date.strftime('%Y-%m-%d')
+            },
+            "tickers": results
+        }
     except Exception as e:
         import traceback
         traceback.print_exc()

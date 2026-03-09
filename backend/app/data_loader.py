@@ -467,7 +467,7 @@ def load_data(filename: str = DATA_FILE, tickers: list[str] = None, start_date: 
             df = pd.read_csv(filename, index_col=0, parse_dates=True)
     except Exception as e:
         print(f"Error reading {filename}: {e}")
-        df = pd.read_csv(filename, index_col=0, parse_dates=True)
+        return pd.DataFrame()
     
     # Ensure we have a valid DatetimeIndex
     if not isinstance(df.index, pd.DatetimeIndex):
