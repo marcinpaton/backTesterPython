@@ -79,9 +79,15 @@ export const getMarketPrices = async (tickers) => {
                     history = history.map(h => ({ ...h, price: h.price / 100 }));
                 }
 
-                // 3. If we only fetched 1d, merge with cached history (which is already in GBP)
+                // 3. If we only fetched 1d, merge with cached history
                 if (range === '1d' && cachedTicker?.history) {
-                    history = cachedTicker.history;
+                    const newPoints = history; // The 1d points we just parsed
+                    history = [...cachedTicker.history];
+                    newPoints.forEach(np => {
+                        const idx = history.findIndex(h => h.date === np.date);
+                        if (idx >= 0) history[idx] = np;
+                        else history.push(np);
+                    });
                 }
 
                 prices[ticker] = {
@@ -180,12 +186,11 @@ export const getCurrencyRates = async (base = 'PLN') => {
                 const price = result.meta.regularMarketPrice;
 
                 let historyMap = {};
-                if (range === '1y') {
-                    const historyArr = parseYahooHistory(result);
-                    historyArr.forEach(h => historyMap[h.date] = h.price);
-                } else if (cachedCurrency?.history) {
-                    historyMap = cachedCurrency.history;
+                if (cachedCurrency?.history) {
+                    historyMap = { ...cachedCurrency.history };
                 }
+                const historyArr = parseYahooHistory(result);
+                historyArr.forEach(h => historyMap[h.date] = h.price);
 
                 rates[currency] = {
                     current: price,

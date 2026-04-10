@@ -183,7 +183,7 @@ const HomeScreen = () => {
                 let h_txIndex = 0;
 
                 // 1. Replay Transactions up to targetDate
-                while (h_txIndex < txData.length && txData[h_txIndex].date && txData[h_txIndex].date.substring(0, 10) < targetDate) {
+                while (h_txIndex < txData.length && txData[h_txIndex].date && txData[h_txIndex].date.substring(0, 10) <= targetDate) {
                     const tx = txData[h_txIndex];
                     const t_qty = parseFloat(tx.quantity) || 0;
                     const t_price = parseFloat(tx.price) || 0;
@@ -339,21 +339,36 @@ const HomeScreen = () => {
                     const h = h_holdings[ticker];
                     const shares = h.qty;
                     if (shares > 0) {
-                        const histPriceObj = prices[ticker]?.history?.find(h => h.date === date);
+                        // Fallback: find closest price BEFORE or ON date
+                        const tickerHistory = prices[ticker]?.history || [];
+                        let histPriceObj = tickerHistory.find(h => h.date === date);
+                        if (!histPriceObj && tickerHistory.length > 0) {
+                            histPriceObj = tickerHistory.reduce((prev, curr) => {
+                                if (curr.date <= date) return curr;
+                                return prev;
+                            }, tickerHistory[0]);
+                        }
                         const price = histPriceObj ? histPriceObj.price : (prices[ticker]?.price || 0);
 
                         const currency = prices[ticker]?.currency || 'PLN';
                         const rateObj = currencyRates[currency];
                         let rate = 1.0;
                         if (currency !== 'PLN') {
-                            rate = rateObj?.history?.[date] || rateObj?.current || 1.0;
+                            if (rateObj?.history) {
+                                const rateDate = Object.keys(rateObj.history).reduce((prev, curr) => {
+                                    if (curr <= date) return curr;
+                                    return prev;
+                                }, Object.keys(rateObj.history)[0]);
+                                rate = rateObj.history[rateDate] || rateObj.current || 1.0;
+                            } else {
+                                rate = rateObj?.current || 1.0;
+                            }
                         }
 
                         const val = shares * price * rate;
                         dailyVal += val;
 
                         // Calculate daily change for historical date
-                        const tickerHistory = prices[ticker]?.history || [];
                         const histPriceIdx = tickerHistory.findIndex(h => h.date === date);
                         let histChange = 0;
                         let histChangeMtd = 0;
