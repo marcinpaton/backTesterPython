@@ -196,6 +196,75 @@ const PortfolioView = ({ onBack }) => {
         }
     };
 
+    // Calculate YTDs from history
+    const yearlyReturns = {};
+    if (performanceData?.history && performanceData.history.length > 0) {
+        const history = performanceData.history;
+        const years = [...new Set(history.map(h => h.date.substring(0, 4)))];
+        
+        years.forEach(year => {
+            const yearHistory = history.filter(h => h.date.startsWith(year));
+            const prevYearHistory = history.filter(h => h.date.startsWith(String(parseInt(year) - 1)));
+            
+            let startValue = yearHistory[0].total_value;
+            if (prevYearHistory.length > 0) {
+                startValue = prevYearHistory[prevYearHistory.length - 1].total_value;
+            }
+            
+            const endValue = yearHistory[yearHistory.length - 1].total_value;
+            if (startValue > 0) {
+                yearlyReturns[year] = (endValue - startValue) / startValue;
+            } else {
+                yearlyReturns[year] = 0.0;
+            }
+        });
+    }
+
+    const returnsToRender = [];
+    if (performanceData?.monthly_returns) {
+        const sortedMonths = Object.entries(performanceData.monthly_returns).sort((a, b) => a[0].localeCompare(b[0]));
+        let currentYear = null;
+        
+        sortedMonths.forEach(([monthStr, ret], index) => {
+            const year = monthStr.split('-')[0];
+            if (currentYear !== null && currentYear !== year) {
+                // Push previous year YTD
+                if (yearlyReturns[currentYear] !== undefined) {
+                    returnsToRender.push({
+                        key: `YTD-${currentYear}`,
+                        label: `${currentYear} YTD`,
+                        ret: yearlyReturns[currentYear],
+                        isYtd: true,
+                        isLastMonth: false
+                    });
+                }
+            }
+            
+            currentYear = year;
+            const isLastMonth = index === sortedMonths.length - 1;
+            returnsToRender.push({
+                key: monthStr,
+                label: isLastMonth ? `${monthStr} (MTD)` : monthStr,
+                ret: ret,
+                isYtd: false,
+                isLastMonth: isLastMonth
+            });
+            
+            if (isLastMonth) {
+                // Push final year YTD
+                if (yearlyReturns[currentYear] !== undefined) {
+                    returnsToRender.push({
+                        key: `YTD-${currentYear}`,
+                        label: `${currentYear} YTD`,
+                        ret: yearlyReturns[currentYear],
+                        isYtd: true,
+                        isLastMonth: true // highlight the current YTD similarly
+                    });
+                }
+            }
+        });
+    }
+
     return (
         <div className="bg-white shadow-md rounded-lg p-6">
 
@@ -230,26 +299,25 @@ const PortfolioView = ({ onBack }) => {
                         />
 
                         {/* Monthly Returns List */}
-                        {performanceData.monthly_returns && (
+                        {returnsToRender.length > 0 && (
                             <div className="mt-8">
-                                <h4 className="text-lg font-bold mb-4 text-gray-700">Monthly Returns</h4>
+                                <h4 className="text-lg font-bold mb-4 text-gray-700">Monthly Returns & YTD</h4>
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                                    {Object.entries(performanceData.monthly_returns)
-                                        .sort((a, b) => a[0].localeCompare(b[0]))
-                                        .map(([month, ret], index, array) => {
-                                            const isLast = index === array.length - 1;
-                                            const label = isLast ? `${month} (MTD)` : month;
-                                            const isPositive = ret >= 0;
+                                    {returnsToRender.map((item) => {
+                                        const isPositive = item.ret >= 0;
+                                        const borderClass = item.isYtd 
+                                            ? 'border-purple-300 bg-purple-50 ring-1 ring-purple-200' 
+                                            : (item.isLastMonth ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200');
 
-                                            return (
-                                                <div key={month} className={`p-3 rounded border ${isLast ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200'}`}>
-                                                    <div className="text-xs text-gray-500 font-semibold mb-1">{label}</div>
-                                                    <div className={`text-lg font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {isPositive ? '+' : ''}{(ret * 100).toFixed(2)}%
-                                                    </div>
+                                        return (
+                                            <div key={item.key} className={`p-3 rounded border ${borderClass}`}>
+                                                <div className={`text-xs font-semibold mb-1 ${item.isYtd ? 'text-purple-700' : 'text-gray-500'}`}>{item.label}</div>
+                                                <div className={`text-lg font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {isPositive ? '+' : ''}{(item.ret * 100).toFixed(2)}%
                                                 </div>
-                                            );
-                                        })}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
