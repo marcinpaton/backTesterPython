@@ -212,39 +212,17 @@ def get_portfolio_performance():
                             record_to_update['total_value'] = new_total_value
                             record_to_update['holdings_value'] = new_holdings_value
                             
-                            # Recalculate MTD Return
-                            # We need month_start_value. 
-                            # If we appended a new record (today), check if month changed.
+                            # 5. Recalculate MTD Return (Period-Start Logic)
                             current_dt = datetime.strptime(record_to_update['date'], '%Y-%m-%d')
                             current_month = current_dt.month
+                            current_year = current_dt.year
                             
-                            # Find previous record (before record_to_update)
-                            prev_record = None
-                            if len(history) > 1:
-                                # If we appended, history[-1] is record_to_update, so prev is history[-2]
-                                if history[-1] == record_to_update:
-                                    prev_record = history[-2]
-                                else:
-                                    # If updated in place, prev is history[-2] if exists
-                                    prev_record = history[-2]
+                            # Find the FIRST record of the current month in the history
+                            first_of_month = next((h for h in history if 
+                                                datetime.strptime(h['date'], '%Y-%m-%d').month == current_month and 
+                                                datetime.strptime(h['date'], '%Y-%m-%d').year == current_year), record_to_update)
                             
-                            month_start_value = 0.0
-                            
-                            if prev_record:
-                                prev_dt = datetime.strptime(prev_record['date'], '%Y-%m-%d')
-                                if prev_dt.month != current_month:
-                                    # New month started, base is previous record (end of last month)
-                                    month_start_value = prev_record['total_value']
-                                else:
-                                    # Same month, so month_start_value is the same as for prev_record
-                                    # We can deduce it from prev_record mtd: prev_mtd = (prev_val - start) / start
-                                    # => start * (1 + prev_mtd) = prev_val => start = prev_val / (1 + prev_mtd)
-                                    # Handle division by zero
-                                    if 1 + prev_record.get('mtd_return', 0) != 0:
-                                        month_start_value = prev_record['total_value'] / (1 + prev_record.get('mtd_return', 0))
-                            else:
-                                # First record ever?
-                                month_start_value = new_total_value # MTD 0
+                            month_start_value = first_of_month['total_value']
 
                             if month_start_value > 0:
                                 record_to_update['mtd_return'] = (new_total_value - month_start_value) / month_start_value

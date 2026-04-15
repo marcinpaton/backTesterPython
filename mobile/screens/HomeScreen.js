@@ -26,22 +26,27 @@ const HomeScreen = () => {
                 .order('date', { ascending: true }); // Ascending for replay
 
             if (error) throw error;
-            console.log('Sample transaction:', txData[0]); // DEBUG
             setTransactions(txData);
 
             // 2. Identify Unique Tickers
-            console.log('Transactions fetched:', txData.length);
             const uniqueTickers = [...new Set(txData.filter(t => t.ticker).map(t => t.ticker))];
 
             // 3. Fetch Market Prices (Yahoo)
             const prices = await getMarketPrices(uniqueTickers);
             const currencyRates = await getCurrencyRates(); // e.g. USDPLN
 
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
             // Define dates early for use in liveAssets loop
             const todayObj = new Date();
-            const todayStr = todayObj.toISOString().split('T')[0];
-            const startOfMonth = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toISOString().split('T')[0];
-            const startOfYear = new Date(todayObj.getFullYear(), 0, 1).toISOString().split('T')[0];
+            const todayStr = formatDate(todayObj);
+            const startOfMonth = formatDate(new Date(todayObj.getFullYear(), todayObj.getMonth(), 1));
+            const startOfYear = formatDate(new Date(todayObj.getFullYear(), 0, 1));
 
             // 4. Calculate Current Value (Simplified Replayer)
             let cash = 0;
@@ -111,7 +116,7 @@ const HomeScreen = () => {
 
                         if (tickerHistory.length > 1) {
                             // Daily Change
-                            const todayStrStrict = new Date().toISOString().split('T')[0];
+                            const todayStrStrict = formatDate(new Date());
                             const lastHistPoint = tickerHistory[tickerHistory.length - 1];
 
                             let prevClose;
@@ -125,11 +130,17 @@ const HomeScreen = () => {
                                 changePct = (priceInfo.price - prevClose) / prevClose;
                             }
 
-                            // MTD Change
-                            const priceAtMtdStartObj = tickerHistory.filter(h => h.date < startOfMonth).pop();
+                            // MTD Change - Find the first available price IN the current month
+                            const priceAtMtdStartObj = tickerHistory.find(h => h.date >= startOfMonth);
 
                             if (priceAtMtdStartObj && priceAtMtdStartObj.price) {
                                 changeMtd = (priceInfo.price - priceAtMtdStartObj.price) / priceAtMtdStartObj.price;
+                            } else {
+                                // Fallback to last close if no prices in current month yet
+                                const fallbackObj = tickerHistory.filter(h => h.date < startOfMonth).pop();
+                                if (fallbackObj) {
+                                    changeMtd = (priceInfo.price - fallbackObj.price) / fallbackObj.price;
+                                }
                             }
                         }
 
@@ -241,8 +252,7 @@ const HomeScreen = () => {
                 return h_cash + h_stocksValue;
             };
 
-            // Get benchmark dates - we need the CLOSE price of the PREVIOUS day for these calculations
-            // To be robust, we find the latest date in history strictly < targetDate
+            // Get benchmark dates - We use the FIRST day of the current period for MTD/YTD
             const getLatestAvailableDateBefore = (targetDate) => {
                 const firstTicker = Object.keys(prices)[0];
                 if (!firstTicker || !prices[firstTicker].history) return targetDate;
@@ -250,13 +260,13 @@ const HomeScreen = () => {
                 return dates.length > 0 ? dates[dates.length - 1] : targetDate;
             };
 
-            const prevDayDate = getLatestAvailableDateBefore(todayStr);
-            const prevMonthDate = getLatestAvailableDateBefore(startOfMonth);
-            const prevYearDate = getLatestAvailableDateBefore(startOfYear);
+            const prevDayDate = getLatestAvailableDateBefore(todayStr); // Yesterday's close for Daily
+            const mtdStartDate = startOfMonth;
+            const ytdStartDate = startOfYear;
 
             const v_prev = calculateValueAtDate(prevDayDate);
-            const v_mtd = calculateValueAtDate(prevMonthDate);
-            const v_ytd = calculateValueAtDate(prevYearDate);
+            const v_mtd = calculateValueAtDate(mtdStartDate);
+            const v_ytd = calculateValueAtDate(ytdStartDate);
 
             setReturns({
                 today: v_prev > 0 ? (totalValue - v_prev) / v_prev : 0,

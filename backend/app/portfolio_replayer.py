@@ -188,14 +188,12 @@ class PortfolioReplayer:
                 
             total_value = cash + holdings_value
             
-            # MTD Calculation
+            # MTD Calculation - Baseline is the first available session of the month
             current_month = current_date.month
-            if last_month is None:
-                # First day of simulation
+            if last_month is None or current_month != last_month:
+                # First day of simulation or start of a new month
+                # MTD baseline should be the START of this session
                 month_start_value = total_value
-            elif current_month != last_month:
-                # New month started, base is previous day (end of last month)
-                month_start_value = prev_total_value
                 
             mtd_return = 0.0
             if month_start_value > 0:
@@ -242,9 +240,16 @@ class PortfolioReplayer:
         drawdown = (df['total_value'] - running_max) / running_max
         max_drawdown = drawdown.min()
         
-        # Monthly Returns
-        monthly_returns = df['total_value'].resample('M').last().pct_change().fillna(0.0)
-        monthly_returns_dict = {k.strftime('%Y-%m'): v for k, v in monthly_returns.items()}
+        # Monthly Returns (Return within the calendar month)
+        # We calculate (LastOfmonth / FirstOfMonth) - 1
+        monthly_groups = df['total_value'].groupby(pd.Grouper(freq='M'))
+        monthly_returns_dict = {}
+        for name, group in monthly_groups:
+            if not group.empty:
+                start_val = group.iloc[0]
+                end_val = group.iloc[-1]
+                ret = (end_val - start_val) / start_val if start_val > 0 else 0.0
+                monthly_returns_dict[name.strftime('%Y-%m')] = ret
         
         # Format history for frontend
         formatted_history = [
@@ -285,21 +290,19 @@ class PortfolioReplayer:
             if year_data.empty:
                 continue
                 
-            start_val = year_data['total_value'].iloc[0]
             end_val = year_data['total_value'].iloc[-1]
             try:
-                # If it's not the very first year of the whole history, we should probably 
-                # check the end value of the *previous* year for accurate 'year_start' base
-                # but using first available data point of the year is a reasonable approx 
-                # if exact EOY previous year is missing. 
-                # Actually closer logic: look for day before first day of year? 
-                # Simpler: The first record of the year IS the start position for our PnL calculation roughly
-                # OR: Logic: Return = (End - Start) / Start.
+                # Period-Start Logic: Use the first available trading record of the current year
+                # to avoid carry-over from previous year holidays (like Jan 1st)
+                start_val = year_data['total_value'].iloc[0] # Default
                 
-                # Let's try to find end of previous year if possible for better precision
-                prev_year_mask = df['year'] == (year - 1)
-                if prev_year_mask.any():
-                    start_val = df.loc[prev_year_mask, 'total_value'].iloc[-1]
+                # Try to find the first ACTUAL trading date in this year
+                if self.price_data is not None and not self.price_data.empty:
+                    year_prices = self.price_data[self.price_data.index.year == year]
+                    if not year_prices.empty:
+                        first_trading_date = year_prices.index.min()
+                        if first_trading_date in year_data.index:
+                            start_val = year_data.loc[first_trading_date, 'total_value']
                 
                 pnl = end_val - start_val
                 pnl_pct = (pnl / start_val) if start_val != 0 else 0.0

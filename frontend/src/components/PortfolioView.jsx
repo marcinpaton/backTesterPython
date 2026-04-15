@@ -196,26 +196,12 @@ const PortfolioView = ({ onBack }) => {
         }
     };
 
-    // Calculate YTDs from history
+    // Unified YTD logic: Use the pre-calculated annual summaries from the backend
     const yearlyReturns = {};
-    if (performanceData?.history && performanceData.history.length > 0) {
-        const history = performanceData.history;
-        const years = [...new Set(history.map(h => h.date.substring(0, 4)))];
-        
-        years.forEach(year => {
-            const yearHistory = history.filter(h => h.date.startsWith(year));
-            const prevYearHistory = history.filter(h => h.date.startsWith(String(parseInt(year) - 1)));
-            
-            let startValue = yearHistory[0].total_value;
-            if (prevYearHistory.length > 0) {
-                startValue = prevYearHistory[prevYearHistory.length - 1].total_value;
-            }
-            
-            const endValue = yearHistory[yearHistory.length - 1].total_value;
-            if (startValue > 0) {
-                yearlyReturns[year] = (endValue - startValue) / startValue;
-            } else {
-                yearlyReturns[year] = 0.0;
+    if (performanceData?.rebalance_history) {
+        performanceData.rebalance_history.forEach(item => {
+            if (item.type === 'annual_summary') {
+                yearlyReturns[item.year] = item.annual_pnl_percent;
             }
         });
     }
