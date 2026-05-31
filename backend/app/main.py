@@ -537,6 +537,7 @@ class MomentumScanRequest(BaseModel):
     n_best_tickers: int = 5
     filter_negative_momentum: bool = False
     sma_period: int = -1
+    excluded_tickers: Optional[List[str]] = []
 
 @app.post("/api/momentum_scan")
 def scan_momentum(request: MomentumScanRequest):
@@ -570,10 +571,14 @@ def scan_momentum(request: MomentumScanRequest):
     try:
         analysis_dt = datetime.strptime(request.analysis_date, '%Y-%m-%d')
         print(f"--- Momentum Scan Started for Date: {request.analysis_date} ---")
-        print(f"Scanning {len(request.tickers)} tickers...")
+        
+        excluded = [t.strip().upper() for t in request.excluded_tickers] if request.excluded_tickers else []
+        tickers_to_scan = [t for t in request.tickers if t.upper() not in excluded]
+        
+        print(f"Scanning {len(tickers_to_scan)} tickers (excluding {len(excluded)}: {', '.join(excluded)})...")
         
         # Use new detailed method - strategy handles loose date matching per ticker
-        detailed_results = strategy.get_detailed_momentum(request.tickers, analysis_dt)
+        detailed_results = strategy.get_detailed_momentum(tickers_to_scan, analysis_dt)
         
         # Take top N
         best_results = detailed_results[:request.n_best_tickers]

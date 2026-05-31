@@ -12,6 +12,7 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
     const [lookbackDays, setLookbackDays] = useState(120);
     const [nBestTickers, setNBestTickers] = useState(5);
     const [smaPeriod, setSmaPeriod] = useState(-1);
+    const [excludedTickers, setExcludedTickers] = useState('');
 
     // Results state
     const [results, setResults] = useState(null);
@@ -66,13 +67,27 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                 return;
             }
 
+            const excludedList = excludedTickers
+                .split(/[\s,;]+/)
+                .map(t => t.trim().toUpperCase())
+                .filter(t => t.length > 0);
+
+            const filteredTickerList = tickerList.filter(t => !excludedList.includes(t.toUpperCase()));
+
+            if (filteredTickerList.length === 0) {
+                alert(`No tickers remaining to scan after exclusion.`);
+                setIsLoading(false);
+                return;
+            }
+
             const response = await axios.post('http://127.0.0.1:8000/api/momentum_scan', {
-                tickers: tickerList,
+                tickers: filteredTickerList,
                 analysis_date: analysisDate,
                 momentum_lookback_days: parseInt(lookbackDays),
                 n_best_tickers: parseInt(nBestTickers),
                 filter_negative_momentum: false, // Default
-                sma_period: parseInt(smaPeriod)
+                sma_period: parseInt(smaPeriod),
+                excluded_tickers: excludedList
             });
 
             setResults(response.data);
@@ -265,6 +280,17 @@ const MomentumScanner = ({ onDownloadData, isLoading: isGlobalLoading }) => {
                                     onChange={(e) => setSmaPeriod(e.target.value)}
                                     className="mt-1 block w-full border border-blue-300 rounded-md shadow-sm p-2"
                                     title="Set to -1 to disable filter"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-blue-800">Excluded Tickers</label>
+                                <input
+                                    type="text"
+                                    value={excludedTickers}
+                                    onChange={(e) => setExcludedTickers(e.target.value)}
+                                    placeholder="e.g. AAPL, MSFT (separated by commas or spaces)"
+                                    className="mt-1 block w-full border border-blue-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                    title="Enter tickers to ignore from the scan"
                                 />
                             </div>
                             <div>
