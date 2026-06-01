@@ -722,10 +722,8 @@ def get_allocation_data(request: ScannerAllocationRequest):
         current_holdings = {}
         for item in latest_record['details']:
             t = item['ticker']
-            val = item['value_pln']
-            price = item['price_pln']
-            if price > 0:
-                qty = val / price
+            qty = item.get('shares', 0.0)
+            if qty > 0.0001:
                 current_holdings[t] = qty
         
         # 2. Get Latest Prices for Candidates using INTRADAY data
@@ -813,8 +811,20 @@ def get_allocation_data(request: ScannerAllocationRequest):
                     "rate": rate
                 })
 
+        # Recalculate accurate total_portfolio_value using the latest prices we just fetched
+        correct_holdings_value = 0.0
+        for cand in candidates_data:
+            t = cand['ticker']
+            if t in current_holdings:
+                qty = current_holdings[t]
+                price = cand['price']
+                rate = cand['rate']
+                correct_holdings_value += (qty * price * rate)
+                
+        accurate_total_portfolio_value = current_cash + correct_holdings_value
+
         return {
-            "total_portfolio_value": total_portfolio_value,
+            "total_portfolio_value": accurate_total_portfolio_value,
             "cash": current_cash,
             "holdings": current_holdings,
             "candidates": candidates_data,
