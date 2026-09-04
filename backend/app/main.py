@@ -875,6 +875,10 @@ class BacktestRequest(BaseModel):
     smart_sell_on_profit_check_freq: int = 1 # Default to daily check
     market_regime_filter_enabled: bool = False
     market_regime_sma_period: int = 200
+    rebalance_keep_position_enabled: bool = False
+    rebalance_keep_profit_months: int = 0
+    rebalance_keep_profit_pct: float = 1.0
+    rebalance_keep_max_months: int = 5
 
 @app.post("/api/backtest")
 def run_backtest_endpoint(request: BacktestRequest):
@@ -933,7 +937,11 @@ def run_backtest_endpoint(request: BacktestRequest):
             smart_sell_on_profit_check_freq=request.smart_sell_on_profit_check_freq,
             ticker_groups=ticker_groups,
             market_regime_filter_enabled=request.market_regime_filter_enabled,
-            market_regime_sma_period=request.market_regime_sma_period
+            market_regime_sma_period=request.market_regime_sma_period,
+            rebalance_keep_position_enabled=request.rebalance_keep_position_enabled,
+            rebalance_keep_profit_months=request.rebalance_keep_profit_months,
+            rebalance_keep_profit_pct=request.rebalance_keep_profit_pct,
+            rebalance_keep_max_months=request.rebalance_keep_max_months
         )
         metrics = calculate_metrics(portfolio)
         return metrics

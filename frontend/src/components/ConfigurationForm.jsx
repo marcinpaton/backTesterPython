@@ -31,6 +31,11 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
   const [filterNegativeMomentum, setFilterNegativeMomentum] = useState(initialValues?.filter_negative_momentum || false);
   const [smaPeriod, setSmaPeriod] = useState(initialValues?.sma_period !== undefined ? initialValues.sma_period : -1);
 
+  const [rebalanceKeepEnabled, setRebalanceKeepEnabled] = useState(initialValues?.rebalance_keep_position_enabled || false);
+  const [rebalanceKeepProfitMonths, setRebalanceKeepProfitMonths] = useState(initialValues?.rebalance_keep_profit_months !== undefined ? initialValues.rebalance_keep_profit_months : 0);
+  const [rebalanceKeepProfitPct, setRebalanceKeepProfitPct] = useState(initialValues?.rebalance_keep_profit_pct !== undefined ? initialValues.rebalance_keep_profit_pct : 1);
+  const [rebalanceKeepMaxMonths, setRebalanceKeepMaxMonths] = useState(initialValues?.rebalance_keep_max_months !== undefined ? initialValues.rebalance_keep_max_months : 5);
+
 
 
   // Effect to update state if initialValues changes (e.g., when navigation happens)
@@ -61,6 +66,10 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
       if (initialValues.sma_period !== undefined) setSmaPeriod(initialValues.sma_period);
       if (initialValues.market_regime_filter_enabled !== undefined) setMarketRegimeFilterEnabled(initialValues.market_regime_filter_enabled);
       if (initialValues.market_regime_sma_period) setMarketRegimeSmaPeriod(initialValues.market_regime_sma_period);
+      if (initialValues.rebalance_keep_position_enabled !== undefined) setRebalanceKeepEnabled(initialValues.rebalance_keep_position_enabled);
+      if (initialValues.rebalance_keep_profit_months !== undefined) setRebalanceKeepProfitMonths(initialValues.rebalance_keep_profit_months);
+      if (initialValues.rebalance_keep_profit_pct !== undefined) setRebalanceKeepProfitPct(initialValues.rebalance_keep_profit_pct);
+      if (initialValues.rebalance_keep_max_months !== undefined) setRebalanceKeepMaxMonths(initialValues.rebalance_keep_max_months);
     }
   }, [initialValues]);
 
@@ -92,7 +101,11 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
       smart_sell_on_profit_threshold_pct: (smartSellOnProfitEnabled || strategy === 'momentum_smart_tp') && smartSellOnProfitThreshold ? parseFloat(smartSellOnProfitThreshold) / 100 : null,
       smart_sell_on_profit_check_freq: parseInt(smartSellOnProfitCheckFreq),
       market_regime_filter_enabled: marketRegimeFilterEnabled,
-      market_regime_sma_period: parseInt(marketRegimeSmaPeriod)
+      market_regime_sma_period: parseInt(marketRegimeSmaPeriod),
+      rebalance_keep_position_enabled: rebalanceKeepEnabled,
+      rebalance_keep_profit_months: parseInt(rebalanceKeepProfitMonths),
+      rebalance_keep_profit_pct: parseFloat(rebalanceKeepProfitPct),
+      rebalance_keep_max_months: parseInt(rebalanceKeepMaxMonths)
     });
   };
 
@@ -175,6 +188,66 @@ const ConfigurationForm = ({ onRunBacktest, isLoading, initialValues }) => {
               <option value="months">Months</option>
             </select>
           </div>
+        </div>
+
+        {/* Rebalance Keep Position Option */}
+        <div className="p-3 rounded-lg border border-green-200 bg-green-50/30 shadow-sm">
+          <label className="flex items-center space-x-2 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={rebalanceKeepEnabled}
+              onChange={(e) => setRebalanceKeepEnabled(e.target.checked)}
+              className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+            />
+            <span className="text-sm font-bold text-gray-800">
+              Keep Profitable Positions <span className="text-gray-500 font-normal italic text-xs">(skip rebalance sell)</span>
+            </span>
+          </label>
+
+          {rebalanceKeepEnabled && (
+            <div className="space-y-3 mt-2 pl-6 border-l-2 border-green-200">
+              <p className="text-xs text-gray-600 leading-relaxed">
+                Position is kept if return over last <b>{rebalanceKeepProfitMonths || 0} mo.</b>{' '}
+                {parseInt(rebalanceKeepProfitMonths) === 0 ? <span className="italic">(since purchase)</span> : ''}{' '}
+                is <b>&ge; {rebalanceKeepProfitPct}%</b> and not extended beyond <b>{rebalanceKeepMaxMonths} mo.</b>
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Profit Period (mo.)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={rebalanceKeepProfitMonths}
+                    onChange={(e) => setRebalanceKeepProfitMonths(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white text-center font-bold"
+                    title="0 = profit since purchase date"
+                  />
+                  <p className="text-xs text-gray-400 mt-0.5">0 = since purchase</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Min. Profit (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={rebalanceKeepProfitPct}
+                    onChange={(e) => setRebalanceKeepProfitPct(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white text-center font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Max Extension (mo.)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={rebalanceKeepMaxMonths}
+                    onChange={(e) => setRebalanceKeepMaxMonths(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white text-center font-bold"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>

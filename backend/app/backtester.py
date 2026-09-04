@@ -2,6 +2,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from app.strategies import Strategy
 
 class Portfolio:
@@ -11,6 +12,8 @@ class Portfolio:
         self.holdings = {} # {ticker: quantity}
         self.cost_basis = {} # {ticker: total_cost}
         self.entry_prices = {} # {ticker: price_per_share}
+        self.entry_dates = {} # {ticker: purchase_date}
+        self.extended_months = {} # {ticker: cumulative months position was kept past rebalance}
         self.history = [] # List of {date, total_value, cash, holdings_value}
         self.rebalance_history = [] # List of {date, sold_pnl, new_tickers}
         self.transaction_fee_enabled = transaction_fee_enabled
@@ -65,11 +68,16 @@ class Portfolio:
         del self.cost_basis[ticker]
         if ticker in self.entry_prices:
             del self.entry_prices[ticker]
+        if ticker in self.entry_dates:
+            del self.entry_dates[ticker]
+        if ticker in self.extended_months:
+            del self.extended_months[ticker]
             
         return sold_record
 
     def buy_ticker(self, ticker, amount, price, score, date, var=None):
         if price <= 0: return None
+        is_new_position = ticker not in self.holdings
         
         # Calculate quantity (whole shares only)
         # Margin Trading: Buy 1 extra share beyond what cash allows IF enabled
@@ -101,6 +109,9 @@ class Portfolio:
         self.holdings[ticker] = quantity
         self.cost_basis[ticker] = actual_cost
         self.entry_prices[ticker] = price
+        if is_new_position:
+            self.entry_dates[ticker] = date
+            self.extended_months[ticker] = 0
         self.cash -= (actual_cost + fee)
         
         return {
@@ -200,28 +211,87 @@ class Portfolio:
                     candidates.append(ticker)
         return candidates
 
-    def rebalance(self, target_tickers_with_scores: list[tuple[str, float]], current_prices: dict, date, var_map: dict = None, should_buy: bool = True):
+    def rebalance(self, target_tickers_with_scores: list[tuple[str, float]], current_prices: dict, date, var_map: dict = None, should_buy: bool = True, keep_position_config: dict = None, full_close_prices: pd.DataFrame = None, rebalance_period_months: int = 1):
         sold_performance = {}
+        kept_positions = []  # Track positions kept due to keep-position rule
         
         target_tickers = [t for t, s in target_tickers_with_scores]
         target_tickers_set = set(target_tickers)
         scores_map = {t: s for t, s in target_tickers_with_scores}
         
+        # Reset extended_months for tickers that are back in TOP N
+        for ticker in list(self.holdings.keys()):
+            if ticker in target_tickers_set and ticker in self.extended_months:
+                self.extended_months[ticker] = 0
+        
         # 1. Sell ONLY tickers that are NOT in the new target list
+        # (with optional keep-position exemption)
         for ticker in list(self.holdings.keys()):
             if ticker not in target_tickers_set:
-                if ticker in current_prices and not pd.isna(current_prices[ticker]):
-                    price = current_prices[ticker]
-                    record = self.sell_ticker(ticker, price, date, reason="rebalance")
-                    if record:
-                        sold_performance[ticker] = record
+                should_sell = True
+                
+                # Check keep-position conditions
+                if keep_position_config and keep_position_config.get('enabled', False):
+                    profit_months = keep_position_config.get('profit_months', 0)
+                    min_profit_pct = keep_position_config.get('profit_pct', 1.0) / 100.0  # Convert from % to decimal
+                    max_extend_months = keep_position_config.get('max_months', 5)
+                    
+                    current_extended = self.extended_months.get(ticker, 0)
+                    
+                    if current_extended < max_extend_months:
+                        # Calculate profit
+                        if ticker in current_prices and not pd.isna(current_prices[ticker]):
+                            current_price = current_prices[ticker]
+                            
+                            if profit_months == 0:
+                                # Use entry price (profit since purchase)
+                                entry_price = self.entry_prices.get(ticker, 0)
+                                if entry_price > 0:
+                                    profit_pct = (current_price - entry_price) / entry_price
+                                else:
+                                    profit_pct = 0.0
+                            else:
+                                # Use price from X months ago
+                                if full_close_prices is not None and ticker in full_close_prices.columns:
+                                    lookback_date = date - relativedelta(months=profit_months)
+                                    # Find closest available date
+                                    available = full_close_prices.index[full_close_prices.index <= lookback_date]
+                                    if not available.empty:
+                                        ref_date = available[-1]
+                                        ref_price = full_close_prices.loc[ref_date, ticker]
+                                        if not pd.isna(ref_price) and ref_price > 0:
+                                            profit_pct = (current_price - ref_price) / ref_price
+                                        else:
+                                            profit_pct = 0.0
+                                    else:
+                                        profit_pct = 0.0
+                                else:
+                                    profit_pct = 0.0
+                            
+                            if profit_pct >= min_profit_pct:
+                                should_sell = False
+                                self.extended_months[ticker] = current_extended + rebalance_period_months
+                                kept_positions.append({
+                                    'ticker': ticker,
+                                    'profit_pct': profit_pct,
+                                    'extended_months': self.extended_months[ticker]
+                                })
+                
+                if should_sell:
+                    if ticker in current_prices and not pd.isna(current_prices[ticker]):
+                        price = current_prices[ticker]
+                        record = self.sell_ticker(ticker, price, date, reason="rebalance")
+                        if record:
+                            sold_performance[ticker] = record
         
         # 2. Buy ONLY tickers that we don't own yet (from the target list)
         bought_performance = []
         tickers_to_buy = []
         
         if should_buy:
-             tickers_to_buy = [t for t in target_tickers if t not in self.holdings]
+             available_to_buy = [t for t in target_tickers if t not in self.holdings]
+             max_to_buy = max(0, len(target_tickers) - len(self.holdings))
+             tickers_to_buy = available_to_buy[:max_to_buy]
         
         if tickers_to_buy:
              # Allocate available cash (including recent sales) among new buys
@@ -266,13 +336,16 @@ class Portfolio:
                     if buy_record:
                         bought_performance.append(buy_record)
 
-        self.rebalance_history.append({
+        rebalance_record = {
             "date": date,
             "type": "rebalance",
             "sold": sold_performance,
             "bought": bought_performance,
             "cash": float(self.cash)
-        })
+        }
+        if kept_positions:
+            rebalance_record["kept_positions"] = kept_positions
+        self.rebalance_history.append(rebalance_record)
 
     def record_history(self, date, current_prices):
         total_value = self.get_total_value(current_prices)
@@ -292,7 +365,7 @@ class Portfolio:
             interest = abs(self.cash) * daily_rate
             self.cash -= interest
 
-def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_enabled: bool = False, smart_sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_check_freq: int = 1, ticker_groups: List[Dict[str, Any]] = None, market_regime_filter_enabled: bool = False, market_regime_sma_period: int = 200):
+def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float, start_date: str, end_date: str, stop_loss_pct: float = None, smart_stop_loss: bool = False, transaction_fee_enabled: bool = False, transaction_fee_type: str = 'percentage', transaction_fee_value: float = 0.0, capital_gains_tax_enabled: bool = False, capital_gains_tax_pct: float = 0.0, margin_enabled: bool = True, sizing_method: str = 'equal', sell_on_profit_enabled: bool = False, sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_enabled: bool = False, smart_sell_on_profit_threshold_pct: float = None, smart_sell_on_profit_check_freq: int = 1, ticker_groups: List[Dict[str, Any]] = None, market_regime_filter_enabled: bool = False, market_regime_sma_period: int = 200, rebalance_keep_position_enabled: bool = False, rebalance_keep_profit_months: int = 0, rebalance_keep_profit_pct: float = 1.0, rebalance_keep_max_months: int = 5):
     # Preprocessing to get Close prices only
     if isinstance(data.columns, pd.MultiIndex):
         try:
@@ -333,6 +406,26 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
     print(f"Margin Trading enabled: {margin_enabled}")
     if smart_sell_on_profit_enabled:
         print(f"Smart Sell on Profit enabled: {smart_sell_on_profit_threshold_pct*100}%")
+    
+    # Prepare keep-position config
+    keep_position_config = None
+    if rebalance_keep_position_enabled:
+        keep_position_config = {
+            'enabled': True,
+            'profit_months': rebalance_keep_profit_months,
+            'profit_pct': rebalance_keep_profit_pct,
+            'max_months': rebalance_keep_max_months
+        }
+        print(f"Rebalance Keep Position enabled: profit_months={rebalance_keep_profit_months}, profit_pct={rebalance_keep_profit_pct}%, max_months={rebalance_keep_max_months}")
+    
+    # Calculate rebalance period in months for extended_months tracking
+    rebalance_period_months = strategy.rebalance_period
+    if hasattr(strategy, 'rebalance_period_unit'):
+        if strategy.rebalance_period_unit == 'days':
+            rebalance_period_months = max(1, strategy.rebalance_period // 30)
+        elif strategy.rebalance_period_unit == 'weeks':
+            rebalance_period_months = max(1, (strategy.rebalance_period * 7) // 30)
+        # else 'months' -> already correct
     
     portfolio = Portfolio(initial_capital, transaction_fee_enabled, transaction_fee_type, transaction_fee_value, capital_gains_tax_enabled, capital_gains_tax_pct, margin_enabled, sizing_method)
     last_rebalance_date = None
@@ -591,7 +684,7 @@ def run_backtest(strategy: Strategy, data: pd.DataFrame, initial_capital: float,
                                  var_95 = np.percentile(returns, 5)
                                  var_map[ticker] = var_95
 
-            portfolio.rebalance(target_tickers_with_scores, current_prices, date, var_map, should_buy=is_bull_market)
+            portfolio.rebalance(target_tickers_with_scores, current_prices, date, var_map, should_buy=is_bull_market, keep_position_config=keep_position_config, full_close_prices=full_close_prices, rebalance_period_months=rebalance_period_months)
             last_rebalance_date = date
             print(f"  Portfolio Value: {portfolio.get_total_value(current_prices):.2f}")
         

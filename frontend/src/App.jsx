@@ -79,6 +79,10 @@ function App() {
       if (params.has('momentum_lookback_days')) config.momentum_lookback_days = parseIntVal('momentum_lookback_days');
       if (params.has('filter_negative_momentum')) config.filter_negative_momentum = parseBool('filter_negative_momentum');
       if (params.has('initial_capital')) config.initial_capital = parseFloatVal('initial_capital');
+      if (params.has('rebalance_keep_position_enabled')) config.rebalance_keep_position_enabled = parseBool('rebalance_keep_position_enabled');
+      if (params.has('rebalance_keep_profit_months')) config.rebalance_keep_profit_months = parseIntVal('rebalance_keep_profit_months');
+      if (params.has('rebalance_keep_profit_pct')) config.rebalance_keep_profit_pct = parseFloatVal('rebalance_keep_profit_pct');
+      if (params.has('rebalance_keep_max_months')) config.rebalance_keep_max_months = parseIntVal('rebalance_keep_max_months');
 
       // Add defaults for missing required params if needed, or rely on ConfigurationForm defaults if undefined
       // But we need to execute runBacktest with complete params.
