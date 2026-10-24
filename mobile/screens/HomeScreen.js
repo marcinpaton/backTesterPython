@@ -5,6 +5,7 @@ import { supabase } from '../services/supabase';
 import { getMarketPrices, getCurrencyRates, clearCache } from '../services/marketData';
 import { calculatePortfolioState } from '../utils/portfolio'; // Assuming we have this, or simple logic here
 import PortfolioChart from '../components/PortfolioChart';
+import YtdChart from '../components/YtdChart';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const HomeScreen = () => {
@@ -15,6 +16,7 @@ const HomeScreen = () => {
     const [history, setHistory] = useState([]); // Simplified history for chart
     const [selectedPoint, setSelectedPoint] = useState(null); // For interactive chart
     const [returns, setReturns] = useState({ today: 0, mtd: 0, ytd: 0 });
+    const [ytdSeries, setYtdSeries] = useState([]); // [{ date, ytd }]
     const [returnDisplayMode, setReturnDisplayMode] = useState('both'); // 'daily', 'mtd', 'both'
     const [revealed, setRevealed] = useState({ total: false, today: false, mtd: false, ytd: false });
     const allRevealed = revealed.total && revealed.today && revealed.mtd && revealed.ytd;
@@ -280,6 +282,75 @@ const HomeScreen = () => {
                 mtd: v_mtd > 0 ? (totalValue - v_mtd) / v_mtd : 0,
                 ytd: v_ytd > 0 ? (totalValue - v_ytd) / v_ytd : 0
             });
+
+            // YTD series: one pass over all trading days since Jan 1 (simple YTD, same formula as the tile)
+            try {
+                const refHistory = prices[Object.keys(prices)[0]]?.history || [];
+                const ytdDates = refHistory.map(h => h.date).filter(d => d >= startOfYear && d <= todayStr);
+                const series = [];
+                if (v_ytd > 0 && ytdDates.length > 0) {
+                    const ptr = {};
+                    const lastPrice = (ticker, date) => {
+                        const hist = prices[ticker]?.history || [];
+                        let i = ptr[ticker] || 0;
+                        while (i + 1 < hist.length && hist[i + 1].date <= date) i++;
+                        ptr[ticker] = i;
+                        return hist[i] && hist[i].date <= date ? hist[i].price : (hist[0]?.price ?? prices[ticker]?.price ?? 0);
+                    };
+                    const rateAt = (currency, date) => {
+                        if (currency === 'PLN') return 1.0;
+                        const r = currencyRates[currency];
+                        if (!r?.history) return r?.current || 1.0;
+                        const keys = Object.keys(r.history);
+                        let found = keys[0];
+                        for (const k of keys) { if (k <= date) found = k; else break; }
+                        return r.history[found] || r.current || 1.0;
+                    };
+
+                    let s_cash = 0;
+                    let s_hold = {};
+                    let s_idx = 0;
+                    ytdDates.forEach(date => {
+                        while (s_idx < txData.length && txData[s_idx].date && txData[s_idx].date.substring(0, 10) <= date) {
+                            const tx = txData[s_idx];
+                            const q = parseFloat(tx.quantity) || 0;
+                            const p = parseFloat(tx.price) || 0;
+                            const f = parseFloat(tx.fee_pln) || 0;
+                            const a = parseFloat(tx.amount_pln) || 0;
+                            if (tx.type === 'DEPOSIT') s_cash += Math.abs(a);
+                            else if (tx.type === 'WITHDRAWAL') s_cash -= Math.abs(a);
+                            else if (tx.type === 'BUY') {
+                                let cost = (q * p) + f;
+                                if (cost === 0 && a !== 0) cost = Math.abs(a);
+                                s_cash -= cost;
+                                s_hold[tx.ticker] = (s_hold[tx.ticker] || 0) + q;
+                            } else if (tx.type === 'SELL') {
+                                let rev = (q * p) - f;
+                                if (rev === 0 && a !== 0) rev = Math.abs(a);
+                                s_cash += rev;
+                                s_hold[tx.ticker] = (s_hold[tx.ticker] || 0) - q;
+                            }
+                            s_idx++;
+                        }
+                        let value = s_cash;
+                        Object.keys(s_hold).forEach(t => {
+                            if (s_hold[t] > 0) {
+                                value += s_hold[t] * lastPrice(t, date) * rateAt(prices[t]?.currency || 'USD', date);
+                            }
+                        });
+                        series.push({ date, ytd: (value - v_ytd) / v_ytd });
+                    });
+                    // Make the last point consistent with the live total value
+                    const lastDate = series[series.length - 1]?.date;
+                    const livePoint = { date: todayStr, ytd: (totalValue - v_ytd) / v_ytd };
+                    if (lastDate === todayStr) series[series.length - 1] = livePoint;
+                    else series.push(livePoint);
+                }
+                setYtdSeries(series);
+            } catch (e) {
+                console.error('Error calculating YTD series:', e);
+                setYtdSeries([]);
+            }
 
             // B. Calculate Chart History (Exactly 5 available days including Today)
             let chartDates = [];
@@ -727,6 +798,9 @@ const HomeScreen = () => {
                                 </View>
                             </View>
                         )}
+
+                        {/* YTD Chart */}
+                        <YtdChart data={ytdSeries} />
 
                         {/* Holdings List (Optional) */}
                         <View style={styles.section}>
