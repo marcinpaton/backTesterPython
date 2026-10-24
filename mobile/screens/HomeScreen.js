@@ -16,6 +16,13 @@ const HomeScreen = () => {
     const [selectedPoint, setSelectedPoint] = useState(null); // For interactive chart
     const [returns, setReturns] = useState({ today: 0, mtd: 0, ytd: 0 });
     const [returnDisplayMode, setReturnDisplayMode] = useState('both'); // 'daily', 'mtd', 'both'
+    const [revealed, setRevealed] = useState({ total: false, today: false, mtd: false, ytd: false });
+    const allRevealed = revealed.total && revealed.today && revealed.mtd && revealed.ytd;
+    const toggleVisibility = (key) => setRevealed(prev => ({ ...prev, [key]: !prev[key] }));
+    const toggleAllVisibility = () => {
+        const next = !allRevealed;
+        setRevealed({ total: next, today: next, mtd: next, ytd: next });
+    };
 
     const fetchData = async () => {
         try {
@@ -526,15 +533,19 @@ const HomeScreen = () => {
         },
     });
 
-    const ReturnLabel = ({ label, value }) => {
+    const ReturnLabel = ({ label, value, isRevealed, onPress }) => {
         const isPositive = value >= 0;
         return (
-            <View style={styles.returnItem}>
+            <TouchableOpacity style={styles.returnItem} activeOpacity={0.7} onPress={onPress}>
                 <Text style={styles.returnLabelText}>{label}</Text>
-                <Text style={[styles.returnValueText, { color: isPositive ? '#16a34a' : '#dc2626' }]}>
-                    {isPositive ? '+' : ''}{(value * 100).toFixed(2)}%
-                </Text>
-            </View>
+                {isRevealed ? (
+                    <Text style={[styles.returnValueText, { color: isPositive ? '#16a34a' : '#dc2626' }]}>
+                        {isPositive ? '+' : ''}{(value * 100).toFixed(2)}%
+                    </Text>
+                ) : (
+                    <Text style={[styles.returnValueText, { color: '#9ca3af' }]}>•••%</Text>
+                )}
+            </TouchableOpacity>
         );
     };
 
@@ -555,30 +566,41 @@ const HomeScreen = () => {
                     <>
                         <View style={styles.summaryCard}>
                             <View style={styles.summaryHeader}>
-                                <View>
+                                <TouchableOpacity activeOpacity={0.7} onPress={() => toggleVisibility('total')}>
                                     <Text style={styles.summaryLabel}>Total Value</Text>
                                     <Text style={styles.summaryValue}>
-                                        {portfolioValue.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}
+                                        {revealed.total
+                                            ? portfolioValue.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })
+                                            : '•••••• PLN'}
                                     </Text>
-                                </View>
-                                <TouchableOpacity
-                                    onPress={handleManualRefresh}
-                                    style={styles.refreshButton}
-                                    disabled={loading || refreshing}
-                                >
-                                    <MaterialCommunityIcons
-                                        name="refresh"
-                                        size={28}
-                                        color="#ffffff"
-                                        style={{ opacity: (loading || refreshing) ? 0.5 : 1 }}
-                                    />
                                 </TouchableOpacity>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <TouchableOpacity onPress={toggleAllVisibility} style={[styles.refreshButton, { marginRight: 8 }]}>
+                                        <MaterialCommunityIcons
+                                            name={allRevealed ? 'eye-outline' : 'eye-off-outline'}
+                                            size={28}
+                                            color="#ffffff"
+                                        />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={handleManualRefresh}
+                                        style={styles.refreshButton}
+                                        disabled={loading || refreshing}
+                                    >
+                                        <MaterialCommunityIcons
+                                            name="refresh"
+                                            size={28}
+                                            color="#ffffff"
+                                            style={{ opacity: (loading || refreshing) ? 0.5 : 1 }}
+                                        />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
 
                             <View style={styles.returnsContainer}>
-                                <ReturnLabel label="Today" value={returns.today} />
-                                <ReturnLabel label="MTD" value={returns.mtd} />
-                                <ReturnLabel label="YTD" value={returns.ytd} />
+                                <ReturnLabel label="Today" value={returns.today} isRevealed={revealed.today} onPress={() => toggleVisibility('today')} />
+                                <ReturnLabel label="MTD" value={returns.mtd} isRevealed={revealed.mtd} onPress={() => toggleVisibility('mtd')} />
+                                <ReturnLabel label="YTD" value={returns.ytd} isRevealed={revealed.ytd} onPress={() => toggleVisibility('ytd')} />
                             </View>
                         </View>
 
